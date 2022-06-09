@@ -1,7 +1,16 @@
-def getNewtonPolytope_approx(points: List[Tuple[int]], DIM=4):
+from typing import List, Tuple
+
+
+def getNewtonPolytope_approx(points: List[Tuple[int]]):
     """
         A simple-minded quick-and-dirty method to obtain an approximation of Newton Polytope disregarding convexity.
     """
+    assert points
+
+    if len(points) == 1:
+        return points
+    DIM = len(points[0])
+
     points = sorted(points)
     result = []
     for i in range(len(points)):
@@ -31,7 +40,6 @@ def shift(points: List[Tuple[int]], coords: List[int], axis: int):
 
     if len(points) == 1:
         return points
-
     DIM = len(points[0])
 
     return [tuple([
