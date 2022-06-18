@@ -5,6 +5,7 @@ from typing import List, Tuple
 
 class GameThom:
     state: List[Tuple[int]]
+    weights: List[int]
     coordHistory: List[int]
     moveHistory: List[int]
     host: Host
@@ -16,6 +17,7 @@ class GameThom:
         self.agent = agent
         self.coordHistory = []
         self.moveHistory = []
+        self.weights = []
         self.stopped = False
 
     def step(self):
@@ -23,8 +25,9 @@ class GameThom:
             return
         coords = self.host.selectCoord(self.state)
         newState, action = self.agent.move(self.state, coords)
+        newShiftedState = newState-np.amin(newState, axis=0)
 
-        self.state = newState
+        self.state = newShiftedState
         self.coordHistory.append(coords)
         self.moveHistory.append(action)
 
