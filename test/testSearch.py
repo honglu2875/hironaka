@@ -6,7 +6,7 @@ from hironaka.util import searchDepth, searchTree
 from hironaka.host import Zeillinger
 
 
-class TestZeillinger(unittest.TestCase):
+class TestSearch(unittest.TestCase):
     def test_search_depth(self):
         host = Zeillinger()
         points = [(7, 5, 3, 8), (8, 1, 8, 18), (8, 3, 17, 8),
