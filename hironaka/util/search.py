@@ -17,6 +17,8 @@ def searchDepth(points, host, debug=False):
 
     maxDepth = 0
     while states:
+        if debug:
+            print(states)
         current, depth = states.pop()
         maxDepth = max(maxDepth, depth)
         coords = host.selectCoord(current, debug=debug)
