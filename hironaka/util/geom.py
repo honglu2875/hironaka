@@ -1,14 +1,22 @@
 from typing import List, Tuple
 import numpy as np
+import ctypes
+
+stdc = ctypes.cdll.LoadLibrary("libc.so.6")  # or similar to load c library
+stdcpp = ctypes.cdll.LoadLibrary("libstdc++.so.6")  # or similar to load c++ library
+cppUtil = ctypes.cdll.LoadLibrary("build/cppUtil.so")
+
+cppUtil.getNewtonPolytope_approx.argtypes = [
+    ctypes.POINTER(ctypes.c_long), ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_long)]
+cppUtil.getNewtonPolytope_approx.restype = None
 
 
-def getNewtonPolytope_approx(points: List[Tuple[int]]):
+def getNewtonPolytope_approx_py(points: List[Tuple[int]]):
     """
         A simple-minded quick-and-dirty method to obtain an approximation of Newton Polytope disregarding convexity.
     """
-    assert points
 
-    if len(points) == 1:
+    if len(points) <= 1:
         return points
     dim = len(points[0])
 
@@ -23,6 +31,22 @@ def getNewtonPolytope_approx(points: List[Tuple[int]]):
         if not contained:
             result.append(points[i])
     return result
+
+
+def getNewtonPolytope_approx(points: np.ndarray):
+
+    assert len(points.shape) == 2
+
+    if len(points) <= 1:
+        return points
+
+    newPoints = np.full(points.shape, -1)
+
+    _c_points = points.ctypes.data_as(ctypes.POINTER(ctypes.c_long))
+    _c_newPoints = newPoints.ctypes.data_as(ctypes.POINTER(ctypes.c_long))
+
+    cppUtil.getNewtonPolytope_approx(_c_points, 1, *points.shape, _c_newPoints)
+    return newPoints
 
 
 def getNewtonPolytope(points: List[Tuple[int]]):
