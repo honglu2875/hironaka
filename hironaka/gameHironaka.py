@@ -2,6 +2,7 @@ from .host import Host
 from .game import Game
 from .agent import Agent
 from typing import List, Tuple
+from .types import Points
 import numpy as np
 
 
@@ -12,9 +13,9 @@ class GameHironaka(Game):
     host: Host
     agent: Agent
 
-    def __init__(self, initState, host, agent):
+    def __init__(self, initState: Points, host, agent):
         self.state = initState
-        self.dim = len(initState[0])
+        self.dim = initState.dim
         self.host = host
         self.agent = agent
         self.coordHistory = []
@@ -36,13 +37,12 @@ class GameHironaka(Game):
         if self.stopped:
             return False
         coords = self.host.selectCoord(self.state)
-        newState, action = self.agent.move(self.state, coords)
+        action = self.agent.move(self.state, coords)
 
-        self.state = newState
         self.coordHistory.append(coords)
         self.moveHistory.append(action)
 
-        if len(self.state) == 1:
+        if self.state.ended:
             self.stopped = True
         return True
 

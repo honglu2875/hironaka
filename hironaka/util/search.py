@@ -1,17 +1,15 @@
 from treelib import Node, Tree
 from typing import Tuple, List
 from collections import deque
-from dataclasses import dataclass
+from hironaka.types import Points
+from hironaka.host import Host
 
-from .geom import getNewtonPolytope, shift
 
-
-def searchDepth(points, host, debug=False):
+def searchDepth(points: Points, host: Host, debug=False):
     """
         Fixing the host, return the maximal length of the game that an agent can achieve.
     """
-    if len(points) == 1:
-        return 0
+    assert points.batchNum == 1  # Only search a single starting case.
 
     states = deque([(points, 0)])
 
@@ -22,9 +20,14 @@ def searchDepth(points, host, debug=False):
         current, depth = states.pop()
         maxDepth = max(maxDepth, depth)
         coords = host.selectCoord(current, debug=debug)
-        for i in coords:
-            next = getNewtonPolytope(shift(current, coords, i))
-            if len(next) > 1:
+
+        # print(depth)
+        # print(current)
+
+        for i in coords[0]:
+            next = current.shift(coords, [i], inplace=False)
+            next.getNewtonPolytope()
+            if not next.ended:
                 states.append((next, depth+1))
 
     return maxDepth
@@ -34,13 +37,6 @@ def searchTree(points, tree, curr_node, host, MAX_SIZE=100):
     """
         Perform a full tree search and store the full result in a Tree object.
     """
-
-    @dataclass
-    class Points:
-        """
-            a wrapper of a set of points.
-        """
-        data: List[Tuple[int]]
 
     if len(points) == 1 or tree.size() > MAX_SIZE:
         return

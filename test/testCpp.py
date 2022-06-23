@@ -2,7 +2,7 @@ import ctypes
 import unittest
 import numpy as np
 import time
-from hironaka.util import getNewtonPolytope_approx_py, getNewtonPolytope_approx
+from hironaka.util import _getNewtonPolytope_approx_py, _getNewtonPolytope_approx
 
 stdc = ctypes.cdll.LoadLibrary("libc.so.6")  # or similar to load c library
 stdcpp = ctypes.cdll.LoadLibrary("libstdc++.so.6")  # or similar to load c++ library
@@ -22,7 +22,7 @@ class TestGame(unittest.TestCase):
         _c_points = points.ctypes.data_as(ctypes.POINTER(ctypes.c_long))
         _c_newPoints = newPoints.ctypes.data_as(ctypes.POINTER(ctypes.c_long))
 
-        cppUtil.getNewtonPolytope_approx(_c_points, 1, len(points), len(points[0]), _c_newPoints)
+        cppUtil._getNewtonPolytope_approx(_c_points, 1, len(points), len(points[0]), _c_newPoints)
 
         print("test1")
         print(newPoints)
@@ -36,10 +36,10 @@ class TestGame(unittest.TestCase):
         print("test2")
         t0 = time.time()
         for _ in range(NUM):
-            getNewtonPolytope_approx_py(points)
+            _getNewtonPolytope_approx_py(points)
         print(time.time()-t0)
 
         t0 = time.time()
         for _ in range(NUM):
-            getNewtonPolytope_approx(np.array(points))
+            _getNewtonPolytope_approx(np.array(points))
         print(time.time()-t0)

@@ -8,7 +8,7 @@ from hironaka.gameHironaka import GameHironaka
 
 class TestGame(unittest.TestCase):
     def test_random_games(self):
-        points = generatePoints(5)
+        points = Points(generatePoints(5))
         agent = RandomAgent()
         host = Zeillinger()
         game = GameHironaka(points, host, agent)

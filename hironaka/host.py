@@ -1,20 +1,20 @@
 import abc
 import numpy as np
 from itertools import combinations
+from .types import Points
 
 
 class Host(metaclass=abc.ABCMeta):
     @abc.abstractmethod
-    def selectCoord(self, points, debug=False):
+    def selectCoord(self, points: Points, debug=False):
         pass
 
 
 class RandomHost(Host):
-    def selectCoord(self, points, debug=False):
-        assert points
+    def selectCoord(self, points: Points, debug=False):
 
-        dim = len(points[0])
-        return list(np.random.choice(list(range(dim)), size=2))
+        dim = points.dim
+        return [np.random.choice(list(range(dim)), size=2) for _ in range(points.batchNum)]
 
 
 class Zeillinger(Host):
@@ -32,18 +32,22 @@ class Zeillinger(Host):
             sum([vt[i] == mn for i in range(len(vt))])
         return (L, S)
 
-    def selectCoord(self, points, debug=False):
-        assert points
+    def selectCoord(self, points: Points, debug=False):
 
-        dim = len(points[0])
-        pairs = combinations(points, 2)
-        charVectors = []
-        for pair in pairs:
-            vector = tuple([pair[0][i] - pair[1][i] for i in range(dim)])
-            charVectors.append((vector, self.getCharVector(vector)))
-        charVectors.sort(key=(lambda x: x[1]))
+        dim = points.dim
+        result = []
+        for b in range(points.batchNum):
+            pts = points.getBatch(b)
+            pairs = combinations(pts, 2)
+            charVectors = []
+            for pair in pairs:
+                vector = tuple([pair[0][i] - pair[1][i] for i in range(dim)])
+                charVectors.append((vector, self.getCharVector(vector)))
+            charVectors.sort(key=(lambda x: x[1]))
 
-        if debug:
-            print(charVectors)
+            if debug:
+                print(charVectors)
 
-        return [np.argmin(charVectors[0][0]), np.argmax(charVectors[0][0])]
+            result.append([np.argmin(charVectors[0][0]), np.argmax(charVectors[0][0])])
+
+        return result
