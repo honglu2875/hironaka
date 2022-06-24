@@ -1,49 +1,54 @@
 import abc
-import numpy as np
 from itertools import combinations
+
+import numpy as np
+
+from .types import Points
 
 
 class Host(metaclass=abc.ABCMeta):
     @abc.abstractmethod
-    def selectCoord(self, points, debug=False):
+    def select_coord(self, points: Points, debug=False):
         pass
 
 
 class RandomHost(Host):
-    def selectCoord(self, points, debug=False):
-        assert points
-
-        dim = len(points[0])
-        return list(np.random.choice(list(range(dim)), size=2))
+    def select_coord(self, points: Points, debug=False):
+        dim = points.dim
+        return [np.random.choice(list(range(dim)), size=2) for _ in range(points.batchNum)]
 
 
 class Zeillinger(Host):
-    def getCharVector(self, vt):
-        '''
+    @staticmethod
+    def get_char_vector(vt):
+        """
             Character vector (L, S),
                 L: maximum coordinate - minimum coordinate
                 S: sum of the numbers of maximum coordinates and minimum coordinates
             e.g., (1, 1, -1, -1) -> (L=2, S=4)
-        '''
+        """
         mx = max(vt)
         mn = min(vt)
         L = mx - mn
         S = sum([vt[i] == mx for i in range(len(vt))]) + \
             sum([vt[i] == mn for i in range(len(vt))])
-        return (L, S)
+        return L, S
 
-    def selectCoord(self, points, debug=False):
-        assert points
+    def select_coord(self, points: Points, debug=False):
+        dim = points.dim
+        result = []
+        for b in range(points.batchNum):
+            pts = points.get_batch(b)
+            pairs = combinations(pts, 2)
+            char_vectors = []
+            for pair in pairs:
+                vector = tuple([pair[0][i] - pair[1][i] for i in range(dim)])
+                char_vectors.append((vector, self.get_char_vector(vector)))
+            char_vectors.sort(key=(lambda x: x[1]))
 
-        dim = len(points[0])
-        pairs = combinations(points, 2)
-        charVectors = []
-        for pair in pairs:
-            vector = tuple([pair[0][i] - pair[1][i] for i in range(dim)])
-            charVectors.append((vector, self.getCharVector(vector)))
-        charVectors.sort(key=(lambda x: x[1]))
+            if debug:
+                print(char_vectors)
 
-        if debug:
-            print(charVectors)
+            result.append([np.argmin(char_vectors[0][0]), np.argmax(char_vectors[0][0])])
 
-        return [np.argmin(charVectors[0][0]), np.argmax(charVectors[0][0])]
+        return result
