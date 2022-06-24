@@ -1,14 +1,14 @@
 import unittest
-from typing import List
-from hironaka.util import *
-from hironaka.host import Zeillinger
+
 from hironaka.agent import RandomAgent
 from hironaka.gameHironaka import GameHironaka
+from hironaka.host import Zeillinger
+from hironaka.util import *
 
 
 class TestGame(unittest.TestCase):
     def test_random_games(self):
-        points = Points(generatePoints(5))
+        points = Points(generate_points(5))
         agent = RandomAgent()
         host = Zeillinger()
         game = GameHironaka(points, host, agent)
@@ -17,4 +17,4 @@ class TestGame(unittest.TestCase):
         while game.step():
             print(game.state)
 
-        game.printHistory()
+        game.print_history()

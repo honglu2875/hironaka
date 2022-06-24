@@ -1,11 +1,10 @@
-from treelib import Node, Tree
-from typing import Tuple, List
 from collections import deque
-from hironaka.types import Points
+
 from hironaka.host import Host
+from hironaka.types import Points
 
 
-def searchDepth(points: Points, host: Host, debug=False):
+def search_depth(points: Points, host: Host, debug=False):
     """
         Fixing the host, return the maximal length of the game that an agent can achieve.
     """
@@ -13,43 +12,41 @@ def searchDepth(points: Points, host: Host, debug=False):
 
     states = deque([(points, 0)])
 
-    maxDepth = 0
+    max_depth = 0
     while states:
         if debug:
             print(states)
         current, depth = states.pop()
-        maxDepth = max(maxDepth, depth)
-        coords = host.selectCoord(current, debug=debug)
+        max_depth = max(max_depth, depth)
+        coords = host.select_coord(current, debug=debug)
 
-        # print(depth)
-        # print(current)
+        # print(current, depth)
 
         for i in coords[0]:
-            next = current.shift(coords, [i], inplace=False)
-            next.getNewtonPolytope()
-            if not next.ended:
-                states.append((next, depth+1))
+            nxt = current.copy()
+            nxt.shift(coords, [i])
+            nxt.get_newton_polytope()
+            if not nxt.ended:
+                states.append((nxt, depth + 1))
 
-    return maxDepth
+    return max_depth + 1
 
 
-def searchTree(points, tree, curr_node, host, MAX_SIZE=100):
+def search_tree(points, tree, curr_node, host, max_size=100):
     """
         Perform a full tree search and store the full result in a Tree object.
     """
 
-    if len(points) == 1 or tree.size() > MAX_SIZE:
+    if points.ended or tree.size() > max_size:
         return
 
     shifts = []
-    coords = host.selectCoord(points)
-    for i in coords:
+    coords = host.select_coord(points)
+    for i in coords[0]:
         shifts.append(
-            getNewtonPolytope(
-                shift(points, coords, i)
-            )
+            points.shift(coords, [i], inplace=False).get_newton_polytope(inplace=False)
         )
         node_id = tree.size()
-        tree.create_node(node_id, node_id, parent=curr_node, data=Points(shifts[-1]))
-        searchTree(shifts[-1], tree, node_id, host)
+        tree.create_node(node_id, node_id, parent=curr_node, data=shifts[-1])
+        search_tree(shifts[-1], tree, node_id, host)
     return tree

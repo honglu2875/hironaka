@@ -1,15 +1,10 @@
-from .host import Host
-from .agent import Agent
 from typing import List, Tuple
+
+from .agent import Agent
+from .host import Host
 
 
 class GameThom:
-    state: List[Tuple[int]]
-    coordHistory: List[int]
-    moveHistory: List[int]
-    host: Host
-    agent: Agent
-
     def __init__(self, points, host, agent):
         self.state = points
         self.host = host
@@ -21,10 +16,10 @@ class GameThom:
     def step(self):
         if self.stopped:
             return
-        coords = self.host.selectCoord(self.state)
-        newState, action = self.agent.move(self.state, coords)
+        coords = self.host.select_coord(self.state)
+        new_state, action = self.agent.move(self.state, coords)
 
-        self.state = newState
+        self.state = new_state
         self.coordHistory.append(coords)
         self.moveHistory.append(action)
 
