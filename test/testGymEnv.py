@@ -23,7 +23,7 @@ class TestEnv(unittest.TestCase):
         o = env.reset()
         env.render()
         while not env.stopped:
-            action = agent.move(Points(o['points']), [np.where(o['coords'][0] == 1)[0]], inplace=False)
-            o, r, stopped, info = env.step(np.array(action))
+            action = agent.move(Points(np.expand_dims(o['points'], axis=0)), [np.where(o['coords'] == 1)[0]], inplace=False)
+            o, r, stopped, info = env.step(action[0])
             print(f"Reward: {r}")
             env.render()
