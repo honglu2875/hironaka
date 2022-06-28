@@ -3,7 +3,7 @@ from itertools import combinations
 
 import numpy as np
 
-from .types import Points
+from .abs import Points
 
 
 class Host(metaclass=abc.ABCMeta):
@@ -35,6 +35,8 @@ class Zeillinger(Host):
         return L, S
 
     def select_coord(self, points: Points, debug=False):
+        assert not points.ended
+
         dim = points.dim
         result = []
         for b in range(points.batchNum):

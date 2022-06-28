@@ -6,7 +6,6 @@ from .src import shift_lst, shift_np, get_newton_polytope_lst, get_newton_polyto
 
 
 class Points:
-    points: List[List[List[int]]]
     """
         Class wrapper of points.
 
@@ -15,6 +14,8 @@ class Points:
         compatibility). (batch, number_of_point, coordinate). For each batch, the number of points is either the
         pre-determined number or smaller.
     """
+    points: List[List[List[int]]]
+    ended: bool # updated after every call of get_newton_polytope()
 
     def __init__(self, pts, ended=False, use_np=False):
         """
@@ -29,6 +30,8 @@ class Points:
             self._shift = shift_np
             self._getNewtonPolytope = get_newton_polytope_np
         else:
+            if isinstance(pts, np.ndarray):
+                pts = pts.tolist()
             shape = get_shape(pts)
             self._shift = shift_lst
             self._getNewtonPolytope = get_newton_polytope_lst
@@ -85,6 +88,12 @@ class Points:
                     if self.points[i][j][0] == -1:
                         self.numPoints[i] = j
                         break
+
+    def get_features(self):
+        """
+            Get the list of points.
+        """
+        return self.points
 
     def get_sym_features(self):
         """

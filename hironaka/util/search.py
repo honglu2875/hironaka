@@ -1,12 +1,12 @@
 from collections import deque
 
 from hironaka.host import Host
-from hironaka.types import Points
+from hironaka.abs import Points
 
 
 def search_depth(points: Points, host: Host, debug=False):
     """
-        Fixing the host, return the maximal length of the game that an agent can achieve.
+        Given the host, return the maximal length of the game that an agent can achieve.
     """
     assert points.batchNum == 1  # Only search a single starting case.
 

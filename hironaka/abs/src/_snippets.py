@@ -1,3 +1,6 @@
+import numpy as np
+
+
 def get_shape(o):
     """
         o is supposed to be a nested object consisting of list and tuple.

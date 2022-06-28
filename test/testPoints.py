@@ -1,7 +1,7 @@
 import unittest
 
-from hironaka.types.Points import Points
-from hironaka.types.src import make_nested_list
+from hironaka.abs.Points import Points
+from hironaka.abs.src import make_nested_list
 from hironaka.util import generate_points
 
 
