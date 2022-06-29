@@ -48,5 +48,5 @@ def search_tree(points, tree, curr_node, host, max_size=100):
         )
         node_id = tree.size()
         tree.create_node(node_id, node_id, parent=curr_node, data=shifts[-1])
-        search_tree(shifts[-1], tree, node_id, host)
+        search_tree(shifts[-1], tree, node_id, host, max_size=max_size)
     return tree

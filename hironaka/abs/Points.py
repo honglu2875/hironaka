@@ -105,14 +105,14 @@ class Points:
                 ((\sum_i (x_i)_1^length), ..., (\sum_i (x_i)_n^length))
         """
         features = [
-            [
-                [
-                    sum([
-                        x[i] ** j for x in batch
-                    ]) for i in range(self.dim)
-                ] for j in range(1, self.m + 1)
-            ] for batch in self.points
-        ]
+                        [
+                            [
+                                sum([
+                                    x[i] ** j for x in batch
+                                ]) for i in range(self.dim)
+                            ] for j in range(1, self.m + 1)
+                        ] for batch in self.points
+                    ]
 
         if self.use_np:
             return np.array(features)  # TODO: could directly optimize using vectorization

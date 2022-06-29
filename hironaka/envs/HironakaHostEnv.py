@@ -6,20 +6,22 @@ from hironaka.abs import Points
 from hironaka.util import generate_points
 
 
-class HironakaEnv(gym.Env):  # fix host, agent moves
+class HironakaHostEnv(gym.Env):  # fix a host inside, receive agent moves from outside
     metadata = {"render_modes": ["ansi"], "render_fps": 1}
 
-    def __init__(self, host, dim=3, max_pt=10, bad_move_penalty=-1e-3):
+    def __init__(self, host, dim=3, max_pt=10, max_value=10, invalid_move_penalty=-1e-3, stop_after_invalid_move=False):
         self.dim = dim
         self.max_pt = max_pt
+        self.max_value = max_value
         self.host = host
-        self.bad_move_penalty = bad_move_penalty
+        self.invalid_move_penalty = invalid_move_penalty
+        self.stop_after_invalid_move = stop_after_invalid_move
         self.stopped = False
 
         self.observation_space = spaces.Dict(
             {
                 "points": spaces.Box(low=-1.0, high=np.inf, shape=(self.max_pt, self.dim), dtype=np.float32),
-                "coords": spaces.MultiBinary((self.dim,))
+                "coords": spaces.MultiBinary(self.dim)
             }
         )
 
@@ -31,11 +33,9 @@ class HironakaEnv(gym.Env):  # fix host, agent moves
         self.clock = None
 
     def reset(self, seed=None, return_info=False, options=None):
-        # We need the following line to seed self.np_random
         super().reset(seed=seed)
 
-        # Choose the agent's location uniformly at random
-        self._points = Points([generate_points(self.max_pt, dim=self.dim)])
+        self._points = Points([generate_points(self.max_pt, dim=self.dim, max_number=self.max_value)])
 
         observation = self._get_obs()
         info = self._get_info()
@@ -45,12 +45,13 @@ class HironakaEnv(gym.Env):  # fix host, agent moves
         if action in self._coords:
             self._points.shift([self._coords], [action])
             self._points.get_newton_polytope()
+            self.stopped = self._points.ended
             reward = 1. if not self._points.ended else 0.
         else:
-            reward = self.bad_move_penalty
+            self.stopped = self.stop_after_invalid_move
+            reward = self.invalid_move_penalty
         observation = self._get_obs()
         info = self._get_info()
-        self.stopped = self._points.ended
 
         return observation, reward, self.stopped, info
 
@@ -62,14 +63,9 @@ class HironakaEnv(gym.Env):  # fix host, agent moves
         pass
 
     def _get_obs(self):
-        def regularize(pts):
-            assert len(pts) > 0
-            assert len(pts) <= self.max_pt
-            assert len(pts[0]) == self.dim
-            diff = self.max_pt - len(pts)
-            return np.array(pts + [[-1] * self.dim for _ in range(diff)])
+        f = np.array(self._points.get_features()[0])
+        f = np.pad(f, ((0, self.max_pt - len(f)), (0, 0)), mode='constant', constant_values=-1)
 
-        f = self._points.get_features()[0]
         if self._points.ended:
             self._coords = None
         else:
@@ -77,8 +73,8 @@ class HironakaEnv(gym.Env):  # fix host, agent moves
         coords_multi_bin = np.zeros(self.dim)
         coords_multi_bin[self._coords] = 1
 
-        o = {'points': np.array(regularize(f)).astype(np.float32), 'coords': coords_multi_bin}
+        o = {'points': f.astype(np.float32), 'coords': coords_multi_bin}
         return o
 
     def _get_info(self):
-        return self._points.ended
+        return dict()
