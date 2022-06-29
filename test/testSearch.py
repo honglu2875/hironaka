@@ -3,8 +3,8 @@ import unittest
 from treelib import Tree
 
 from hironaka.host import Zeillinger
-from hironaka.types import Points
-from hironaka.types.src import make_nested_list
+from hironaka.abs import Points
+from hironaka.abs.src import make_nested_list
 from hironaka.util import search_depth, search_tree
 
 

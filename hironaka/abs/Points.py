@@ -6,7 +6,6 @@ from .src import shift_lst, shift_np, get_newton_polytope_lst, get_newton_polyto
 
 
 class Points:
-    points: List[List[List[int]]]
     """
         Class wrapper of points.
 
@@ -15,6 +14,8 @@ class Points:
         compatibility). (batch, number_of_point, coordinate). For each batch, the number of points is either the
         pre-determined number or smaller.
     """
+    points: List[List[List[int]]]
+    ended: bool # updated after every call of get_newton_polytope()
 
     def __init__(self, pts, ended=False, use_np=False):
         """
@@ -29,6 +30,8 @@ class Points:
             self._shift = shift_np
             self._getNewtonPolytope = get_newton_polytope_np
         else:
+            if isinstance(pts, np.ndarray):
+                pts = pts.tolist()
             shape = get_shape(pts)
             self._shift = shift_lst
             self._getNewtonPolytope = get_newton_polytope_lst
@@ -86,6 +89,12 @@ class Points:
                         self.numPoints[i] = j
                         break
 
+    def get_features(self):
+        """
+            Get the list of points.
+        """
+        return self.points
+
     def get_sym_features(self):
         """
             Say the points are ((x_1)_1, ...,(x_1)_n), ...,((x_k)_1, ...,(x_k)_n)
@@ -96,14 +105,14 @@ class Points:
                 ((\sum_i (x_i)_1^length), ..., (\sum_i (x_i)_n^length))
         """
         features = [
-            [
-                [
-                    sum([
-                        x[i] ** j for x in batch
-                    ]) for i in range(self.dim)
-                ] for j in range(1, self.m + 1)
-            ] for batch in self.points
-        ]
+                        [
+                            [
+                                sum([
+                                    x[i] ** j for x in batch
+                                ]) for i in range(self.dim)
+                            ] for j in range(1, self.m + 1)
+                        ] for batch in self.points
+                    ]
 
         if self.use_np:
             return np.array(features)  # TODO: could directly optimize using vectorization

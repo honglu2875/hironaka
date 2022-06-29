@@ -3,3 +3,4 @@ future==0.18.2
 numpy==1.22.4
 treelib==1.6.1
 wheel
+gym==0.22

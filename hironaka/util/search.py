@@ -1,12 +1,12 @@
 from collections import deque
 
 from hironaka.host import Host
-from hironaka.types import Points
+from hironaka.abs import Points
 
 
 def search_depth(points: Points, host: Host, debug=False):
     """
-        Fixing the host, return the maximal length of the game that an agent can achieve.
+        Given the host, return the maximal length of the game that an agent can achieve.
     """
     assert points.batchNum == 1  # Only search a single starting case.
 
@@ -48,5 +48,5 @@ def search_tree(points, tree, curr_node, host, max_size=100):
         )
         node_id = tree.size()
         tree.create_node(node_id, node_id, parent=curr_node, data=shifts[-1])
-        search_tree(shifts[-1], tree, node_id, host)
+        search_tree(shifts[-1], tree, node_id, host, max_size=max_size)
     return tree
