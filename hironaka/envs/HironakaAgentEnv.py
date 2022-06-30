@@ -38,7 +38,7 @@ class HironakaAgentEnv(gym.Env):  # fix an agent inside, receive host moves from
         return (observation, info) if return_info else observation
 
     def step(self, action):
-        action = self.agent.move(self._points, [np.where(action == 1)[0]])
+        self.agent.move(self._points, [np.where(action == 1)[0]])
 
         observation = self._get_obs()
         info = self._get_info()

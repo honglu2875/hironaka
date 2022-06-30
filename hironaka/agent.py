@@ -6,9 +6,9 @@ from .abs import Points
 
 
 class Agent(metaclass=abc.ABCMeta):
-    '''
+    """
         An agent can either modify the points in-place, or just return the action (the chosen coordinate)
-    '''
+    """
     @abc.abstractmethod
     def move(self, points: Points, coords, inplace=True):
         pass
