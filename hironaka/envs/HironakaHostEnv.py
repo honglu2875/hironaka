@@ -32,10 +32,13 @@ class HironakaHostEnv(gym.Env):  # fix a host inside, receive agent moves from o
         self.window = None
         self.clock = None
 
-    def reset(self, seed=None, return_info=False, options=None):
+    def reset(self, seed=None, return_info=False, options=None, points=None):
         super().reset(seed=seed)
 
-        self._points = Points([generate_points(self.max_pt, dim=self.dim, max_number=self.max_value)])
+        if points is None:
+            self._points = Points([generate_points(self.max_pt, dim=self.dim, max_number=self.max_value)])
+        else:
+            self._points = Points(points)
 
         observation = self._get_obs()
         info = self._get_info()

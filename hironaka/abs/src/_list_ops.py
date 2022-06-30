@@ -66,13 +66,15 @@ def shift_lst(points: List[List[List[int]]], coords: List[List[int]], axis: List
 
     if inplace:
         for b in range(batch_num):
+            if axis[b] is None:
+                continue
             for i in range(len(points[b])):
                 points[b][i][axis[b]] = sum([points[b][i][k] for k in coords[b]])
     else:
         result = [[
-            [
-                sum([x[k] for k in coords[b]]) if i == axis[b] else x[i]
-                for i in range(dim)
-            ] for x in point
-        ] for b, point in enumerate(points)]
+                    [
+                        sum([x[k] for k in coord]) if ax is not None and i == ax else x[i]
+                        for i in range(dim)
+                    ] for x in point
+                ] for point, coord, ax in zip(points, coords, axis)]
         return result
