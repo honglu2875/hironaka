@@ -40,7 +40,6 @@ class HironakaHostEnv(gym.Env):  # fix a host inside, receive agent moves from o
         else:
             self._points = Points(points)
 
-
         observation = self._get_obs()
         info = self._get_info()
         return (observation, info) if return_info else observation
