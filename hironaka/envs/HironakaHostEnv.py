@@ -39,8 +39,16 @@ class HironakaHostEnv(gym.Env):  # fix a host inside, receive agent moves from o
             self._points = Points([generate_points(self.max_pt, dim=self.dim, max_number=self.max_value)])
         else:
             self._points = Points(points)
-
-        observation = self._get_obs()
+        #I forgot to add the initial coordinate choice when reset.
+        #There should be a uniformed way that separates reset and taking the first step.
+        if self._points.ended:
+            self._coords = None
+        else:
+            self._coords = self.host.select_coord(self._points)[0]
+        coords_multi_bin = np.zeros(self.dim)
+        coords_multi_bin[self._coords] = 1
+            
+        observation = self._get_obs(coords_multi_bin = coords_milti_bin)
         info = self._get_info()
         return (observation, info) if return_info else observation
 
