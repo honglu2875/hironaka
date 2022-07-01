@@ -1,5 +1,5 @@
-from .game import Game
 from .abs import Points
+from .game import Game
 
 
 class GameHironaka(Game):

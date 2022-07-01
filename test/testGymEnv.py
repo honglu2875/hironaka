@@ -4,9 +4,9 @@ import gym
 import numpy as np
 from gym.envs.registration import register
 
+from hironaka.abs import Points
 from hironaka.agent import RandomAgent
 from hironaka.host import Zeillinger, RandomHost
-from hironaka.abs import Points
 
 register(
     id='hironaka/HironakaHost-v0',

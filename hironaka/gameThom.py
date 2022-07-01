@@ -1,9 +1,3 @@
-from typing import List, Tuple
-
-from .agent import Agent
-from .host import Host
-
-
 class GameThom:
     def __init__(self, points, host, agent):
         self.state = points

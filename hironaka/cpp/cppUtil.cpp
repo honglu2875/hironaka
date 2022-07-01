@@ -22,9 +22,7 @@ void _getNewtonPolytope_approx_brute_force(long* points, int batchNum, int m, in
     */
 
     bool isContained = true;
-    //for (int i=0;i<24;i++) {
-    //    std::cout<<points[i]<<std::endl;
-    //}
+
     for (int b=0;b<batchNum;b++){
         int counter = 0;
 
@@ -47,7 +45,6 @@ void _getNewtonPolytope_approx_brute_force(long* points, int batchNum, int m, in
                 for (int k=0;k<n;k++) {
                     newPoints[locate(b,counter,k)] = points[locate(b,i,k)];
                 }
-                //std::cout<<i<<std::endl;
                 counter++;
             }
         }

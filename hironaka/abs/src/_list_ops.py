@@ -72,9 +72,9 @@ def shift_lst(points: List[List[List[int]]], coords: List[List[int]], axis: List
                 points[b][i][axis[b]] = sum([points[b][i][k] for k in coords[b]])
     else:
         result = [[
-                    [
-                        sum([x[k] for k in coord]) if ax is not None and i == ax else x[i]
-                        for i in range(dim)
-                    ] for x in point
-                ] for point, coord, ax in zip(points, coords, axis)]
+            [
+                sum([x[k] for k in coord]) if ax is not None and i == ax else x[i]
+                for i in range(dim)
+            ] for x in point
+        ] for point, coord, ax in zip(points, coords, axis)]
         return result

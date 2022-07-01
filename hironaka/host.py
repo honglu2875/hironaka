@@ -6,7 +6,7 @@ import numpy as np
 from .abs import Points
 
 
-class Host(metaclass=abc.ABCMeta):
+class Host(abc.ABC):
     @abc.abstractmethod
     def select_coord(self, points: Points, debug=False):
         pass
@@ -52,6 +52,7 @@ class Zeillinger(Host):
 
             if debug:
                 print(char_vectors)
+
             r = [np.argmin(char_vectors[0][0]), np.argmax(char_vectors[0][0])]
             if r[0] != r[1]:
                 result.append(r)

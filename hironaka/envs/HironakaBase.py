@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+import abc
 from typing import Optional, Dict, Any
 
 import gym
@@ -9,7 +9,7 @@ from hironaka.agent import Agent
 from hironaka.util import generate_points
 
 
-class HironakaBase(gym.Env, ABC):
+class HironakaBase(gym.Env, abc.ABC):
     """
         Base gym class for both host and agent in Hironaka polyhedral game.
         As an abstract class, the subclasses need to implement:
@@ -20,7 +20,7 @@ class HironakaBase(gym.Env, ABC):
     """
     metadata = {"render_modes": ["ansi"], "render_fps": 1}
 
-    @abstractmethod
+    @abc.abstractmethod
     def __init__(self,
                  agent: Agent,
                  dimension: Optional[int] = 3,
@@ -67,16 +67,16 @@ class HironakaBase(gym.Env, ABC):
         info = self._get_info()
         return (observation, info) if return_info else observation
 
-    @abstractmethod
+    @abc.abstractmethod
     def _post_reset_update(self):
         """
-            implement the action taken after the environment is reset. It may include but not limited to:
+            implement the action taken after the environment is reset. It may include but is not limited to:
                 - update self._coord
                 - clean up state-related internal attributes (if any)
         """
         pass
 
-    @abstractmethod
+    @abc.abstractmethod
     def step(self, action):
         pass
 
@@ -87,7 +87,7 @@ class HironakaBase(gym.Env, ABC):
     def close(self):
         pass
 
-    @abstractmethod
+    @abc.abstractmethod
     def _get_obs(self):
         """
             a utility method to be implemented: return the data that matches with the gym environment observation.

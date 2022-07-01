@@ -15,7 +15,7 @@ class Points:
         pre-determined number or smaller.
     """
     points: List[List[List[int]]]
-    ended: bool # updated after every call of get_newton_polytope()
+    ended: bool  # updated after every call of get_newton_polytope()
 
     def __init__(self, pts, ended=False, use_np=False):
         """
@@ -100,19 +100,19 @@ class Points:
             Say the points are ((x_1)_1, ...,(x_1)_n), ...,((x_k)_1, ...,(x_k)_n)
             We generate the Newton polynomials of each coordinate and output the new array as feature.
             The output becomes
-                ((\sum_i (x_i)_1^1), ..., (\sum_i (x_i)_n^1)),
+                ((sum_i (x_i)_1^1), ..., (sum_i (x_i)_n^1)),
                 ...,
-                ((\sum_i (x_i)_1^length), ..., (\sum_i (x_i)_n^length))
+                ((sum_i (x_i)_1^length), ..., (sum_i (x_i)_n^length))
         """
         features = [
-                        [
-                            [
-                                sum([
-                                    x[i] ** j for x in batch
-                                ]) for i in range(self.dim)
-                            ] for j in range(1, self.m + 1)
-                        ] for batch in self.points
-                    ]
+            [
+                [
+                    sum([
+                        x[i] ** j for x in batch
+                    ]) for i in range(self.dim)
+                ] for j in range(1, self.m + 1)
+            ] for batch in self.points
+        ]
 
         if self.use_np:
             return np.array(features)  # TODO: could directly optimize using vectorization

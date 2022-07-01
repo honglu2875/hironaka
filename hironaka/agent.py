@@ -5,7 +5,7 @@ import numpy as np
 from .abs import Points
 
 
-class Agent(metaclass=abc.ABCMeta):
+class Agent(abc.ABC):
     """
         An agent can either modify the points in-place, or just return the action (the chosen coordinate)
     """
