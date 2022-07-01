@@ -36,8 +36,6 @@ class Zeillinger(Host):
 
     def select_coord(self, points: Points, debug=False):
         assert not points.ended
-        print("select coord")
-        print(points)
         dim = points.dim
         result = []
         for b in range(points.batchNum):
@@ -54,7 +52,6 @@ class Zeillinger(Host):
 
             if debug:
                 print(char_vectors)
-            print(char_vectors)
             result.append([np.argmin(char_vectors[0][0]), np.argmax(char_vectors[0][0])])
 
         return result
