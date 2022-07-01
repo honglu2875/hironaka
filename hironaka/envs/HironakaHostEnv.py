@@ -39,7 +39,6 @@ class HironakaHostEnv(gym.Env):  # fix a host inside, receive agent moves from o
             self._points = Points([generate_points(self.max_pt, dim=self.dim, max_number=self.max_value)])
         else:
             self._points = Points(points)
-            
         
         self._points.get_newton_polytope()
         
@@ -53,6 +52,7 @@ class HironakaHostEnv(gym.Env):  # fix a host inside, receive agent moves from o
         coords_multi_bin[self._coords] = 1
             
         observation = self._get_obs(coords_multi_bin = coords_milti_bin)
+
         info = self._get_info()
         return (observation, info) if return_info else observation
 
