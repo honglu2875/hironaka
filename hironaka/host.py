@@ -52,6 +52,10 @@ class Zeillinger(Host):
 
             if debug:
                 print(char_vectors)
-            result.append([np.argmin(char_vectors[0][0]), np.argmax(char_vectors[0][0])])
+            r = [np.argmin(char_vectors[0][0]), np.argmax(char_vectors[0][0])]
+            if r[0] != r[1]:
+                result.append(r)
+            else:  # if all coordinates are the same, return the first two.
+                result.append([0, 1])
 
         return result

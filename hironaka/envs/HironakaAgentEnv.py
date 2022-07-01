@@ -32,6 +32,7 @@ class HironakaAgentEnv(gym.Env):  # fix an agent inside, receive host moves from
             self._points = Points([generate_points(self.max_pt, dim=self.dim, max_number=self.max_value)])
         else:
             self._points = Points(points)
+        self._points.get_newton_polytope()
 
         observation = self._get_obs()
         info = self._get_info()
