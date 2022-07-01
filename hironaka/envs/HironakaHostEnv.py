@@ -51,7 +51,7 @@ class HironakaHostEnv(gym.Env):  # fix a host inside, receive agent moves from o
         coords_multi_bin = np.zeros(self.dim)
         coords_multi_bin[self._coords] = 1
             
-        observation = self._get_obs(coords_multi_bin = coords_milti_bin)
+        observation = self._get_obs(coords_multi_bin = coords_multi_bin)
 
         info = self._get_info()
         return (observation, info) if return_info else observation
