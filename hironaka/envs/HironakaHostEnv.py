@@ -45,15 +45,30 @@ class HironakaHostEnv(gym.Env):  # fix a host inside, receive agent moves from o
         return (observation, info) if return_info else observation
 
     def step(self, action):
+        
+        #The host takes an action from the agent and resolve it
+        #If the action is valid (inside the coordnates chose by the host), then resolve the game, update the situation, award the agent, pick a subset of coordinates, and give a new observation to the agent.
+        #If the action is not valid, let the game stop and give the agent a very negative feedback.
+        
         if action in self._coords:
             self._points.shift([self._coords], [action])
             self._points.get_newton_polytope()
+            #Since you always take newton polytope after shift, maybe it would be better to embed points.get_newton_polytope() into points.shift()?
             self.stopped = self._points.ended
             reward = 1. if not self._points.ended else 0.
         else:
             self.stopped = self.stop_after_invalid_move
             reward = self.invalid_move_penalty
-        observation = self._get_obs()
+           
+        #here we conjour host.select_coord to select a subset of coordinates by a method given by the host.
+        if self._points.ended:
+            self._coords = None
+        else:
+            self._coords = self.host.select_coord(self._points)[0]
+        coords_multi_bin = np.zeros(self.dim)
+        coords_multi_bin[self._coords] = 1
+            
+        observation = self._get_obs(coords_multi_bin = coords_multi_bin)
         info = self._get_info()
 
         return observation, reward, self.stopped, info
@@ -64,18 +79,10 @@ class HironakaHostEnv(gym.Env):  # fix a host inside, receive agent moves from o
 
     def close(self):
         pass
-
-    def _get_obs(self):
+    #I add coords_multi_bin parameter to pass the choice into creating the new observation.
+    def _get_obs(self, coords_multi_bin):
         f = np.array(self._points.get_features()[0])
         f = np.pad(f, ((0, self.max_pt - len(f)), (0, 0)), mode='constant', constant_values=-1)
-
-        if self._points.ended:
-            self._coords = None
-        else:
-            self._coords = self.host.select_coord(self._points)[0]
-        coords_multi_bin = np.zeros(self.dim)
-        coords_multi_bin[self._coords] = 1
-
         o = {'points': f.astype(np.float32), 'coords': coords_multi_bin}
         return o
 
