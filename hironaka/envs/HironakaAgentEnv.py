@@ -39,6 +39,7 @@ class HironakaAgentEnv(gym.Env):  # fix an agent inside, receive host moves from
         return (observation, info) if return_info else observation
 
     def step(self, action):
+        #Is this the line that decide which coordinate the agent choose?
         self.agent.move(self._points, [np.where(action == 1)[0]])
 
         observation = self._get_obs()
