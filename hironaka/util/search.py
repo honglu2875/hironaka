@@ -1,7 +1,7 @@
 from collections import deque
 
-from hironaka.host import Host
 from hironaka.abs import Points
+from hironaka.host import Host
 
 
 def search_depth(points: Points, host: Host, debug=False):

@@ -1,13 +1,10 @@
 from typing import Any, Dict, Optional
 
-import gym
-from gym import spaces
 import numpy as np
+from gym import spaces
 
-from hironaka.abs import Points
 from hironaka.agent import Agent
 from hironaka.envs.HironakaBase import HironakaBase
-from hironaka.util import generate_points
 
 
 class HironakaAgentEnv(HironakaBase):
@@ -17,8 +14,9 @@ class HironakaAgentEnv(HironakaBase):
 
     def __init__(self,
                  agent: Agent,
-                 config_kwargs: Optional[Dict[str, Any]] = dict(),
+                 config_kwargs: Optional[Dict[str, Any]] = None,
                  **kwargs):
+        config_kwargs = dict() if config_kwargs is None else config_kwargs
         super().__init__(agent, **{**config_kwargs, **kwargs})
 
         self.observation_space = \

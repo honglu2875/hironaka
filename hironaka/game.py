@@ -1,7 +1,7 @@
 import abc
 
 
-class Game(metaclass=abc.ABCMeta):
+class Game(abc.ABC):
     """
         This framework simulates a fully autonomous game without interference from outside.
     """
@@ -13,7 +13,8 @@ class Game(metaclass=abc.ABCMeta):
             host: the host player
             agent: the agent player
         """
-        pass
+        self.coord_history = None
+        self.move_history = None
 
     @abc.abstractmethod
     def step(self) -> bool:
