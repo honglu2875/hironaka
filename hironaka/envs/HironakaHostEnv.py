@@ -79,8 +79,8 @@ class HironakaHostEnv(gym.Env):  # fix a host inside, receive agent moves from o
 
     def close(self):
         pass
-    #I add coords_multi_bin parameter to pass the choice into creating the new observation.
     def _get_obs(self, coords_multi_bin):
+        #I add coords_multi_bin parameter to pass the choice into creating the new observation.
         f = np.array(self._points.get_features()[0])
         f = np.pad(f, ((0, self.max_pt - len(f)), (0, 0)), mode='constant', constant_values=-1)
         o = {'points': f.astype(np.float32), 'coords': coords_multi_bin}
