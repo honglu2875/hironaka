@@ -37,7 +37,7 @@ class TestEnv(unittest.TestCase):
 
     def test_agent_run_env(self):
         dim = 4
-        env = gym.make('hironaka/HironakaAgent-v0', agent=RandomAgent(), dim=dim)
+        env = gym.make('hironaka/HironakaAgent-v0', agent=RandomAgent(), dimension=dim)
         host = RandomHost()
 
         o = env.reset()

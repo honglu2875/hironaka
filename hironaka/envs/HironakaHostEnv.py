@@ -74,7 +74,7 @@ class HironakaHostEnv(gym.Env):  # fix a host inside, receive agent moves from o
            
         #here we conjour host.select_coord to select a subset of coordinates by a method given by the host.
         if self._points.ended:
-            self._coords = None
+            self._coords = []
         else:
             self._coords = self.host.select_coord(self._points)[0]
         coords_multi_bin = np.zeros(self.dim)
@@ -91,6 +91,7 @@ class HironakaHostEnv(gym.Env):  # fix a host inside, receive agent moves from o
 
     def close(self):
         pass
+
     def _get_obs(self, coords_multi_bin):
         #I add coords_multi_bin parameter to pass the choice into creating the new observation.
         f = np.array(self._points.get_features()[0])
