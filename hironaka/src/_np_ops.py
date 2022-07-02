@@ -105,8 +105,7 @@ def shift_np(points: np.ndarray, coords: List[List[int]], axis: List[int], inpla
     assert len(points.shape) == 3  # 3-dim numpy array
     assert sum([s == 0 for s in points.shape]) == 0  # no coordinate is zero
 
-    if not inplace:
-        new_points = points.copy()
+    new_points = None if inplace else points.copy()
 
     batch_num, m, dim = points.shape
 

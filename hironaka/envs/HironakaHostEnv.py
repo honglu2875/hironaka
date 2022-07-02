@@ -36,25 +36,22 @@ class HironakaHostEnv(HironakaBase):
         if action in self._coords:
             self._points.shift([self._coords], [action])
             self._points.get_newton_polytope()
-            self.stopped = self._points.ended
+            stopped = self._points.ended
             reward = 1. if not self._points.ended else 0.
         else:
-            self.stopped = self.stop_after_invalid_move
+            stopped = self.stop_after_invalid_move
             reward = self.invalid_move_penalty
 
+        # After action is already taken. Now get coordinates.
         if self._points.ended:
             self._coords = []
         else:
             self._coords = self.host.select_coord(self._points)[0]
 
-        coords_multi_bin = np.zeros(self.dimension)
-        coords_multi_bin[self._coords] = 1
-
         observation = self._get_obs()
         info = self._get_info()
-        self.stopped = self._points.ended
 
-        return observation, reward, self.stopped, info
+        return observation, reward, stopped, info
 
     def _get_obs(self):
         coords_multi_bin = self._get_coords_multi_bin()

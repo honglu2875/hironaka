@@ -19,6 +19,7 @@ class RandomHost(Host):
 
 
 class Zeillinger(Host):
+    # noinspection PyPep8Naming
     @staticmethod
     def get_char_vector(vt):
         """

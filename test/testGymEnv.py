@@ -29,8 +29,9 @@ class TestEnv(unittest.TestCase):
 
         o = env.reset()
         env.render()
-        while not env.stopped:
-            action = agent.move(Points(np.expand_dims(o['points'], axis=0)), [np.where(o['coords'] == 1)[0]],
+        stopped = False
+        while not stopped:
+            action = agent.move(Points(np.expand_dims(o.get('points'), axis=0)), [np.where(o.get('coords') == 1)[0]],
                                 inplace=False)
             o, r, stopped, info = env.step(action[0])
             print(f"Reward: {r}")
@@ -46,7 +47,8 @@ class TestEnv(unittest.TestCase):
 
         o = env.reset()
         env.render()
-        while not env.stopped:
+        stopped = False
+        while not stopped:
             action = host.select_coord(Points(np.expand_dims(o, axis=0)))[0]
             action_input = np.zeros(dim)
             action_input[action] = 1
