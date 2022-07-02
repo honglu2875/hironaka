@@ -22,7 +22,7 @@ class HironakaBase(gym.Env, abc.ABC):
 
     @abc.abstractmethod
     def __init__(self,
-                 agent: Agent,
+                 agent,
                  dimension: Optional[int] = 3,
                  max_number_points: Optional[int] = 10,
                  max_value: Optional[int] = 10,
@@ -36,7 +36,7 @@ class HironakaBase(gym.Env, abc.ABC):
 
         # States. Will be implemented in reset()
         self._points = None
-        self._coords = None
+        self._coords = []
 
         # Implement these two
         self.observation_space = None
