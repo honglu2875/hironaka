@@ -3,8 +3,8 @@ from typing import Any, Dict, Optional
 import numpy as np
 from gym import spaces
 
-from hironaka.host import Host
 from hironaka.envs.HironakaBase import HironakaBase
+from hironaka.host import Host
 
 
 class HironakaHostEnv(HironakaBase):
@@ -30,7 +30,7 @@ class HironakaHostEnv(HironakaBase):
         self.stop_after_invalid_move = stop_after_invalid_move
 
     def _post_reset_update(self):
-        self.step(action = None)
+        self.step(action=None)
 
     def step(self, action):
         if action in self._coords:
@@ -62,4 +62,3 @@ class HironakaHostEnv(HironakaBase):
         f = np.pad(f, ((0, self.max_number_points - len(f)), (0, 0)), mode='constant', constant_values=-1)
         o = {'points': f.astype(np.float32), 'coords': coords_multi_bin}
         return o
-

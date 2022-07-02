@@ -5,7 +5,6 @@ import gym
 import numpy as np
 
 from hironaka.abs import Points
-from hironaka.agent import Agent
 from hironaka.util import generate_points
 
 
