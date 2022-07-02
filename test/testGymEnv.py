@@ -23,6 +23,7 @@ register(
 
 class TestEnv(unittest.TestCase):
     def test_host_run_env(self):
+        print("Host test starts.")
         env = gym.make('hironaka/HironakaHost-v0', host=Zeillinger())
         agent = RandomAgent()
 
@@ -35,7 +36,10 @@ class TestEnv(unittest.TestCase):
             print(f"Reward: {r}")
             env.render()
 
+        print("Host test ends.")
+
     def test_agent_run_env(self):
+        print("Agent test starts.")
         dim = 4
         env = gym.make('hironaka/HironakaAgent-v0', agent=RandomAgent(), dimension=dim)
         host = RandomHost()
@@ -49,3 +53,5 @@ class TestEnv(unittest.TestCase):
             o, r, stopped, info = env.step(action_input)
             print(f"Reward: {r}")
             env.render()
+
+        print("Agent test ends.")

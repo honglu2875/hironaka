@@ -5,7 +5,6 @@ import gym
 import numpy as np
 
 from hironaka.abs import Points
-from hironaka.agent import Agent
 from hironaka.util import generate_points
 
 
@@ -22,7 +21,6 @@ class HironakaBase(gym.Env, abc.ABC):
 
     @abc.abstractmethod
     def __init__(self,
-                 agent: Agent,
                  dimension: Optional[int] = 3,
                  max_number_points: Optional[int] = 10,
                  max_value: Optional[int] = 10,
@@ -31,12 +29,11 @@ class HironakaBase(gym.Env, abc.ABC):
         self.max_number_points = max_number_points
         self.max_value = max_value
         self.max_efficiency = max_efficiency
-        self.agent = agent
         self.stopped = False
 
         # States. Will be implemented in reset()
         self._points = None
-        self._coords = None
+        self._coords = []
 
         # Implement these two
         self.observation_space = None
