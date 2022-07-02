@@ -22,7 +22,6 @@ class HironakaBase(gym.Env, abc.ABC):
 
     @abc.abstractmethod
     def __init__(self,
-                 agent,
                  dimension: Optional[int] = 3,
                  max_number_points: Optional[int] = 10,
                  max_value: Optional[int] = 10,
@@ -31,7 +30,6 @@ class HironakaBase(gym.Env, abc.ABC):
         self.max_number_points = max_number_points
         self.max_value = max_value
         self.max_efficiency = max_efficiency
-        self.agent = agent
         self.stopped = False
 
         # States. Will be implemented in reset()

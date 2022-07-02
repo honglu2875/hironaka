@@ -17,7 +17,8 @@ class HironakaAgentEnv(HironakaBase):
                  config_kwargs: Optional[Dict[str, Any]] = None,
                  **kwargs):
         config_kwargs = dict() if config_kwargs is None else config_kwargs
-        super().__init__(agent, **{**config_kwargs, **kwargs})
+        super().__init__(**{**config_kwargs, **kwargs})
+        self.agent = agent
 
         self.observation_space = \
             spaces.Box(low=-1.0, high=np.inf, shape=(self.max_number_points, self.dimension), dtype=np.float32)

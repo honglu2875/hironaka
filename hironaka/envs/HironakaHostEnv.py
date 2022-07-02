@@ -6,6 +6,7 @@ from gym import spaces
 from hironaka.host import Host
 from hironaka.envs.HironakaBase import HironakaBase
 
+
 class HironakaHostEnv(HironakaBase):
     """
     This environment fixes a Host. It receives actions from an agent (player B), resolve the action, rewards the
@@ -14,15 +15,19 @@ class HironakaHostEnv(HironakaBase):
 
     def __init__(self,
                  host: Host,
+                 invalid_move_penalty: int = -1e-3,
+                 stop_after_invalid_move: bool = False,
                  config_kwargs: Optional[Dict[str, Any]] = None,
                  **kwargs):
         config_kwargs = dict() if config_kwargs is None else config_kwargs
-        super().__init__(host, **{**config_kwargs, **kwargs})
+        super().__init__(**{**config_kwargs, **kwargs})
         self.observation_space = \
             spaces.Box(low=-1.0, high=np.inf, shape=(self.max_number_points, self.dimension), dtype=np.float32)
         self.action_space = spaces.MultiBinary(self.dimension)
 
         self.host = host
+        self.invalid_move_penalty = invalid_move_penalty
+        self.stop_after_invalid_move = stop_after_invalid_move
 
     def _post_reset_update(self):
         self.step(action = None)
@@ -34,8 +39,8 @@ class HironakaHostEnv(HironakaBase):
             self.stopped = self._points.ended
             reward = 1. if not self._points.ended else 0.
         else:
-            self.stopped = True #self.stop_after_invalid_move
-            reward = 10e-3 #self.invalid_move_penalty
+            self.stopped = self.stop_after_invalid_move
+            reward = self.invalid_move_penalty
 
         if self._points.ended:
             self._coords = []
