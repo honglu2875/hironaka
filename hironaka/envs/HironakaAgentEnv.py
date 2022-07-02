@@ -32,10 +32,9 @@ class HironakaAgentEnv(HironakaBase):
 
         observation = self._get_obs()
         info = self._get_info()
-        self.stopped = self._points.ended
         reward = 1 if self._points.ended else 0
 
-        return observation, reward, self.stopped, info
+        return observation, reward, self._points.ended, info
 
     def _get_obs(self):
         return self._get_padded_points()

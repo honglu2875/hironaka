@@ -1,12 +1,15 @@
 import abc
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, TypeVar
 
 import gym
 import numpy as np
 
 from hironaka.abs import Points
+from hironaka.src import get_padded_array
 from hironaka.util import generate_points
 
+ObsType = TypeVar("ObsType")
+ActType = TypeVar("ActType")
 
 class HironakaBase(gym.Env, abc.ABC):
     """
@@ -18,6 +21,11 @@ class HironakaBase(gym.Env, abc.ABC):
             _get_obs
     """
     metadata = {"render_modes": ["ansi"], "render_fps": 1}
+    reward_range = (-1, 1)
+
+    # Implement these two
+    action_space: gym.spaces.Space[ActType]
+    observation_space: gym.spaces.Space[ObsType]
 
     @abc.abstractmethod
     def __init__(self,
@@ -29,15 +37,10 @@ class HironakaBase(gym.Env, abc.ABC):
         self.max_number_points = max_number_points
         self.max_value = max_value
         self.max_efficiency = max_efficiency
-        self.stopped = False
 
         # States. Will be implemented in reset()
         self._points = None
         self._coords = []
-
-        # Implement these two
-        self.observation_space = None
-        self.action_space = None
 
     def reset(self,
               points=None,
@@ -48,7 +51,7 @@ class HironakaBase(gym.Env, abc.ABC):
 
         if points is None:
             self._points = Points(
-                [generate_points(self.max_number_points, dim=self.dimension, max_number=self.max_value)])
+                [generate_points(self.max_number_points, dim=self.dimension, max_value=self.max_value)])
         else:
             self._points = Points(points)
 
@@ -56,7 +59,6 @@ class HironakaBase(gym.Env, abc.ABC):
         # should have gone through it before being passed to reset(). For max efficiency run, we may ignore it.
         if not self.max_efficiency:
             self._points.get_newton_polytope()
-        self.stopped = False
 
         self._post_reset_update()
 
@@ -96,10 +98,7 @@ class HironakaBase(gym.Env, abc.ABC):
             a utility method that returns -1 padded point information.
             return: numpy array of shape (self.max_number_points, self.dimension)
         """
-        f = np.array(self._points.get_features()[0])
-        f = np.pad(f, ((0, self.max_number_points - len(f)), (0, 0)), mode='constant', constant_values=-1)
-        o = f.astype(np.float32)
-        return o
+        return get_padded_array(self._points.get_features()[0], new_length=self.max_number_points).astype(np.float32)
 
     def _get_coords_multi_bin(self) -> np.ndarray:
         """

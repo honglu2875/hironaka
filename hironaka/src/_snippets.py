@@ -1,3 +1,8 @@
+from typing import List, Union
+
+import numpy as np
+
+
 def get_shape(o):
     """
         o is supposed to be a nested object consisting of list and tuple.
@@ -45,3 +50,43 @@ def lst_cpy(dest, orig):
     diff = len(dest) - len(orig)
     for i in range(diff):
         dest.pop()
+
+
+def get_padded_array(f: Union[List[List[int]], np.ndarray], new_length, constant_value=-1) -> np.ndarray:
+    """
+        This augments a 2d nested list (axis 1 having uniform length) on axis 0 into given length.
+    """
+    f_np = np.array(f)
+    f_np = np.pad(f_np, ((0, new_length - f_np.shape[0]), (0, 0)), mode='constant', constant_values=constant_value)
+    return f_np
+
+
+def get_batched_padded_array(f: List[List[List[int]]], new_length, constant_value=-1) -> np.ndarray:
+    """
+        This augments a 3d nested list (axis 2 having uniform length, but not axis 1) on axis 1 into a fixed length.
+    """
+    assert len(get_shape(f)) == 3
+
+    result = []
+    for f_batch in f:
+        result.append(get_padded_array(f_batch, new_length, constant_value))
+    return np.stack(result, axis=0)
+
+
+def coord_list_to_binary(f: List[int], dimension):
+    """
+        This turns a list of coordinates to a numpy array of size (dimension,) consisting of 0/1.
+    """
+    f_np = np.zeros(dimension)
+    f_np[f] = 1
+    return f_np
+
+
+def batched_coord_list_to_binary(f: List[List[int]], dimension):
+    """
+        This turns a batched list of coordinate to a numpy array of size (batch_num, dimension) of 0/1.
+    """
+    f_np = np.zeros((len(f), dimension))
+    for b in range(len(f)):
+        f_np[b][f[b]] = 1
+    return f_np

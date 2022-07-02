@@ -1,8 +1,8 @@
 import unittest
 
 from hironaka.abs import Points
-from hironaka.abs.src import make_nested_list
 from hironaka.host import Zeillinger
+from hironaka.src import make_nested_list
 
 
 class TestZeillinger(unittest.TestCase):

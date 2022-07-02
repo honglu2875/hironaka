@@ -2,15 +2,15 @@ from typing import List
 
 import numpy as np
 
-from .src import shift_lst, shift_np, get_newton_polytope_lst, get_newton_polytope_np, get_shape
+from hironaka.src import shift_lst, shift_np, get_newton_polytope_lst, get_newton_polytope_np, get_shape
 
 
 class Points:
     """
         Class wrapper of points.
 
-        Internally, it is List[List[List[int]]] containing batches of lists of points. Use 3d numpy array instead, if
-        use_np=True (size will be unchanged and removed points will be marked as [-1,...,-1] for easier c++
+        Internally, it is List[List[List[int]]] containing batches of lists of points. When use_np is True, it uses
+        3d numpy array instead(size will be unchanged and removed points will be marked as [-1,...,-1] for easier c++
         compatibility). (batch, number_of_point, coordinate). For each batch, the number of points is either the
         pre-determined number or smaller.
     """

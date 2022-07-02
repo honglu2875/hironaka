@@ -13,8 +13,13 @@ class Game(abc.ABC):
             host: the host player
             agent: the agent player
         """
-        self.coord_history = None
-        self.move_history = None
+        self.state = state
+        self.dim = state.dim
+        self.host = host
+        self.agent = agent
+
+        self.coord_history = []
+        self.move_history = []
 
     @abc.abstractmethod
     def step(self) -> bool:

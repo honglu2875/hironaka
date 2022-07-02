@@ -4,12 +4,7 @@ from .game import Game
 
 class GameHironaka(Game):
     def __init__(self, state: Points, host, agent):
-        self.state = state
-        self.dim = state.dim
-        self.host = host
-        self.agent = agent
-        self.coord_history = []
-        self.move_history = []
+        super().__init__(state, host, agent)
         self.stopped = False
 
     def step(self) -> bool:
