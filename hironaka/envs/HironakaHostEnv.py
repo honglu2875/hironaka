@@ -14,6 +14,8 @@ class HironakaHostEnv(HironakaBase):
 
     def __init__(self,
                  host: Host,
+                 invalid_move_penalty: int = -1e-3, 
+                 stop_after_invalid_move: bool = False,
                  config_kwargs: Optional[Dict[str, Any]] = None,
                  **kwargs):
         config_kwargs = dict() if config_kwargs is None else config_kwargs
