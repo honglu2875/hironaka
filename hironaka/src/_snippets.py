@@ -90,3 +90,15 @@ def batched_coord_list_to_binary(f: List[List[int]], dimension):
     for b in range(len(f)):
         f_np[b][f[b]] = 1
     return f_np
+
+
+def get_gym_version_in_float():
+    """
+        This tries to get the gym version in float number, but will not report error.
+    """
+    r = 0
+    try:
+        import gym
+        r = float(".".join(gym.__version__.split(".")[:2]))
+    finally:
+        return r
