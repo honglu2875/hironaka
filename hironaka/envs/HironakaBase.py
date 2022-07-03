@@ -11,6 +11,8 @@ from hironaka.util import generate_points
 ObsType = TypeVar("ObsType")
 ActType = TypeVar("ActType")
 
+GYM_VERSION = get_gym_version_in_float()
+
 
 class HironakaBase(gym.Env, abc.ABC):
     """
@@ -49,7 +51,8 @@ class HironakaBase(gym.Env, abc.ABC):
               seed=None,
               return_info=False,
               options=None) -> Any:
-        super().reset(seed=seed)
+        if GYM_VERSION >= 0.22:
+            super().reset(seed=seed)
 
         if points is None:
             self._points = Points(
