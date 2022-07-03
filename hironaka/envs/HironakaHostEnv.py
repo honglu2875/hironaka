@@ -23,12 +23,13 @@ class HironakaHostEnv(HironakaBase):
         super().__init__(**{**config_kwargs, **kwargs})
         self.observation_space = spaces.Dict(
             {
-                "points": spaces.Box(low=-1.0, high=np.inf, shape=(self.max_pt, self.dim), dtype=np.float32),
-                "coords": spaces.MultiBinary(self.dim)
+                "points": spaces.Box(low=-1.0, high=np.inf, shape=(self.max_number_points, self.dimension),
+                                     dtype=np.float32),
+                "coords": spaces.MultiBinary(self.dimension)
             }
         )
 
-        self.action_space = spaces.Discrete(self.dim)
+        self.action_space = spaces.Discrete(self.dimension)
 
         self.host = host
         self.invalid_move_penalty = invalid_move_penalty
