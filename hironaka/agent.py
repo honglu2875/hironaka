@@ -24,11 +24,15 @@ class RandomAgent(Agent):
 
 class AgentThom(TAgent):
     def move(self, points, weights, restrictAxis):
+        dim = len(points[0])
+        #print(restrictAxis, restrictAxis[0],restrictAxis[1])
         if weights[restrictAxis[0]] == weights[restrictAxis[1]]:
             action = np.random.choice(restrictAxis, size=1)[0]
+            #print(action)
         else:
             action = restrictAxis[np.argmin([weights[restrictAxis[0]], weights[restrictAxis[1]]])]
-        changingcoordinate = restrictAxis[np.where(restrictAxis != action)]
-        newweights = weights
-        newweights[changingcoordinate] = weights[action] - weights[changingcoordinate]
-        return getNewtonPolytope(shift(points, restrictAxis, action)), action, newweights
+        changingcoordinate = restrictAxis[np.where(restrictAxis != action)[0][0]]
+        weights[changingcoordinate] = 0
+        newState = shift(points, restrictAxis, action)
+        #print(newState, list(map(tuple,newState-np.amin(newState, axis=0))))
+        return (getNewtonPolytope(list(map(tuple,newState-np.amin(newState, axis=0)))), action, weights)

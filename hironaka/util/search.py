@@ -2,7 +2,6 @@ from treelib import Node, Tree
 from typing import Tuple, List
 from collections import deque
 from dataclasses import dataclass
-
 from .geom import getNewtonPolytope, shift
 
 
