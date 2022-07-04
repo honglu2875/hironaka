@@ -5,11 +5,14 @@ import gym
 import numpy as np
 
 from hironaka.abs import Points
-from hironaka.src import get_padded_array
+from hironaka.src import get_padded_array, get_gym_version_in_float
 from hironaka.util import generate_points
 
 ObsType = TypeVar("ObsType")
 ActType = TypeVar("ActType")
+
+GYM_VERSION = get_gym_version_in_float()
+
 
 class HironakaBase(gym.Env, abc.ABC):
     """
@@ -24,8 +27,9 @@ class HironakaBase(gym.Env, abc.ABC):
     reward_range = (-1, 1)
 
     # Implement these two
-    action_space: gym.spaces.Space[ActType]
-    observation_space: gym.spaces.Space[ObsType]
+    if get_gym_version_in_float() >= 0.22:
+        action_space: gym.spaces.Space[ActType]
+        observation_space: gym.spaces.Space[ObsType]
 
     @abc.abstractmethod
     def __init__(self,
@@ -47,7 +51,8 @@ class HironakaBase(gym.Env, abc.ABC):
               seed=None,
               return_info=False,
               options=None) -> Any:
-        super().reset(seed=seed)
+        if GYM_VERSION >= 0.22:
+            super().reset(seed=seed)
 
         if points is None:
             self._points = Points(

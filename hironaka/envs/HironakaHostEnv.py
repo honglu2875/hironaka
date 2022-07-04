@@ -21,9 +21,15 @@ class HironakaHostEnv(HironakaBase):
                  **kwargs):
         config_kwargs = dict() if config_kwargs is None else config_kwargs
         super().__init__(**{**config_kwargs, **kwargs})
-        self.observation_space = \
-            spaces.Box(low=-1.0, high=np.inf, shape=(self.max_number_points, self.dimension), dtype=np.float32)
-        self.action_space = spaces.MultiBinary(self.dimension)
+        self.observation_space = spaces.Dict(
+            {
+                "points": spaces.Box(low=-1.0, high=np.inf, shape=(self.max_number_points, self.dimension),
+                                     dtype=np.float32),
+                "coords": spaces.MultiBinary(self.dimension)
+            }
+        )
+
+        self.action_space = spaces.Discrete(self.dimension)
 
         self.host = host
         self.invalid_move_penalty = invalid_move_penalty
@@ -39,10 +45,10 @@ class HironakaHostEnv(HironakaBase):
             stopped = self._points.ended
             reward = 1. if not self._points.ended else 0.
         else:
-            stopped = self.stop_after_invalid_move
+            stopped = self.stop_after_invalid_move or self._points.ended
             reward = self.invalid_move_penalty
 
-        # After action is already taken. Now get coordinates.
+        # After action is already taken, now get coordinates.
         if self._points.ended:
             self._coords = []
         else:

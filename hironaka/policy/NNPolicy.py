@@ -39,21 +39,22 @@ class NNPolicy(Policy):
         else:
             assert False  # Impossible code path unless something is broken.
 
-        input_tensor.to(self._device)
+        input_tensor = input_tensor.to(self._device)
         self._model.to(self._device)
+
         if self.eval_mode:
             self._model.eval()
             with torch.inference_mode(mode=True):
-                output_tensor = self._model(input_tensor)
+                output_tensor = self._evaluate(input_tensor)
         else:
-            output_tensor = self._model(input_tensor)
+            output_tensor = self._evaluate(input_tensor)
 
         if self.mode == 'agent':
             output_tensor = torch.softmax(output_tensor, dim=1)
             if self.masked:
-                mask = torch.FloatTensor(batched_coord_list_to_binary(features[1], self.dimension))
+                mask = torch.FloatTensor(batched_coord_list_to_binary(features[1], self.dimension)).to(self._device)
                 output_tensor = output_tensor * mask
-            return torch.argmax(output_tensor, dim=1).detach().numpy()
+            return torch.argmax(output_tensor, dim=1).detach().cpu().numpy()
         elif self.mode == 'host':
             output_tensor = torch.sigmoid(output_tensor)
             out = torch.gt(output_tensor, 0.5)
@@ -62,4 +63,13 @@ class NNPolicy(Policy):
                     if torch.sum(out[b]) < 2:
                         t = torch.topk(output_tensor[b], k=2)[1]
                         out[b][t[0]], out[b][t[1]] = True, True
-            return out.detach().numpy().astype(int)
+            return out.detach().cpu().numpy().astype(int)
+
+    def _evaluate(self, input_tensor):
+        """
+            This method evaluates the input_tensor using self._model.
+            For certain policies (subclasses of nn.Module), getting the probability tensor may not be like
+                self._model(input_tensor)
+            In these cases, please override this method.
+        """
+        return self._model(input_tensor)

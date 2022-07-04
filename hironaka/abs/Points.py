@@ -32,6 +32,13 @@ class Points:
         else:
             if isinstance(pts, np.ndarray):
                 pts = pts.tolist()
+                # If the input is already numpy array, the input might already be -1 padded arrays.
+                # Thus, we do a thorough check to clean that up.
+                for b in range(len(pts)):
+                    while pts[b][-1][0] == -1:
+                        pts[b].pop()
+                        assert len(pts[b]) != 0
+
             shape = get_shape(pts)
             self._shift = shift_lst
             self._getNewtonPolytope = get_newton_polytope_lst

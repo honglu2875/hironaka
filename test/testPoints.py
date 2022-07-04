@@ -1,5 +1,7 @@
 import unittest
 
+import numpy as np
+
 from hironaka.abs.Points import Points
 from hironaka.src import make_nested_list
 from hironaka.util import generate_points
@@ -85,3 +87,20 @@ class TestPoints(unittest.TestCase):
         r = [[0, 1, 0, 1], [0, 2, 0, 0], [1, 0, 0, 1], [1, 0, 1, 0], [1, 1, 0, 0], [2, 0, 0, 0]]
 
         assert str(p.get_batch(1)) == str(r)
+
+    def test_numpy_input_without_use_np(self):
+        p = Points(np.array(
+            [[[7, 5, 11, 8],
+              [8, 1, 26, 18],
+              [8, 3, 25, 8],
+              [11, 11, 20, 19],
+              [-1, -1, -1, -1],
+              [-1, -1, -1, -1]]]
+        ))
+
+        r = [[[7, 5, 11, 8],
+              [8, 1, 26, 18],
+              [8, 3, 25, 8],
+              [11, 11, 20, 19]]]
+
+        assert str(p.points) == str(r)
