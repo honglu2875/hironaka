@@ -8,10 +8,10 @@ from hironaka.util.search import searchDepth
 
 host = Zeillinger()
 agent = AgentThom()
-points = getNewtonPolytope(ThomPointsHomogeneous(3))
+points = getNewtonPolytope(ThomPointsHomogeneous(5))
 game = GameThom(points, host, agent)
-print(points)
-for i in range(10):
+print('Points:', points)
+for i in range(100):
     game.step()
     print('Game state:', game.state)
     if game.stopped:
