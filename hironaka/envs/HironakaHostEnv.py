@@ -45,10 +45,10 @@ class HironakaHostEnv(HironakaBase):
             stopped = self._points.ended
             reward = 1. if not self._points.ended else 0.
         else:
-            stopped = self.stop_after_invalid_move
+            stopped = self.stop_after_invalid_move or self._points.ended
             reward = self.invalid_move_penalty
 
-        # After action is already taken. Now get coordinates.
+        # After action is already taken, now get coordinates.
         if self._points.ended:
             self._coords = []
         else:

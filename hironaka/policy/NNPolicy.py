@@ -45,11 +45,9 @@ class NNPolicy(Policy):
         if self.eval_mode:
             self._model.eval()
             with torch.inference_mode(mode=True):
-                output_tensor = self._model(input_tensor)
+                output_tensor = self._evaluate(input_tensor)
         else:
-            output_tensor = self._model(input_tensor)
-
-
+            output_tensor = self._evaluate(input_tensor)
 
         if self.mode == 'agent':
             output_tensor = torch.softmax(output_tensor, dim=1)
@@ -66,3 +64,12 @@ class NNPolicy(Policy):
                         t = torch.topk(output_tensor[b], k=2)[1]
                         out[b][t[0]], out[b][t[1]] = True, True
             return out.detach().cpu().numpy().astype(int)
+
+    def _evaluate(self, input_tensor):
+        """
+            This method evaluates the input_tensor using self._model.
+            For certain policies (subclasses of nn.Module), getting the probability tensor may not be like
+                self._model(input_tensor)
+            In these cases, please override this method.
+        """
+        return self._model(input_tensor)
