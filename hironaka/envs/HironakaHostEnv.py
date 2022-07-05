@@ -39,21 +39,31 @@ class HironakaHostEnv(HironakaBase):
         self.step(action=None)
 
     def step(self, action):
+        super().step(action)
+
+        stopped = False
+        reward = 0
         if action in self._coords:
             self._points.shift([self._coords], [action])
             self._points.get_newton_polytope()
-            stopped = self._points.ended
-            reward = 1. if not self._points.ended else 0.
+            reward += 1. if not self._points.ended else 0.
         else:
-            stopped = self.stop_after_invalid_move or self._points.ended
-            reward = self.invalid_move_penalty
+            stopped |= self.stop_after_invalid_move
+            reward += self.invalid_move_penalty
+
+        stopped |= self._points.ended
+
+        # Check whether the maximal value exceeds the self.value_threshold
+        self.exceed_threshold = self._points.exceed_threshold()
+        stopped |= self.exceed_threshold
 
         # After action is already taken, now get coordinates.
-        if self._points.ended:
+        if stopped:
             self._coords = []
         else:
             self._coords = self.host.select_coord(self._points)[0]
 
+        self.last_action_taken = self._coords
         observation = self._get_obs()
         info = self._get_info()
 

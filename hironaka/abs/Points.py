@@ -17,7 +17,7 @@ class Points:
     points: List[List[List[int]]]
     ended: bool  # updated after every call of get_newton_polytope()
 
-    def __init__(self, pts, ended=False, use_np=False):
+    def __init__(self, pts, ended=False, use_np=False, value_threshold=None):
         """
         In any case, the three dimensions will be (self.batchNum, self.m, self.dim). When use_np=True, everything
         will be saved and manipulated as numpy array (a lot of room for improvement!!!). Otherwise, it will be nested
@@ -57,6 +57,7 @@ class Points:
         self.points = pts
         self.batchNum, self.m, self.dim = shape
         self.ended = ended
+        self.value_threshold = value_threshold
 
         if self.use_np:
             self.numPoints = np.full(self.batchNum, self.m)
@@ -80,21 +81,22 @@ class Points:
 
     def copy(self):
         p = [[point.copy() for point in batch] for batch in self.points]
-        return Points(p, ended=self.ended, use_np=self.use_np)
+        return Points(p, ended=self.ended, use_np=self.use_np, value_threshold=self.value_threshold)
 
     def get_batch(self, b: int):
         return self.points[b][:self.numPoints[b]]
 
-    def _update_num_points(self):
-        """
-            When use_np=True, removed points will become [-1,...,-1] and the numPoints array will need to be updated.
-        """
-        if self.use_np:
-            for i in range(self.batchNum):
-                for j in range(self.m):
-                    if self.points[i][j][0] == -1:
-                        self.numPoints[i] = j
-                        break
+    def exceed_threshold(self):
+        if self.value_threshold is not None:
+            if self.use_np:
+                return np.max(self.points) > self.value_threshold
+            else:
+                for b in range(self.batchNum):
+                    for i in range(len(self.points[b])):
+                        if max(self.points[b][i]) > self.value_threshold:
+                            return True
+                return False
+        return False
 
     def get_features(self):
         """
@@ -125,6 +127,17 @@ class Points:
             return np.array(features)  # TODO: could directly optimize using vectorization
         else:
             return features
+
+    def _update_num_points(self):
+        """
+            When use_np=True, removed points will become [-1,...,-1] and the numPoints array will need to be updated.
+        """
+        if self.use_np:
+            for i in range(self.batchNum):
+                for j in range(self.m):
+                    if self.points[i][j][0] == -1:
+                        self.numPoints[i] = j
+                        break
 
     def __repr__(self):
         return str(self.points)

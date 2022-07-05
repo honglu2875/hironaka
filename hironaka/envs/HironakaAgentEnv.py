@@ -28,13 +28,30 @@ class HironakaAgentEnv(HironakaBase):
         pass
 
     def step(self, action: np.ndarray):
-        self.agent.move(self._points, [np.where(action == 1)[0]])
+        super().step(action) # reset self.current_step
+
+        stopped = False
+        reward = 0
+
+        self.last_action_taken = self.agent.move(self._points, [np.where(action == 1)[0]])
+
+        stopped |= self._points.ended
+
+        # Check whether the step and the maximal value exceeds the pre-set thresholds
+        self.exceed_threshold = self._points.exceed_threshold()
+        if self.stop_at_threshold:
+            if self.current_step >= self.step_threshold or self.exceed_threshold:
+                stopped = True
+                if self.fixed_penalty_crossing_threshold is None:
+                    reward -= self.step_threshold  # Massive penalty based on steps
+                else:
+                    reward += self.fixed_penalty_crossing_threshold  # Fixed penalty. Can be set to 0
 
         observation = self._get_obs()
         info = self._get_info()
-        reward = 1 if self._points.ended else 0
+        reward += 1 if self._points.ended else 0
 
-        return observation, reward, self._points.ended, info
+        return observation, reward, stopped, info
 
     def _get_obs(self):
         return self._get_padded_points()

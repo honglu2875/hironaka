@@ -5,6 +5,7 @@ class Game(abc.ABC):
     """
         This framework simulates a fully autonomous game without interference from outside.
     """
+    logger = None
 
     @abc.abstractmethod
     def __init__(self, state, host, agent):
@@ -22,7 +23,7 @@ class Game(abc.ABC):
         self.move_history = []
 
     @abc.abstractmethod
-    def step(self) -> bool:
+    def step(self, verbose: int = 0) -> bool:
         """
             Make the game one step forward.
 
