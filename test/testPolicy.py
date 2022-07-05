@@ -56,7 +56,7 @@ class TestUtil(unittest.TestCase):
         agent = PolicyAgent(pl_a)
         host = PolicyHost(pl_h)
 
-        game = GameHironaka(Points(generate_batch_points(11, dim=4)), host, agent)
+        game = GameHironaka(Points(generate_batch_points(11, dimension=4)), host, agent)
 
         print(game.state)
         for _ in range(10):

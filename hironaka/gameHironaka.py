@@ -1,15 +1,24 @@
 import logging
+from typing import Optional, Union
 
 from .abs import Points
+from .agent import Agent
 from .game import Game
+from .host import Host
 
 
 class GameHironaka(Game):
-    def __init__(self, state: Points, host, agent):
+    def __init__(self,
+                 state: Union[Points, None],
+                 host: Host,
+                 agent: Agent,
+                 scale_observation: Optional[bool] = True,
+                 **kwargs):
         if self.logger is None:
             self.logger = logging.getLogger(__class__.__name__)
 
-        super().__init__(state, host, agent)
+        super().__init__(state, host, agent, **kwargs)
+        self.scale_observation = scale_observation
         self.stopped = False
 
     def step(self, verbose: int = 0) -> bool:
@@ -32,6 +41,8 @@ class GameHironaka(Game):
 
         coords = self.host.select_coord(self.state)
         action = self.agent.move(self.state, coords)
+        if self.scale_observation:
+            self.state.rescale()
 
         if verbose:
             self.logger.info(f"Host move: {coords}")

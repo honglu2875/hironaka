@@ -21,10 +21,10 @@ class HironakaHostEnv(HironakaBase):
                  **kwargs):
         config_kwargs = dict() if config_kwargs is None else config_kwargs
         super().__init__(**{**config_kwargs, **kwargs})
+
         self.observation_space = spaces.Dict(
             {
-                "points": spaces.Box(low=-1.0, high=np.inf, shape=(self.max_number_points, self.dimension),
-                                     dtype=np.float32),
+                "points": self.point_observation_space,
                 "coords": spaces.MultiBinary(self.dimension)
             }
         )
@@ -57,11 +57,15 @@ class HironakaHostEnv(HironakaBase):
         self.exceed_threshold = self._points.exceed_threshold()
         stopped |= self.exceed_threshold
 
-        # After action is already taken, now get coordinates.
+        # After an action is already taken, now get coordinates.
         if stopped:
             self._coords = []
         else:
             self._coords = self.host.select_coord(self._points)[0]
+
+        # Rescale the points
+        if self.scale_observation:
+            self._points.rescale()
 
         self.last_action_taken = self._coords
         observation = self._get_obs()

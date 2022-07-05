@@ -2,7 +2,7 @@ from typing import List
 
 import numpy as np
 
-from hironaka.src import shift_lst, shift_np, get_newton_polytope_lst, get_newton_polytope_np, get_shape
+from hironaka.src import shift_lst, shift_np, get_newton_polytope_lst, get_newton_polytope_np, get_shape, scale_points
 
 
 class Points:
@@ -27,8 +27,9 @@ class Points:
         if self.use_np:
             pts = np.array(pts)
             shape = pts.shape
+
             self._shift = shift_np
-            self._getNewtonPolytope = get_newton_polytope_np
+            self._get_newton_polytope = get_newton_polytope_np
         else:
             if isinstance(pts, np.ndarray):
                 pts = pts.tolist()
@@ -38,10 +39,10 @@ class Points:
                     while pts[b][-1][0] == -1:
                         pts[b].pop()
                         assert len(pts[b]) != 0
-
             shape = get_shape(pts)
+
             self._shift = shift_lst
-            self._getNewtonPolytope = get_newton_polytope_lst
+            self._get_newton_polytope = get_newton_polytope_lst
 
         if len(shape) == 2:
             print("Input is required to be 3-dimensional: batch, number_of_points, coordinate")
@@ -65,6 +66,9 @@ class Points:
             self.numPoints = [self.m] * self.batchNum
 
     def shift(self, coords: List[List[int]], axis: List[int], inplace=True):
+        """
+            Shift each batch according to the list of coords and axis.
+        """
         if inplace:
             self._shift(self.points, coords, axis)
         else:
@@ -72,12 +76,23 @@ class Points:
             return Points(r.copy(), ended=self.ended, use_np=self.use_np)
 
     def get_newton_polytope(self, inplace=True):
+        """
+            Get the Newton Polytope for points in each batch.
+        """
         if inplace:
-            self.ended = self._getNewtonPolytope(self.points)
+            self.ended = self._get_newton_polytope(self.points)
             self._update_num_points()
         else:
-            r, self.ended = self._getNewtonPolytope(self.points, inplace=False)
+            r, self.ended = self._get_newton_polytope(self.points, inplace=False)
             return Points(r.copy(), ended=self.ended, use_np=self.use_np)
+
+    def rescale(self, inplace=True):
+        """
+            Apply L1 normalization to each batch.
+        """
+        if self.use_np:  # Currently does not want to implement use_np==True
+            return None
+        return scale_points(self.points, inplace=inplace)
 
     def copy(self):
         p = [[point.copy() for point in batch] for batch in self.points]
@@ -97,6 +112,14 @@ class Points:
                             return True
                 return False
         return False
+
+    def get_num_points(self):
+        """
+            The the number of points for each batch. Currently does not support use_np==True.
+        """
+        if self.use_np:
+            return None
+        return [len(batch) for batch in self.points]
 
     def get_features(self):
         """

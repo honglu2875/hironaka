@@ -1,4 +1,6 @@
 import abc
+import logging
+from typing import Optional
 
 
 class Game(abc.ABC):
@@ -8,14 +10,21 @@ class Game(abc.ABC):
     logger = None
 
     @abc.abstractmethod
-    def __init__(self, state, host, agent):
+    def __init__(self,
+                 state,
+                 host,
+                 agent,
+                 **kwargs):
         """
             state: initial state
             host: the host player
             agent: the agent player
         """
+        if self.logger is None:
+            self.logger = logging.getLogger(__class__.__name__)
+
         self.state = state
-        self.dim = state.dim
+        self.dim = state.dim if state is not None else None
         self.host = host
         self.agent = agent
 
@@ -38,7 +47,7 @@ class Game(abc.ABC):
         pass
 
     def print_history(self):
-        print("Coordinate history (host choices):")
-        print(self.coord_history)
-        print("Move history (agent choices):")
-        print(self.move_history)
+        self.logger.info("Coordinate history (host choices):")
+        self.logger.info(self.coord_history)
+        self.logger.info("Move history (agent choices):")
+        self.logger.info(self.move_history)

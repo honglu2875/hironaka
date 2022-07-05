@@ -23,10 +23,10 @@ class HironakaValidator(GameHironaka):
         config_kwargs = dict() if config_kwargs is None else config_kwargs
         config = {**config_kwargs, **kwargs}
 
-        self.config = {
+        self.points_config = {
             'n': config.get('max_number_points', 10),
             'batch_num': 1,
-            'dim': config.get('dimension', 3),
+            'dimension': config.get('dimension', 3),
             'max_value': config.get('max_value', 50)
         }
         value_threshold = config.get('value_threshold', None)
@@ -35,11 +35,8 @@ class HironakaValidator(GameHironaka):
         self.value_threshold = value_threshold
         self.step_threshold = step_threshold
 
-        super().__init__(
-            Points(generate_batch_points(**self.config),
-                   value_threshold=self.value_threshold),
-            host,
-            agent)
+        super().__init__(None, host, agent, **config)
+        self.reset()
 
     def playoff(self, num_steps: int, verbose: int = 0):
         if self.stopped:
@@ -62,5 +59,7 @@ class HironakaValidator(GameHironaka):
         return len_history
 
     def reset(self):
-        self.state = Points(generate_batch_points(**self.config), value_threshold=self.value_threshold)
+        self.state = Points(generate_batch_points(**self.points_config), value_threshold=self.value_threshold)
+        if self.scale_observation:
+            self.state.rescale()
         self.stopped = False
