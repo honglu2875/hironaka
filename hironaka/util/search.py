@@ -3,6 +3,7 @@ from typing import Tuple, List
 from collections import deque
 from dataclasses import dataclass
 from .geom import getNewtonPolytope, shift
+from .agent import AgentMorin
 
 
 def searchDepth(points, host, debug=False):
@@ -54,3 +55,32 @@ def searchTree(points, tree, curr_node, host, MAX_SIZE=100):
         tree.create_node(node_id, node_id, parent=curr_node, data=Points(shifts[-1]))
         searchTree(shifts[-1], tree, node_id, host)
     return tree
+
+def searchTreeMorin(points, tree, curr_node, host, MAX_SIZE=100):
+    """
+        Perform a full tree search and store the full result in a Tree object.
+    """
+
+    @dataclass
+    class Points:
+        """
+            a wrapper of a set of points.
+        """
+        data: List[Tuple[int]]
+
+    if len(points) == 1 or tree.size() > MAX_SIZE or AgentMorin.move() == False:
+        return
+
+    shifts = []
+    coords = host.selectCoord(points)
+    for i in coords:
+        shifts.append(
+            getNewtonPolytope(
+                shift(points, coords, i)
+            )
+        )
+        node_id = tree.size()
+        tree.create_node(node_id, node_id, parent=curr_node, data=Points(shifts[-1]))
+        searchTree(shifts[-1], tree, node_id, host)
+    return tree
+
