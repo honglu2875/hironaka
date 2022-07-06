@@ -3,16 +3,20 @@ from typing import List
 from ._snippets import get_shape
 
 
-def get_newton_polytope_approx_lst(points: List[List[List[int]]], inplace=True):
+def get_newton_polytope_approx_lst(points: List[List[List[int]]], inplace=True, get_ended=False):
     """
         A simple-minded quick-and-dirty method to obtain an approximation of Newton Polytope disregarding convexity.
+        Returns:
+            None, ended_each_batch: List[bool] (if inplace)
+            new_points:List[List[List[int]]], ended_each_batch: List[bool] (if not inplace)
+            None or new_points (if not get_ended)
     """
     batch_num, _, dim = get_shape(points)
 
     assert batch_num
 
-    result = []
-    ended = True
+    new_points = []
+    ended_each_batch = []
     for b in range(batch_num):
         counter = 0
         r = []
@@ -32,27 +36,27 @@ def get_newton_polytope_approx_lst(points: List[List[List[int]]], inplace=True):
                     r.append(points[b][i])
 
         if inplace:
-            if counter > 1:
-                ended = False
+            if get_ended:
+                ended_each_batch.append(counter <= 1)
             for _ in range(len(points[b]) - counter):
                 points[b].pop()
         else:
-            if len(r) > 1:
-                ended = False
-            result.append(r)
+            if get_ended:
+                ended_each_batch.append(len(r) <= 1)
+            new_points.append(r)
 
     if inplace:
-        return ended
+        return (None, ended_each_batch) if get_ended else None
     else:
-        return result, ended
+        return (new_points, ended_each_batch) if get_ended else new_points
 
 
-def get_newton_polytope_lst(points: List[List[List[int]]], inplace=True):
+def get_newton_polytope_lst(points: List[List[List[int]]], inplace=True, get_ended=False):
     """
         Get the Newton Polytope for a set of points.
     """
-    return get_newton_polytope_approx_lst(points, inplace=inplace)
-    # TODO: change to a more precise algo to obtain Newton Polytope
+    return get_newton_polytope_approx_lst(points, inplace=inplace, get_ended=get_ended)
+    # TODO: perhaps change to a more precise algo to obtain Newton Polytope
 
 
 def shift_lst(points: List[List[List[int]]], coords: List[List[int]], axis: List[int], inplace=True):

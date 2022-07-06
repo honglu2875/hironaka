@@ -7,18 +7,19 @@ void _getNewtonPolytope_approx_brute_force(long* points, int batchNum, int m, in
     *   This is a brute force implementation, O(m^2*n) where m is the number of points and n is the number of coordinates.
     *   This can be used as
     *       - either a substitute of Newton polytope algorithm (more points -> slightly more wasteful on further operations, but the result has one single point if and only if the Newton polytope has one single vertex),
-    *       - or a part of Newton polytope algorithm (first get the convex hull, second take the inner part by invoking this function).
+    *       - or a part of Newton polytope algorithm (first get the convex hull, and second take the inner part by invoking this function).
     *
-    *   points: The array of points. 2d but flattened to 1d in the contiguous fashion.
-    *   batchNum: batch size.
-    *   n: dimension.
-    *   m: number of points in one batch.
-    *   (in python it is a 3d numpy array. (batch, m, n))
-    *   newPoints: The array that stores
+    *   parameters:
+    *       points: The array of points. 2d but flattened to 1d in the contiguous fashion.
+    *       batchNum: batch size.
+    *       n: dimension.
+    *       m: number of points in one batch.
+    *       (in python it is a 3d numpy array. (batch, m, n))
+    *       newPoints: The array that stores
     *
     *   ASSUMPTIONS:
-    *   number of points in each batch is no more than m.
-    *   in each batch, the first appearance of "-1" represents the end of the point list.
+    *    - number of points in each batch is no more than m.
+    *    - in each batch, the first appearance of "-1" represents the end of the point list (unless there are exactly m points).
     */
 
     bool isContained = true;
