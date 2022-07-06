@@ -102,3 +102,25 @@ def get_gym_version_in_float():
         r = float(".".join(gym.__version__.split(".")[:2]))
     finally:
         return r
+
+
+def scale_points(points: List[List[List[int]]], inplace=True):
+    new_points = None if inplace else [[] for _ in range(len(points))]
+    for b in range(len(points)):
+        m = 0
+
+        for point in points[b]:
+            m = max(m, max(point))
+
+        if m == 0:  # All vectors are zero, nothing to scale (in fact, game is over.)
+            continue
+
+        for point in points[b]:
+            if inplace:
+                point[:] = [x/m for x in point]
+            else:
+                new_points[b].append([x/m for x in point])
+
+    if not inplace:
+        return new_points
+

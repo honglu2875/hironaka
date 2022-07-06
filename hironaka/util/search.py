@@ -8,7 +8,7 @@ def search_depth(points: Points, host: Host, debug=False):
     """
         Given the host, return the maximal length of the game that an agent can achieve.
     """
-    assert points.batchNum == 1  # Only search a single starting case.
+    assert points.batch_size == 1  # Only search a single starting case.
 
     states = deque([(points, 0)])
 

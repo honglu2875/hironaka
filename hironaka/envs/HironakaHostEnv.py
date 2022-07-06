@@ -21,10 +21,10 @@ class HironakaHostEnv(HironakaBase):
                  **kwargs):
         config_kwargs = dict() if config_kwargs is None else config_kwargs
         super().__init__(**{**config_kwargs, **kwargs})
+
         self.observation_space = spaces.Dict(
             {
-                "points": spaces.Box(low=-1.0, high=np.inf, shape=(self.max_number_points, self.dimension),
-                                     dtype=np.float32),
+                "points": self.point_observation_space,
                 "coords": spaces.MultiBinary(self.dimension)
             }
         )
@@ -39,21 +39,35 @@ class HironakaHostEnv(HironakaBase):
         self.step(action=None)
 
     def step(self, action):
+        super().step(action)
+
+        stopped = False
+        reward = 0
         if action in self._coords:
             self._points.shift([self._coords], [action])
             self._points.get_newton_polytope()
-            stopped = self._points.ended
-            reward = 1. if not self._points.ended else 0.
+            reward += 1. if not self._points.ended else 0.
         else:
-            stopped = self.stop_after_invalid_move or self._points.ended
-            reward = self.invalid_move_penalty
+            stopped |= self.stop_after_invalid_move
+            reward += self.invalid_move_penalty
 
-        # After action is already taken, now get coordinates.
-        if self._points.ended:
+        stopped |= self._points.ended
+
+        # Check whether the maximal value exceeds the self.value_threshold
+        self.exceed_threshold = self._points.exceed_threshold()
+        stopped |= self.exceed_threshold
+
+        # After an action is already taken, now get coordinates.
+        if stopped:
             self._coords = []
         else:
             self._coords = self.host.select_coord(self._points)[0]
 
+        # Rescale the points
+        if self.scale_observation:
+            self._points.rescale()
+
+        self.last_action_taken = self._coords
         observation = self._get_obs()
         info = self._get_info()
 

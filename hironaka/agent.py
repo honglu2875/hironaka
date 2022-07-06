@@ -23,3 +23,13 @@ class RandomAgent(Agent):
         points.shift(coords, actions)
         points.get_newton_polytope()
         return actions
+
+
+class ChooseFirstAgent(Agent):
+    def move(self, points: Points, coords, inplace=True):
+        actions = [min(coord) if len(coord) > 1 else None for coord in coords]
+        if not inplace:
+            return actions
+        points.shift(coords, actions)
+        points.get_newton_polytope()
+        return actions

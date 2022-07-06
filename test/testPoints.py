@@ -40,32 +40,31 @@ class TestPoints(unittest.TestCase):
         # print(p2)
 
     def test_operations2(self):
-        for i in [True, False]:
-            p = Points(make_nested_list(
-                [(7, 5, 3, 8), (8, 9, 8, 18), (8, 3, 17, 8),
-                 (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)]
-            ), use_np=i)
-            q = Points(make_nested_list(
-                [(7, 5, 3, 8), (8, 9, 8, 18), (8, 3, 17, 8),
-                 (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)]
-            ), use_np=i)
-            r = Points(make_nested_list(
-                [[[7, 5, 3, 8],
-                  [8, 3, 17, 8],
-                  [11, 11, 1, 19],
-                  [11, 12, 18, 6],
-                  [16, 11, 5, 6],
-                  [-1, -1, -1, -1]]]
-            ), use_np=i)
-            r2 = Points(make_nested_list(
-                [[[16, 11, 5, 6], [11, 12, 18, 6], [11, 11, 1, 19], [8, 3, 17, 8], [7, 5, 3, 8]]]
-            ), use_np=i)
-            q.get_newton_polytope()
-            assert str(q) == str(p.get_newton_polytope(inplace=False))
-            if i:
-                assert str(q) == str(r)
-            else:
-                assert str(q) == str(r2)
+        p = Points(make_nested_list(
+            [(7, 5, 3, 8), (8, 9, 8, 18), (8, 3, 17, 8),
+             (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)]
+        ))
+        q = Points(make_nested_list(
+            [(7, 5, 3, 8), (8, 9, 8, 18), (8, 3, 17, 8),
+             (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)]
+        ))
+        """
+        # For numpy Points test
+        r = Points(make_nested_list(
+            [[[7, 5, 3, 8],
+              [8, 3, 17, 8],
+              [11, 11, 1, 19],
+              [11, 12, 18, 6],
+              [16, 11, 5, 6],
+              [-1, -1, -1, -1]]]
+        ))
+        """
+        r2 = Points(make_nested_list(
+            [[[16, 11, 5, 6], [11, 12, 18, 6], [11, 11, 1, 19], [8, 3, 17, 8], [7, 5, 3, 8]]]
+        ))
+        q.get_newton_polytope()
+        assert str(q) == str(p.get_newton_polytope(inplace=False))
+        assert str(q) == str(r2)
 
     def test_features(self):
         p = Points(make_nested_list(
@@ -104,3 +103,21 @@ class TestPoints(unittest.TestCase):
               [11, 11, 20, 19]]]
 
         assert str(p.points) == str(r)
+
+    def test_scale(self):
+        points = Points(make_nested_list(
+            [(7, 5, 3, 8), (8, 1, 8, 18), (8, 3, 17, 8),
+             (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)]
+        ))
+
+        r = [[[0.3684210526315789, 0.2631578947368421, 0.15789473684210525, 0.42105263157894735],
+              [0.42105263157894735, 0.05263157894736842, 0.42105263157894735, 0.9473684210526315],
+              [0.42105263157894735, 0.15789473684210525, 0.8947368421052632, 0.42105263157894735],
+              [0.5789473684210527, 0.5789473684210527, 0.05263157894736842, 1.0],
+              [0.5789473684210527, 0.631578947368421, 0.9473684210526315, 0.3157894736842105],
+              [0.8421052631578947, 0.5789473684210527, 0.2631578947368421, 0.3157894736842105]]]
+
+        points.rescale()
+        assert str(points) == str(r)
+        # p2.shift([[1, 3]], [3])
+        # print(p2)

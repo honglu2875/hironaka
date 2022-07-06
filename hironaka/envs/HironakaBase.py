@@ -3,6 +3,7 @@ from typing import Optional, Dict, Any, TypeVar
 
 import gym
 import numpy as np
+from gym import spaces
 
 from hironaka.abs import Points
 from hironaka.src import get_padded_array, get_gym_version_in_float
@@ -24,10 +25,12 @@ class HironakaBase(gym.Env, abc.ABC):
             _get_obs
     """
     metadata = {"render_modes": ["ansi"], "render_fps": 1}
-    reward_range = (-1, 1)
+
+    config_key_for_points = ["value_threshold"]
+    config_key_for_generate_points = ["dimension", "max_value"]
 
     # Implement these two
-    if get_gym_version_in_float() >= 0.22:
+    if GYM_VERSION >= 0.22:
         action_space: gym.spaces.Space[ActType]
         observation_space: gym.spaces.Space[ObsType]
 
@@ -36,15 +39,44 @@ class HironakaBase(gym.Env, abc.ABC):
                  dimension: Optional[int] = 3,
                  max_number_points: Optional[int] = 10,
                  max_value: Optional[int] = 10,
-                 max_efficiency: Optional[bool] = False):
+                 value_threshold: Optional[int] = None,
+                 step_threshold: Optional[int] = 1000,
+                 fixed_penalty_crossing_threshold: Optional[int] = None,
+                 stop_at_threshold: Optional[bool] = True,
+                 improve_efficiency: Optional[bool] = False,
+                 scale_observation: Optional[bool] = True,
+                 reward_based_on_point_reduction: Optional[bool] = True,
+                 **kwargs):
         self.dimension = dimension
         self.max_number_points = max_number_points
         self.max_value = max_value
-        self.max_efficiency = max_efficiency
+        self.value_threshold = value_threshold
+        self.step_threshold = step_threshold
+        self.fixed_penalty_crossing_threshold = fixed_penalty_crossing_threshold
+        self.stop_at_threshold = stop_at_threshold
+        self.improve_efficiency = improve_efficiency
+        self.scale_observation = scale_observation
+        self.reward_based_on_point_reduction = reward_based_on_point_reduction
+
+        # Use self.point_observation_space in the definition of observations
+        if self.scale_observation:
+            self.point_observation_space = spaces.Box(low=-1.0, high=np.inf,
+                                                      shape=(self.max_number_points, self.dimension),
+                                                      dtype=np.float32)
+        else:
+            self.point_observation_space = spaces.Box(low=-1.0, high=1.0, shape=(self.max_number_points, self.dimension),
+                                                      dtype=np.float32)
+
+        # Configs to pass down to other functions
+        self.config_for_points = {key: getattr(self, key) for key in self.config_key_for_points}
+        self.config_for_generate_points = {key: getattr(self, key) for key in self.config_key_for_generate_points}
 
         # States. Will be implemented in reset()
         self._points = None
         self._coords = []
+        self.current_step = 0
+        self.exceed_threshold = False
+        self.last_action_taken = None
 
     def reset(self,
               points=None,
@@ -56,13 +88,23 @@ class HironakaBase(gym.Env, abc.ABC):
 
         if points is None:
             self._points = Points(
-                [generate_points(self.max_number_points, dim=self.dimension, max_value=self.max_value)])
+                [generate_points(self.max_number_points, **self.config_for_generate_points)],
+                value_threshold=self.value_threshold
+            )
         else:
-            self._points = Points(points)
+            self._points = Points(points, **self.config_for_points)
+
+        self._points.get_newton_polytope()
+        if self.scale_observation:
+            self._points.rescale(inplace=True)
+
+        self.current_step = 0
+        self.exceed_threshold = False
+        self.last_action_taken = None
 
         # This line guarantees that the points underwent Newton Polytope process. But in principle, the input
         # should have gone through it before being passed to reset(). For max efficiency run, we may ignore it.
-        if not self.max_efficiency:
+        if not self.improve_efficiency:
             self._points.get_newton_polytope()
 
         self._post_reset_update()
@@ -82,7 +124,7 @@ class HironakaBase(gym.Env, abc.ABC):
 
     @abc.abstractmethod
     def step(self, action):
-        pass
+        self.current_step += 1
 
     def render(self, mode='ansi'):
         print(self._points)
@@ -117,6 +159,13 @@ class HironakaBase(gym.Env, abc.ABC):
             coords_multi_bin[self._coords] = 1
         return coords_multi_bin
 
-    @staticmethod
-    def _get_info() -> Dict:
-        return dict()
+    def _get_info(self) -> Dict:
+        if self.improve_efficiency:
+            return {}
+        else:
+            return {
+                'step_threshold': self.step_threshold,
+                'current_step': self.current_step,
+                'exceed_threshold': self.exceed_threshold,
+                'last_action_taken': self.last_action_taken
+            }

@@ -15,7 +15,7 @@ class Host(abc.ABC):
 class RandomHost(Host):
     def select_coord(self, points: Points, debug=False):
         dim = points.dim
-        return [np.random.choice(list(range(dim)), size=2) for _ in range(points.batchNum)]
+        return [np.random.choice(list(range(dim)), size=2) for _ in range(points.batch_size)]
 
 
 class Zeillinger(Host):
@@ -39,7 +39,7 @@ class Zeillinger(Host):
         assert not points.ended
         dim = points.dim
         result = []
-        for b in range(points.batchNum):
+        for b in range(points.batch_size):
             pts = points.get_batch(b)
             if len(pts) <= 1:
                 result.append([])

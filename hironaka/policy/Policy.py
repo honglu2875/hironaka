@@ -24,7 +24,8 @@ class Policy(abc.ABC):
                  mode: str,
                  max_number_points: int,
                  dimension: Optional[int] = 3,
-                 normalized: Optional[bool] = True):
+                 normalized: Optional[bool] = False,
+                 **kwargs):
         if mode not in self.allowed_modes:
             raise Exception(f'"mode" must be one of {self.allowed_modes}. Got {mode} instead.')
         self.mode = mode
