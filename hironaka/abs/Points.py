@@ -7,6 +7,9 @@ from hironaka.src import shift_lst, get_newton_polytope_lst, get_shape, scale_po
 
 
 class Points(PointsBase):
+    """
+        When dealing with small batches, small dimension and small point numbers, list is much better than numpy.
+    """
     config_keys = ['value_threshold']
 
     def __init__(self,
@@ -94,7 +97,7 @@ class Points(PointsBase):
                 [
                     sum([
                         x[i] ** j for x in batch
-                    ]) for i in range(self.dim)
+                    ]) for i in range(self.dimension)
                 ] for j in range(1, self.max_num_points + 1)
             ] for batch in self.points
         ]
