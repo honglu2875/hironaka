@@ -131,6 +131,7 @@ dmypy.json
 
 # High-fly cluster config
 .hfai
+.hfignore
 
 # PyCharm
 .idea
