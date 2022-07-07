@@ -143,7 +143,7 @@ def ThomPointsHomogeneous(Ord: int):
 
 
 #print(ThomPoints(4))
-#print(ThomPoints(4)[-1])
+##print(ThomPoints(4)[-1])
 #print(ThomPointsHomogeneous(4)[-1])
 #for k in range(2,4):
 #    print(len(ThomPoints(k)[0]),ThomPoints(k))
