@@ -3,7 +3,7 @@ from typing import List, Any, Dict, Optional, Union
 import numpy as np
 
 from hironaka.abs.PointsBase import PointsBase
-from hironaka.src import shift_lst, get_newton_polytope_lst, get_shape, scale_points
+from hironaka.src import shift_lst, get_newton_polytope_lst, get_shape, scale_points, reposition_lst
 
 
 class Points(PointsBase):
@@ -53,6 +53,9 @@ class Points(PointsBase):
                axis: List[int],
                inplace: Optional[bool] = True):
         return shift_lst(points, coords, axis, inplace=inplace)
+
+    def _reposition(self, points: Any, inplace: Optional[bool] = True):
+        return reposition_lst(points, inplace=inplace)
 
     def _get_newton_polytope(self, points: Any, inplace: Optional[bool] = True):
         return get_newton_polytope_lst(points, inplace=inplace, get_ended=False)

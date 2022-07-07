@@ -23,6 +23,7 @@ class PointsBase(abc.ABC):
         Need to implement:
             _get_shape
             _get_newton_polytope
+            _reposition
             _shift
             _rescale
             _point_copy
@@ -94,6 +95,16 @@ class PointsBase(abc.ABC):
             Shift each batch according to the list of coords and axis.
         """
         r = self._shift(self.points, coords, axis, inplace=inplace)
+        if inplace:
+            return None
+        else:
+            return self.copy(points=r)
+
+    def reposition(self, inplace=True):
+        """
+            Reposition batches of points so that each batch touches all the coordinate planes.
+        """
+        r = self._reposition(self.points, inplace=inplace)
         if inplace:
             return None
         else:
@@ -178,6 +189,18 @@ class PointsBase(abc.ABC):
                 points: the point data (must be mutable).
                 coords: the list of chosen coordinates.
                 axis: the list of chose axis.
+                inplace: True, directly make modifications on the reference `points`. False, return as a new object.
+            Returns:
+                None if inplace==True. The new object if inplace==False.
+        """
+        pass
+
+    @abc.abstractmethod
+    def _reposition(self, points: Any, inplace: Optional[bool] = True):
+        """
+            Reposition batches of points so that each batch touches all the coordinate planes.
+            Parameters:
+                points: the point data.
                 inplace: True, directly make modifications on the reference `points`. False, return as a new object.
             Returns:
                 None if inplace==True. The new object if inplace==False.
