@@ -69,12 +69,9 @@ class PointsBase(abc.ABC):
 
         self.points = points
 
-        self.batch_size, self.max_num_points, self.dimension = None, None, None  # Prevent warnings from linter
         self.batch_size = self.config.get('points_batch_size', shape[0])
         self.dimension = self.config.get('dimension', shape[2])
-        # If `max_num_points` is not in the config, find it.
-        if not hasattr(self, 'max_num_points'):
-            self.max_num_points = self._get_max_num_points()
+        self.max_num_points = self.config.get('max_number_points', self._get_max_num_points())
 
         # self.ended represents whether the whole game (for all batches) has ended
         # will be updated on point-changing modifications including `get_newton_polytope`
