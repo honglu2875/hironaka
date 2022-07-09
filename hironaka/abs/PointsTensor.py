@@ -5,9 +5,10 @@ import torch
 
 from hironaka.abs.PointsBase import PointsBase
 from hironaka.src import shift_lst, get_newton_polytope_lst, get_shape, scale_points, get_batched_padded_array
+from hironaka.src._torch_ops import shift_torch, get_newton_polytope_torch, reposition_torch
 
 
-class PointsTorch(PointsBase):
+class PointsTensor(PointsBase):
     config_keys = ['value_threshold', 'device_key', 'padded_value']
 
     def __init__(self,
@@ -21,8 +22,6 @@ class PointsTorch(PointsBase):
         self.value_threshold = value_threshold
 
         # It's better to require a fixed shape of the tensor implementation.
-        if 'max_num_points' not in config:
-            raise Exception("Must have `max_num_points` in parameters.")
 
         if isinstance(points, list):
             points = torch.FloatTensor(
@@ -34,6 +33,8 @@ class PointsTorch(PointsBase):
         else:
             raise Exception(f"Input must be a Tensor, a numpy array or a nested list. Got {type(points)}.")
 
+        self.batch_size, self.max_num_points, self.dimension = points.shape
+
         self.device_key = device_key
         self.padded_value = padded_value
 
@@ -41,53 +42,49 @@ class PointsTorch(PointsBase):
         self.device = torch.device(self.device_key)
         self.points.to(self.device)
 
-    # TODO:
     def exceed_threshold(self) -> bool:
         """
             Check whether the maximal value exceeds the threshold.
         """
         if self.value_threshold is not None:
-            if torch.max(self.points) >= self.value_threshold:
-                return True
+            return torch.max(self.points) >= self.value_threshold
         return False
 
     def get_num_points(self) -> List[int]:
         """
             The number of points for each batch.
         """
-        first_slice = self.points[:, :, 0].ge(0)
-        # TODO:
-
-        return [len(batch) for batch in self.points]
+        num_points = torch.sum(self.points[:, :, 0].ge(0), dim=1)
+        return num_points.cpu().tolist()
 
     def _shift(self,
-               points: Any,
+               points: torch.Tensor,
                coords: List[List[int]],
                axis: List[int],
                inplace: Optional[bool] = True):
-        return shift_lst(points, coords, axis, inplace=inplace)
+        return shift_torch(points, coords, axis, inplace=inplace)
 
-    def _get_newton_polytope(self, points: Any, inplace: Optional[bool] = True):
-        return get_newton_polytope_lst(points, inplace=inplace, get_ended=False)
+    def _get_newton_polytope(self, points: torch.Tensor, inplace: Optional[bool] = True):
+        return get_newton_polytope_torch(points, inplace=inplace)
 
-    def _get_shape(self, points: Any):
-        return get_shape(points)
+    def _get_shape(self, points: torch.Tensor):
+        return points.shape
 
-    def _rescale(self, points: Any, inplace: Optional[bool] = True):
-        return scale_points(points, inplace=inplace)
+    def _reposition(self, points: torch.Tensor, inplace: Optional[bool] = True):
+        return reposition_torch(points, inplace=inplace)
 
-    def _points_copy(self, points: Any):
-        return [[point.copy() for point in batch] for batch in points]
+    def _rescale(self, points: torch.Tensor, inplace: Optional[bool] = True):
+        return points / torch.reshape(torch.amax(points, (1, 2)), (-1, 1, 1))
 
-    def _add_batch_axis(self, points: Any):
-        return [points]
+    def _points_copy(self, points: torch.Tensor):
+        return points.clone().detach()
 
-    def _get_batch_ended(self, points: Any):
-        ended_each_batch = []
-        for p in points:
-            assert len(p) != 0
-            ended_each_batch.append(True if len(p) <= 1 else False)
-        return ended_each_batch
+    def _add_batch_axis(self, points: torch.Tensor):
+        return points.unsqueeze(0)
+
+    def _get_batch_ended(self, points: torch.Tensor):
+        num_points = torch.sum(points[:, :, 0].ge(0), 1)
+        return num_points.le(1).cpu().detach().tolist()
 
     def __repr__(self):
         return str(self.points)
