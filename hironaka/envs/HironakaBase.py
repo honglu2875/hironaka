@@ -39,7 +39,8 @@ class HironakaBase(gym.Env, abc.ABC):
                  dimension: Optional[int] = 3,
                  max_number_points: Optional[int] = 10,
                  max_value: Optional[int] = 10,
-                 value_threshold: Optional[int] = None,
+                 padding_value: Optional[float] = -1e-8,
+                 value_threshold: Optional[float] = None,
                  step_threshold: Optional[int] = 1000,
                  fixed_penalty_crossing_threshold: Optional[int] = None,
                  stop_at_threshold: Optional[bool] = True,
@@ -50,6 +51,7 @@ class HironakaBase(gym.Env, abc.ABC):
         self.dimension = dimension
         self.max_number_points = max_number_points
         self.max_value = max_value
+        self.padding_value = padding_value
         self.value_threshold = value_threshold
         self.step_threshold = step_threshold
         self.fixed_penalty_crossing_threshold = fixed_penalty_crossing_threshold
@@ -140,12 +142,14 @@ class HironakaBase(gym.Env, abc.ABC):
         """
         pass
 
-    def _get_padded_points(self) -> np.ndarray:
+    def _get_padded_points(self, constant_value: Optional[int] = -1e8) -> np.ndarray:
         """
             a utility method that returns -1 padded point information.
             return: numpy array of shape (self.max_number_points, self.dimension)
         """
-        return get_padded_array(self._points.get_features()[0], new_length=self.max_number_points).astype(np.float32)
+        return get_padded_array(self._points.get_features()[0],
+                                new_length=self.max_number_points,
+                                constant_value=constant_value).astype(np.float32)
 
     def _get_coords_multi_bin(self) -> np.ndarray:
         """

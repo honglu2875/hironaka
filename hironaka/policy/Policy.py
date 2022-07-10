@@ -1,4 +1,5 @@
 import abc
+import logging
 from typing import Any, Optional, List, Tuple
 
 import torch
@@ -18,23 +19,29 @@ class Policy(abc.ABC):
             predict
     """
     allowed_modes = ['host', 'agent']
+    logger = None
 
     @abc.abstractmethod
     def __init__(self,
                  mode: str,
                  max_number_points: int,
+                 padding_value: Optional[float] = -1e-8,
                  dimension: Optional[int] = 3,
                  normalized: Optional[bool] = False,
                  **kwargs):
+        if self.logger is None:
+            self.logger = logging.getLogger(__class__.__name__)
+
         if mode not in self.allowed_modes:
             raise Exception(f'"mode" must be one of {self.allowed_modes}. Got {mode} instead.')
         self.mode = mode
         self.dimension = dimension
         self.max_number_points = max_number_points
+        self.padding_value = padding_value
         self.normalized = normalized
 
     @abc.abstractmethod
-    def predict(self, features: Any) -> Any:
+    def predict(self, features: Any, debug: Optional[bool] = False) -> Any:
         """
             Return the prediction based on the observed features.
 
@@ -50,7 +57,7 @@ class Policy(abc.ABC):
         """
         feature_tensor = torch.flatten(
             torch.FloatTensor(
-                get_batched_padded_array(features, self.max_number_points)
+                get_batched_padded_array(features, self.max_number_points, constant_value=self.padding_value)
             ), start_dim=1)  # TODO: maybe add a GPU option for the process?
         if self.normalized:
             return torch.nn.functional.normalize(feature_tensor, p=1.0)
@@ -66,7 +73,7 @@ class Policy(abc.ABC):
 
         feature_tensor = torch.flatten(
             torch.FloatTensor(
-                get_batched_padded_array(features[0], self.max_number_points)
+                get_batched_padded_array(features[0], self.max_number_points, constant_value=self.padding_value)
             ), start_dim=1)
         if self.normalized:
             feature_tensor = torch.nn.functional.normalize(feature_tensor, p=1.0)
