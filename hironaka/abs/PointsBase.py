@@ -20,9 +20,10 @@ class PointsBase(abc.ABC):
             self.points: List[List[List[int]]]
         But one should feel free to implement it in any other different data types.
 
-        Need to implement:
+        Must implement:
             _get_shape
             _get_newton_polytope
+            _reposition
             _shift
             _rescale
             _point_copy
@@ -30,9 +31,10 @@ class PointsBase(abc.ABC):
             _get_batch_ended
         Feel free to override:
             get_features
+            _get_max_num_points
     """
     # You MUST define `config_keys` when inheriting.
-    # Keys in `config_keys` will be tracked when calling `copy()` method.
+    # Keys in `config_keys` will be tracked when calling the `copy()` method.
     config_keys: List[str]
 
     def __init__(self,
@@ -42,7 +44,7 @@ class PointsBase(abc.ABC):
             Comments:
                 Arguments when inheriting __init__:
                     self, <keys in config_keys>, config_kwargs=None, **kwargs
-                Then please combine `config_kwargs` with `kwargs` into a dict (say, `config`) and call
+                Then please combine `config_kwargs` and `kwargs` into a dict (say, `config`), and call
                     super().__init__(points, **config)
                 at the end.
         """
@@ -51,6 +53,7 @@ class PointsBase(abc.ABC):
         else:
             self.config = kwargs
 
+        # Update keys if modified or created in subclass
         for key in self.config_keys:
             self.config[key] = getattr(self, key)
 
@@ -65,7 +68,10 @@ class PointsBase(abc.ABC):
             raise Exception("input dimension must be 2 or 3.")
 
         self.points = points
-        self.batch_size, self.max_num_points, self.dim = shape
+
+        self.batch_size = self.config.get('points_batch_size', shape[0])
+        self.dimension = self.config.get('dimension', shape[2])
+        self.max_num_points = self.config.get('max_number_points', self._get_max_num_points())
 
         # self.ended represents whether the whole game (for all batches) has ended
         # will be updated on point-changing modifications including `get_newton_polytope`
@@ -94,6 +100,16 @@ class PointsBase(abc.ABC):
             Shift each batch according to the list of coords and axis.
         """
         r = self._shift(self.points, coords, axis, inplace=inplace)
+        if inplace:
+            return None
+        else:
+            return self.copy(points=r)
+
+    def reposition(self, inplace=True):
+        """
+            Reposition batches of points so that each batch touches all the coordinate planes.
+        """
+        r = self._reposition(self.points, inplace=inplace)
         if inplace:
             return None
         else:
@@ -185,6 +201,18 @@ class PointsBase(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def _reposition(self, points: Any, inplace: Optional[bool] = True):
+        """
+            Reposition batches of points so that each batch touches all the coordinate planes.
+            Parameters:
+                points: the point data.
+                inplace: True, directly make modifications on the reference `points`. False, return as a new object.
+            Returns:
+                None if inplace==True. The new object if inplace==False.
+        """
+        pass
+
+    @abc.abstractmethod
     def _rescale(self, points: Any, inplace: Optional[bool] = True):
         """
             Rescale the points.
@@ -219,12 +247,21 @@ class PointsBase(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def _get_batch_ended(self, points: Any):
+    def _get_batch_ended(self, points: Any) -> List[bool]:
         """
             Get a list of bool representing whether each batch of points has ended (having only 1 point left).
             Parameters:
                 points: the point data.
-            Returns:
-                List[bool]
+            Returns: List[bool]
         """
         pass
+
+    def _get_max_num_points(self) -> int:
+        """
+            Get the maximal number of points in all batches
+            Returns: int
+        """
+        max_num_points = 0
+        for b in range(self.batch_size):
+            max_num_points = max(max_num_points, len(self.get_batch(b)))
+        return max_num_points

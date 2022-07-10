@@ -3,10 +3,13 @@ from typing import List, Any, Dict, Optional, Union
 import numpy as np
 
 from hironaka.abs.PointsBase import PointsBase
-from hironaka.src import shift_lst, get_newton_polytope_lst, get_shape, scale_points
+from hironaka.src import shift_lst, get_newton_polytope_lst, get_shape, scale_points, reposition_lst
 
 
 class Points(PointsBase):
+    """
+        When dealing with small batches, small dimension and small point numbers, list is much better than numpy.
+    """
     config_keys = ['value_threshold']
 
     def __init__(self,
@@ -54,6 +57,9 @@ class Points(PointsBase):
                inplace: Optional[bool] = True):
         return shift_lst(points, coords, axis, inplace=inplace)
 
+    def _reposition(self, points: Any, inplace: Optional[bool] = True):
+        return reposition_lst(points, inplace=inplace)
+
     def _get_newton_polytope(self, points: Any, inplace: Optional[bool] = True):
         return get_newton_polytope_lst(points, inplace=inplace, get_ended=False)
 
@@ -91,7 +97,7 @@ class Points(PointsBase):
                 [
                     sum([
                         x[i] ** j for x in batch
-                    ]) for i in range(self.dim)
+                    ]) for i in range(self.dimension)
                 ] for j in range(1, self.max_num_points + 1)
             ] for batch in self.points
         ]
