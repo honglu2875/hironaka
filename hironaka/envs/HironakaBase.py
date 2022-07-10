@@ -142,13 +142,12 @@ class HironakaBase(gym.Env, abc.ABC):
         """
         pass
 
-    def _get_padded_points(self, constant_value: Optional[int] = -1e8) -> np.ndarray:
+    def _get_padded_points(self, constant_value: Optional[int] = -1e-8) -> np.ndarray:
         """
             a utility method that returns -1 padded point information.
             return: numpy array of shape (self.max_number_points, self.dimension)
         """
-        return get_padded_array(self._points.get_features()[0],
-                                new_length=self.max_number_points,
+        return get_padded_array(self._points.get_features()[0], new_length=self.max_number_points,
                                 constant_value=constant_value).astype(np.float32)
 
     def _get_coords_multi_bin(self) -> np.ndarray:

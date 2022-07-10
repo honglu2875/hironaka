@@ -56,7 +56,7 @@ def get_padded_array(f: Union[List[List[int]], np.ndarray], new_length, constant
     """
         This augments a 2d nested list (axis 1 having uniform length) on axis 0 into given length.
     """
-    f_np = np.array(f)
+    f_np = np.array(f).astype(float)
     f_np = np.pad(f_np, ((0, new_length - f_np.shape[0]), (0, 0)), mode='constant', constant_values=constant_value)
     return f_np
 
@@ -69,7 +69,7 @@ def get_batched_padded_array(f: List[List[List[int]]], new_length, constant_valu
 
     result = []
     for f_batch in f:
-        result.append(get_padded_array(f_batch, new_length, constant_value))
+        result.append(get_padded_array(f_batch, new_length, constant_value=constant_value))
     return np.stack(result, axis=0)
 
 

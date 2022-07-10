@@ -29,7 +29,7 @@ class NNPolicy(Policy):
         super().__init__(**config)
 
         self._model = model
-        if use_cuda or config_kwargs.get('use_cuda'):
+        if use_cuda or config.get('use_cuda'):
             self._device = torch.device('cuda')
         else:
             self._device = torch.device('cpu')
