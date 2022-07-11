@@ -1,57 +1,9 @@
-from typing import List, Tuple
+import numpy as np
 
 
-def getNewtonPolytope_approx(points: List[Tuple[int]]):
-    """
-        A simple-minded quick-and-dirty method to obtain an approximation of Newton Polytope disregarding convexity.
-    """
-    assert points
-
-    if len(points) == 1:
-        return points
-    DIM = len(points[0])
-
-    points = sorted(points)
-    result = []
-    for i in range(len(points)):
-        contained = False
-        for j in range(i):
-            if sum([points[j][k] > points[i][k] for k in range(DIM)]) == 0:
-                contained = True
-                break
-        if not contained:
-            result.append(points[i])
-    return result
+def generate_points(n: int, dimension=3, max_value=50):
+    return [[np.random.randint(max_value) for _ in range(dimension)] for _ in range(n)]
 
 
-def getNewtonPolytope(points: List[Tuple[int]]):
-    """
-        Get the Newton Polytope for a set of points.
-    """
-    return getNewtonPolytope_approx(points)  # TODO: change to a more precise algo to obtain Newton Polytope
-
-
-def shift(points: List[Tuple[int]], coords: List[int], axis: int):
-    """
-        Shift a set of points according to the rule of Hironaka game.
-    """
-    assert axis in coords
-    assert points
-
-    if len(points) == 1:
-        return points
-    DIM = len(points[0])
-
-    return [tuple([
-        sum([x[k] for k in coords]) if i == axis else x[i]
-        for i in range(DIM)])
-        for x in points]
-
-#print(QuadraticPart(3))
-#print(sp.flatten([QuadraticPart(3)[1][i,i:] for i in range(QuadraticPart(3)[1].rows)]))
-
-#print(QuadraticFixedPoints(3))
-
-#print(ThomMonomialIdeal(3))
-
-
+def generate_batch_points(n: int, batch_num=1, dimension=3, max_value=50):
+    return [[[np.random.randint(max_value) for _ in range(dimension)] for _ in range(n)] for _ in range(batch_num)]

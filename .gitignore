@@ -127,3 +127,11 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+
+# High-fly cluster config
+.hfai
+.hfignore
+
+# PyCharm
+.idea
