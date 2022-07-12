@@ -82,3 +82,36 @@ def shift_lst(points: List[List[List[int]]], coords: List[List[int]], axis: List
             ] for x in point
         ] for point, coord, ax in zip(points, coords, axis)]
         return result
+
+
+def reposition_lst(points: List[List[List[int]]], inplace=True):
+    """
+        Reposition all batches of points so that each of them hits all coordinate planes.
+    """
+    dim = len(points[0][0])
+    new_points = []
+    for b in range(len(points)):
+        min_vector = []
+        for i in range(dim):
+            min_value = points[b][0][i]
+            for point in points[b]:
+                min_value = min(point[i], min_value)
+            min_vector.append(min_value)
+
+        if not inplace:
+            new_points.append([])
+
+        for point in points[b]:
+            new_point = None if inplace else []
+            for i in range(dim):
+                if inplace:
+                    point[i] -= min_vector[i]
+                else:
+                    new_point.append(point[i] - min_vector[i])
+            if not inplace:
+                new_points[-1].append(new_point)
+
+    if inplace:
+        return None
+    else:
+        return new_points

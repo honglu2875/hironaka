@@ -121,3 +121,20 @@ class TestPoints(unittest.TestCase):
         assert str(points) == str(r)
         # p2.shift([[1, 3]], [3])
         # print(p2)
+
+    def test_value_threshold(self):
+        points = Points([[[5e7, 5e7+1, 1e7], [1, 1, 2]]], value_threshold=int(1e8))
+        assert not points.exceed_threshold()
+        points.shift([[0, 1]], [0])
+        assert points.exceed_threshold()
+
+    def test_reposition(self):
+        points = Points(make_nested_list(
+            [(7, 5, 3, 8), (8, 1, 8, 18), (8, 3, 17, 8),
+             (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)]
+        ))
+        r = Points([[[0, 4, 2, 2], [1, 0, 7, 12], [1, 2, 16, 2], [4, 10, 0, 13], [4, 11, 17, 0], [9, 10, 4, 0]]])
+        points.reposition()
+        a = points.reposition(inplace=False)
+        assert str(points) == str(r)
+        assert str(points) == str(a)

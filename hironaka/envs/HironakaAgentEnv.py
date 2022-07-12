@@ -1,10 +1,11 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 import numpy as np
 from gym import spaces
 
 from hironaka.agent import Agent
 from hironaka.envs.HironakaBase import HironakaBase
+from hironaka.src import decode_action
 
 
 class HironakaAgentEnv(HironakaBase):
@@ -14,21 +15,31 @@ class HironakaAgentEnv(HironakaBase):
 
     def __init__(self,
                  agent: Agent,
+                 use_discrete_actions_for_host: Optional[bool] = False,
                  config_kwargs: Optional[Dict[str, Any]] = None,
                  **kwargs):
-        config_kwargs = dict() if config_kwargs is None else config_kwargs
-        super().__init__(**{**config_kwargs, **kwargs})
+        config = kwargs if config_kwargs is None else {**kwargs, **config_kwargs}
+        super().__init__(**config)
 
         self.agent = agent
+        self.use_discrete_actions_for_host = config.get('use_discrete_actions_for_host', use_discrete_actions_for_host)
 
         self.observation_space = self.point_observation_space
-        self.action_space = spaces.MultiBinary(self.dimension)
+        if self.use_discrete_actions_for_host:
+            self.action_space = spaces.Discrete(2 ** self.dimension)
+        else:
+            self.action_space = spaces.MultiBinary(self.dimension)
 
     def _post_reset_update(self):
         pass
 
-    def step(self, action: np.ndarray):
-        super().step(action)  # reset self.current_step
+    def step(self, action: Union[np.ndarray, int]):
+        # `action` for HironakaAgentEnv: a binary vector of 0/1 according to chosen coordinates by the host.
+
+        super().step(action)  # update self.current_step
+        # decode the action if discrete
+        if self.use_discrete_actions_for_host:
+            action = decode_action(action, self.dimension)
 
         stopped = False
         reward = 0
@@ -61,4 +72,4 @@ class HironakaAgentEnv(HironakaBase):
         return observation, reward, stopped, info
 
     def _get_obs(self):
-        return self._get_padded_points()
+        return self._get_padded_points(constant_value=self.padding_value)

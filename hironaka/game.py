@@ -24,7 +24,7 @@ class Game(abc.ABC):
             self.logger = logging.getLogger(__class__.__name__)
 
         self.state = state
-        self.dim = state.dim if state is not None else None
+        self.dimension = state.dimension if state is not None else None
         self.host = host
         self.agent = agent
 
