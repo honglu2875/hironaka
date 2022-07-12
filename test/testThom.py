@@ -32,7 +32,7 @@ class TestThom(unittest.TestCase):
         print(game.move_history)
 
     def test_ThomTree(self):
-        points = thom_points_homogeneous(4)
+        points = thom_points_homogeneous(3)
         print(f"Points: {points}")
         dimension = len(points[0])
         initial_points = Points([points], distinguished_points=[len(points) - 1])

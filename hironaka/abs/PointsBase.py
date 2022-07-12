@@ -1,4 +1,5 @@
 import abc
+from copy import deepcopy
 from typing import Any, Optional, List
 
 
@@ -36,6 +37,8 @@ class PointsBase(abc.ABC):
     # You MUST define `config_keys` when inheriting.
     # Keys in `config_keys` will be tracked when calling the `copy()` method.
     subcls_config_keys: List[str]
+    # Keys in `copied_attributes` will be directly copied during `copy()`. They MUST be initialized.
+    copied_attributes: List[str]
 
     def __init__(self,
                  points: Any,
@@ -96,7 +99,14 @@ class PointsBase(abc.ABC):
             new_points = self._points_copy(self.points)
         else:
             new_points = self._points_copy(points)
-        return self.__class__(new_points, **self.config)
+        new_points = self.__class__(new_points, **self.config)
+
+        for key in self.copied_attributes:
+            if hasattr(self, key):
+                setattr(new_points, key, deepcopy(getattr(self, key)))
+            else:
+                raise Exception(f"Attribute {key} is not initialized.")
+        return new_points
 
     def shift(self, coords: List[List[int]], axis: List[int], inplace=True):
         """
@@ -132,7 +142,7 @@ class PointsBase(abc.ABC):
             return None
         else:
             new_points = self.copy(points=r)
-            new_points.ended_each_batch = ended_each_batch
+            new_points.ended_each_batch = ended_each_batch  # TODO: duplicate?
             new_points.ended = ended
             return new_points
 

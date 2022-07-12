@@ -22,30 +22,25 @@ def search_tree_morin(points: Points, tree, curr_node, curr_weights, host, max_s
             node_id = tree.size()
             tree.create_node(node_id, node_id, parent=curr_node, data=NoCont('...more...'))
         return tree
-    shifts = []
     coords = host.select_coord(points)[0]
-
-    print(f"Weight {points}, {curr_weights}, {coords}")
 
     for action in coords:
         if curr_weights[action] > min([curr_weights[i] for i in coords]):
             continue
 
         changing_coordinate = [coord for coord in coords if coord != action]
-        next_weights = [curr_weights[i] if i not in changing_coordinate else 0 for i in range(len(curr_weights))]
+        next_weights = [curr_weights[i] if i not in changing_coordinate else curr_weights[i]-curr_weights[action] for i in range(len(curr_weights))]
 
         new_points = points.shift([coords], [action], inplace=False)
+
         new_points.reposition()
         new_points.get_newton_polytope()
 
-        if new_points.distinguished_points[0] is not None:
-            shifts.append(new_points)
-        else:
+        if new_points.distinguished_points[0] is None:
             node_id = tree.size()
             tree.create_node(node_id, node_id, parent=curr_node, data=NoCont('No contribution'))
-            return tree
+            continue
         node_id = tree.size()
-        tree.create_node(node_id, node_id, parent=curr_node, data=shifts[-1])
-
-        search_tree_morin(shifts[-1], tree, node_id, next_weights, host, max_size)
+        tree.create_node(node_id, node_id, parent=curr_node, data=NoCont(str(new_points) + f", {new_points.distinguished_points}"))
+        search_tree_morin(new_points, tree, node_id, next_weights, host, max_size)
     return tree
