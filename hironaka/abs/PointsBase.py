@@ -35,7 +35,7 @@ class PointsBase(abc.ABC):
     """
     # You MUST define `config_keys` when inheriting.
     # Keys in `config_keys` will be tracked when calling the `copy()` method.
-    config_keys: List[str]
+    subcls_config_keys: List[str]
 
     def __init__(self,
                  points: Any,
@@ -54,8 +54,11 @@ class PointsBase(abc.ABC):
             self.config = kwargs
 
         # Update keys if modified or created in subclass
-        for key in self.config_keys:
-            self.config[key] = getattr(self, key)
+        for key in self.subcls_config_keys:
+            if hasattr(self, key):
+                self.config[key] = getattr(self, key)
+            else:
+                raise Exception("Must initialize keys in 'subcls_config_keys' before calling super().__init__.")
 
         # Check the shape of `points`.
         shape = self._get_shape(points)

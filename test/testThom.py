@@ -1,30 +1,24 @@
-from hironaka.host import Zeillinger, RandomHost
-from hironaka.agent import RandomAgent
-from hironaka.agentThom import AgentThom, AgentMorin
-from hironaka.game import Game
-from hironaka.gameThom import GameThom, GameMorin
-from hironaka.util import getNewtonPolytope
-from hironaka.util.geomThom import ThomPoints, ThomPointsHomogeneous
-from hironaka.util import searchDepth, searchTree
-from hironaka.util.searchThom import searchTreeMorin
-from treelib import Node, Tree
-from dataclasses import dataclass
-from typing import List
-from collections import deque
-from typing import List, Tuple
-import numpy as np
+import unittest
 
-from hironaka.util.search import searchDepth
+import numpy as np
+from treelib import Tree
+
+from hironaka.abs import Points
+from hironaka.agentThom import AgentMorin
+from hironaka.gameThom import GameMorin
+from hironaka.host import Zeillinger
+from hironaka.util.geomThom import thom_points, thom_points_homogeneous, thom_monomial_ideal
+from hironaka.util.searchThom import search_tree_morin
 
 
 class TestThom(unittest.TestCase):
-    def test_ThomPoints(self):
-
+    def test_game(self):
+        N = 4
         host = Zeillinger()
         agent = AgentMorin()
-        points = ThomPointsHomogeneous(4)
-        opoints = ThomPoints(4)
-        game = GameMorin(points, host, agent)
+        points = thom_points_homogeneous(N)
+        opoints = thom_points(N)
+        game = GameMorin(Points([points], distinguished_points=[len(points) - 1]), host, agent)
         print('Original Points:', opoints)
         print('Homogeneous Points:', points)
         for i in range(100):
@@ -34,25 +28,40 @@ class TestThom(unittest.TestCase):
                 break
 
         print("-------")
-        print(game.coordHistory)
-        print(game.moveHistory)
-
-
+        print(game.coord_history)
+        print(game.move_history)
 
     def test_ThomTree(self):
+        points = thom_points_homogeneous(4)
+        print(f"Points: {points}")
+        dimension = len(points[0])
+        initial_points = Points([points], distinguished_points=[len(points) - 1])
 
-        agent = AgentMorin()
         tree = Tree()
-        tree.create_node(0, 0, data=Points(points))
-        MAX_SIZE=10000
+        tree.create_node(0, 0, data=initial_points)
+        MAX_SIZE = 10000
+
         host = Zeillinger()
-        weights = np.ones(len(points[0]))
-        searchTreeMorin(points, tree, 0, weights, host, MAX_SIZE=MAX_SIZE)
-        tree.show(data_property="data", idhidden=False)
+        weights = [1] * dimension
+        search_tree_morin(initial_points, tree, 0, weights, host, max_size=MAX_SIZE)
+        tree.show(data_property="points", idhidden=False)
         tree.depth()
 
-print(ThomPoints(3))
-#print(ThomPoints(4)[-1])
-#print(ThomPointsHomogeneous(4)[-1])
-#for k in range(2,4):
-#   print(len(ThomPoints(k)[0]),ThomPoints(k))
+    def test_thom_points(self):
+        thom_points_homogeneous_2 = "[[0, 1]]"
+        assert str(thom_points_homogeneous(2)) == thom_points_homogeneous_2
+
+        thom_points_2 = "[(1, 1)]"
+        assert str(thom_points(2)) == thom_points_2
+
+        thom_monomial_idea_3 = \
+            "[-b[0, 0]**3*b[1, 2], 2*b[0, 0]**2*b[1, 1]**2, -b[0, 0]**3*b[2, 2], b[0, 0]*b[1, 1]*b[2, 2]]"
+        assert str(thom_monomial_ideal(3)) == thom_monomial_idea_3
+
+        thom_points_homogeneous_3 = "[[1, 0, 1, 0], [1, 0, 0, 1], [0, 2, 0, 0], [0, 1, 0, 1]]"
+        assert str(thom_points_homogeneous(3)) == thom_points_homogeneous_3
+
+        thom_points_homogeneous_4 = "[[2, 1, 0, 1, 0, 0, 0], [2, 0, 2, 0, 0, 0, 0], [2, 0, 0, 0, 2, 0, 0], [1, 2, 1, 0, 0, 0, 0], [2, 0, 1, 0, 0, 1, 0], [2, 0, 1, 0, 0, 0, 1], [2, 0, 0, 1, 1, 0, 0], [2, 0, 0, 0, 1, 0, 1], [0, 4, 0, 0, 0, 0, 0], [1, 2, 0, 0, 0, 1, 0], [1, 2, 0, 0, 0, 0, 1], [1, 1, 1, 0, 1, 0, 0], [1, 1, 0, 0, 2, 0, 0], [0, 3, 0, 0, 1, 0, 0], [1, 1, 0, 0, 1, 0, 1]]"
+        assert str(thom_points_homogeneous(4)) == thom_points_homogeneous_4
+
+

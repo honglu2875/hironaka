@@ -1,46 +1,51 @@
+from collections import namedtuple
 from dataclasses import dataclass
 from typing import List, Tuple
 
 import numpy as np
 
-from hironaka.util import shift, getNewtonPolytope
+from hironaka.abs import Points
+from hironaka.src import shift_lst, get_newton_polytope_lst, reposition_lst
 
 
-def searchTreeMorin(points, tree, curr_node, curr_weights, host, MAX_SIZE):
+def search_tree_morin(points: Points, tree, curr_node, curr_weights, host, max_size=100):
     """
         Perform a full tree search and store the full result in a Tree object.
     """
+    NoCont = namedtuple('NoCont', ['points'])
 
-    @dataclass
-    class Points:
-        """
-            a wrapper of a set of points.
-        """
-        data: List[Tuple[int]]
+    if isinstance(curr_weights, np.ndarray):
+        curr_weights = curr_weights.tolist()
 
-    if len(points) == 1 or tree.size() > MAX_SIZE:
-        print('Contr')
-        return
+    if points.ended or tree.size() > max_size:
+        if tree.size() > max_size:
+            node_id = tree.size()
+            tree.create_node(node_id, node_id, parent=curr_node, data=NoCont('...more...'))
+        return tree
     shifts = []
-    coords = host.selectCoord(points)
-    dim = len(points[0])
+    coords = host.select_coord(points)[0]
+
+    print(f"Weight {points}, {curr_weights}, {coords}")
+
     for action in coords:
-        if curr_weights[action] > np.amin([curr_weights[coords]]):
-            return
+        if curr_weights[action] > min([curr_weights[i] for i in coords]):
+            continue
+
+        changing_coordinate = [coord for coord in coords if coord != action]
+        next_weights = [curr_weights[i] if i not in changing_coordinate else 0 for i in range(len(curr_weights))]
+
+        new_points = points.shift([coords], [action], inplace=False)
+        new_points.reposition()
+        new_points.get_newton_polytope()
+
+        if new_points.distinguished_points[0] is not None:
+            shifts.append(new_points)
         else:
-            changingcoordinate = coords[np.where(coords != action)[0][0]]
-            curr_weights[changingcoordinate] = 0
-            ShiftedState = shift(points, coords, action)
-            newState = list(map(tuple, ShiftedState - np.amin(ShiftedState, axis=0)))
-            newNewtonPolytope = getNewtonPolytope(newState)
-            if newState[-1] in newNewtonPolytope:
-                A = newNewtonPolytope.pop(newNewtonPolytope.index(newState[-1]))
-                newNewtonPolytope.append(A)
-                shifts.append(newNewtonPolytope)
-            else:
-                print('No contr')
-                return
+            node_id = tree.size()
+            tree.create_node(node_id, node_id, parent=curr_node, data=NoCont('No contribution'))
+            return tree
         node_id = tree.size()
-        tree.create_node(node_id, node_id, parent=curr_node, data=Points(shifts[-1]))
-        searchTreeMorin(shifts[-1], tree, node_id, curr_weights, host, MAX_SIZE)
+        tree.create_node(node_id, node_id, parent=curr_node, data=shifts[-1])
+
+        search_tree_morin(shifts[-1], tree, node_id, next_weights, host, max_size)
     return tree

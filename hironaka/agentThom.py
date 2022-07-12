@@ -2,59 +2,53 @@ import abc
 
 import numpy as np
 
-from hironaka.util import shift, getNewtonPolytope
+from hironaka.abs import Points
+from hironaka.agent import Agent
+from hironaka.src import shift_lst, get_newton_polytope_lst
 
 
-class TAgent(metaclass=abc.ABCMeta):
+class TAgent(abc.ABC):
     @abc.abstractmethod
-    def move(self, points, weights, restrictAxis):
-        pass
-
-
-class MAgent(metaclass=abc.ABCMeta):
-    @abc.abstractmethod
-    def move(self, points, weights, restrictAxis):
+    def move(self, points: Points, weights, coords):
         pass
 
 
 class AgentThom(TAgent):
-    def move(self, points, weights, restrictAxis):
-        dim = len(points[0])
-        #print(restrictAxis, restrictAxis[0],restrictAxis[1])
-        if weights[restrictAxis[0]] == weights[restrictAxis[1]]:
-            action = np.random.choice(restrictAxis, size=1)[0]
-            #print(action)
+    def move(self, points: Points, weights, coords):
+        assert points.batch_size == 1  # Temporarily only support batch size 1. TODO: generalize!
+        weights = weights[0]
+        coords = coords[0]
+
+        if weights[coords[0]] == weights[coords[1]]:
+            action = np.random.choice(coords, size=1)[0]
         else:
-            action = restrictAxis[np.argmin([weights[restrictAxis[0]], weights[restrictAxis[1]]])]
-        changingcoordinate = restrictAxis[np.where(restrictAxis != action)[0][0]]
-        weights[changingcoordinate] = 0
-        newState = shift(points, restrictAxis, action)
-        #print(newState, list(map(tuple,newState-np.amin(newState, axis=0))))
-        return (getNewtonPolytope(list(map(tuple,newState-np.amin(newState, axis=0)))), action, weights)
+            action = coords[np.argmin([weights[coords[0]], weights[coords[1]]])]
+        changing_coordinate = [coord for coord in coords if coord != action]
+        next_weights = [weights[i] if i not in changing_coordinate else 0 for i in range(len(weights))]
+        points.shift([coords], [action])
+        points.reposition()
+        points.get_newton_polytope()
+        return points, action, [next_weights]
 
 
-class AgentMorin(MAgent):
-    def move(self, points, weights, restrictAxis):
-        dim = len(points[0])
-        #print(restrictAxis, restrictAxis[0],restrictAxis[1])
-        if weights[restrictAxis[0]] == weights[restrictAxis[1]]:
-            action = np.random.choice(restrictAxis, size=1)[0]
-            #print(action)
+class AgentMorin(TAgent):
+    def move(self, points, weights, coords):
+        assert points.batch_size == 1  # Temporarily only support batch size 1. TODO: generalize!
+        weights = weights[0]
+        coords = coords[0]
+
+        if weights[coords[0]] == weights[coords[1]]:
+            action = np.random.choice(coords, size=1)[0]
         else:
-            action = restrictAxis[np.argmin([weights[restrictAxis[0]], weights[restrictAxis[1]]])]
-        changingcoordinate = restrictAxis[np.where(restrictAxis != action)[0][0]]
-        weights[changingcoordinate] = 0
-        ShiftedState = shift(points, restrictAxis, action)
-        newState = list(map(tuple,ShiftedState - np.amin(ShiftedState, axis=0)))
-        newNewtonPolytope = getNewtonPolytope(newState)
-        #print(newState[-1])
-        #print(newNewtonPolytope)
-        #print(newNewtonPolytope.index(newState[-1]))
-        #print(newNewtonPolytope.pop(newNewtonPolytope.index(newState[-1])))
-        #print(newNewtonPolytope)
-        if newState[-1] in newNewtonPolytope:
-            A = newNewtonPolytope.pop(newNewtonPolytope.index(newState[-1]))
-            newNewtonPolytope.append(A)
-            return (newNewtonPolytope, action, weights)
+            action = coords[np.argmin([weights[coords[0]], weights[coords[1]]])]
+        changing_coordinate = [coord for coord in coords if coord != action]
+        next_weights = [weights[i] if i not in changing_coordinate else 0 for i in range(len(weights))]
+        points.shift([coords], [action])
+        points.reposition()
+        points.get_newton_polytope()
+
+        ## NEED WORK
+        if points.distinguished_points[0] is not None:
+            return points, action, [next_weights]
         else:
             return False
