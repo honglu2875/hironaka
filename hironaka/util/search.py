@@ -1,6 +1,6 @@
 from collections import deque
 
-from hironaka.abs import Points
+from hironaka.core import Points
 from hironaka.host import Host
 
 
@@ -19,8 +19,6 @@ def search_depth(points: Points, host: Host, debug=False):
         current, depth = states.pop()
         max_depth = max(max_depth, depth)
         coords = host.select_coord(current, debug=debug)
-
-        # print(current, depth)
 
         for i in coords[0]:
             nxt = current.copy()

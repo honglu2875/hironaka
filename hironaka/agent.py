@@ -2,7 +2,7 @@ import abc
 
 import numpy as np
 
-from .abs import Points
+from .core import Points
 
 
 class Agent(abc.ABC):

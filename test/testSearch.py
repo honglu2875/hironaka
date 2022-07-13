@@ -2,7 +2,7 @@ import unittest
 
 from treelib import Tree
 
-from hironaka.abs import Points
+from hironaka.core import Points
 from hironaka.host import Zeillinger
 from hironaka.src import make_nested_list
 from hironaka.util import search_depth, search_tree

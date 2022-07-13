@@ -1,6 +1,6 @@
 from typing import List
 
-from hironaka.abs import Points
+from hironaka.core import Points
 from hironaka.agent import Agent
 from hironaka.policy.Policy import Policy
 

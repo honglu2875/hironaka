@@ -1,7 +1,7 @@
 import logging
 from typing import Optional, Union
 
-from .abs import Points
+from .core import Points
 from .agent import Agent
 from .game import Game
 from .host import Host
