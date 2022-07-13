@@ -5,12 +5,12 @@ import torch
 
 from hironaka.core.PointsBase import PointsBase
 from hironaka.src import shift_lst, get_newton_polytope_lst, get_shape, scale_points, get_batched_padded_array
-from hironaka.src._torch_ops import shift_torch, get_newton_polytope_torch, reposition_torch
+from hironaka.src import shift_torch, get_newton_polytope_torch, reposition_torch
 
 
 class PointsTensor(PointsBase):
-    config_keys = ['value_threshold', 'device_key', 'padded_value']
-    subcls_config_keys = ['ended', 'ended_each_batch']
+    subcls_config_keys = ['value_threshold', 'device_key', 'padded_value']
+    copied_attributes = []
 
     def __init__(self,
                  points: Union[torch.Tensor, List[List[List[int]]], np.ndarray],
@@ -21,8 +21,6 @@ class PointsTensor(PointsBase):
                  **kwargs):
         config = kwargs if config_kwargs is None else {**config_kwargs, **kwargs}
         self.value_threshold = value_threshold
-
-        # It's better to require a fixed shape of the tensor implementation.
 
         if isinstance(points, list):
             points = torch.FloatTensor(

@@ -3,7 +3,7 @@ import logging
 
 from hironaka.core import Points
 from hironaka.gameHironaka import GameHironaka
-from hironaka.util import generate_batch_points
+from hironaka.src import generate_batch_points
 
 
 class HironakaValidator(GameHironaka):
