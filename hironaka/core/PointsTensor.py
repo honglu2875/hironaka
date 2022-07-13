@@ -10,6 +10,7 @@ from hironaka.src._torch_ops import shift_torch, get_newton_polytope_torch, repo
 
 class PointsTensor(PointsBase):
     config_keys = ['value_threshold', 'device_key', 'padded_value']
+    subcls_config_keys = ['ended', 'ended_each_batch']
 
     def __init__(self,
                  points: Union[torch.Tensor, List[List[List[int]]], np.ndarray],
