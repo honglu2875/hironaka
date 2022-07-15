@@ -7,7 +7,6 @@ import sys
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.resolve()))
 
 from hironaka.policy import NNPolicy
-from hironaka.policy_players import PolicyHost, PolicyAgent
 from hironaka.validator import HironakaValidator
 
 import gym
@@ -16,8 +15,8 @@ import yaml
 
 from stable_baselines3 import DQN
 
-from hironaka.agent import RandomAgent, ChooseFirstAgent
-from hironaka.host import Zeillinger, RandomHost
+from hironaka.agent import RandomAgent, ChooseFirstAgent, PolicyAgent
+from hironaka.host import Zeillinger, RandomHost, PolicyHost
 
 register(
     id='hironaka/HironakaHost-v0',
