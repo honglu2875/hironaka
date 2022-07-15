@@ -13,7 +13,7 @@ from hironaka.util.searchThom import search_tree_morin
 
 class TestThom(unittest.TestCase):
     def test_game(self):
-        N = 4
+        N = 3
         host = Zeillinger()
         agent = AgentMorin()
         points = thom_points_homogeneous(N)
