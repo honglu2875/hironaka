@@ -4,7 +4,9 @@ This is the core functionality whose classes
  - perform transformations (Newton polytope, shift, rescale, etc.),
  - provide features, states, etc.
 
-The base class is `PointsBase`, and the subclasses are currently `Points` and `PointsTensor`
+The base class is `PointsBase`, and the subclasses are currently `Points` and `PointsTensor`. 
+
+`PointsNumpy` is currently unnecessary and the implementation is postponed.
 
 ## .PointsBase
 This interface is an abstraction of collection of points used in the Hironaka games and its variations.
@@ -57,4 +59,6 @@ This is a batch of 2 separate sets of points. They are of different sizes.
 ## .PointsTensor
 It performs everything using PyTorch tensors.
 
-...
+Major differences between `PointsTensor` and `Points`
+ - `PointsTensor.points` have a fixed shape. Removed points will be replaced by `padded_value` which must be a negative number.
+ - In `Points.points`, the order of points may change during `get_newton_polytope()`. But for `PointsTensor.points`, the order will never change. When points are removed, we still maintain the original orders without moving surviving points next to each other. As a result, `distinguished_points` marks the distinguished point in each set of points, but is never changed under any operations.

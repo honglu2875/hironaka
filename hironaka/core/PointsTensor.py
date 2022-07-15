@@ -10,23 +10,26 @@ from hironaka.src import shift_torch, get_newton_polytope_torch, reposition_torc
 
 class PointsTensor(PointsBase):
     subcls_config_keys = ['value_threshold', 'device_key', 'padded_value']
-    copied_attributes = []
+    copied_attributes = ['distinguished_points']
 
     def __init__(self,
                  points: Union[torch.Tensor, List[List[List[int]]], np.ndarray],
                  value_threshold: Optional[int] = 1e8,
                  device_key: Optional[str] = 'cpu',
                  padded_value: Optional[float] = -1.0,
+                 distinguished_points: Optional[List[int]] = None,
                  config_kwargs: Optional[Dict[str, Any]] = None,
                  **kwargs):
         config = kwargs if config_kwargs is None else {**config_kwargs, **kwargs}
         self.value_threshold = value_threshold
 
+        assert padded_value < 0, f"'padded_value' must be a negative number. Got {padded_value} instead."
+
         if isinstance(points, list):
             points = torch.FloatTensor(
                     get_batched_padded_array(points,
                                              new_length=config['max_num_points'],
-                                             constant_value=config.get('padded_value', -1)))
+                                             constant_value=padded_value))
         elif isinstance(points, (torch.Tensor, np.ndarray)):
             points = torch.FloatTensor(points)
         else:
@@ -36,6 +39,7 @@ class PointsTensor(PointsBase):
 
         self.device_key = device_key
         self.padded_value = padded_value
+        self.distinguished_points = distinguished_points
 
         super().__init__(points, **config)
         self.device = torch.device(self.device_key)

@@ -1,5 +1,5 @@
 # hironaka.gym_env
-This is a gym wrapper of hironaka host/agent environment.
+This contains gym wrappers of host/agent environments.
 
 Note:
  - The naming is indeed confusing, and I do not see a better way of naming them. **Please remember**
