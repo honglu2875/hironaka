@@ -6,14 +6,14 @@ from treelib import Tree
 from hironaka.abs import Points
 from hironaka.agentThom import AgentMorin
 from hironaka.gameThom import GameMorin
-from hironaka.host import Zeillinger, ZeillingerLex
+from hironaka.host import Zeillinger, ZeillingerLex, WeakSpivakovsky
 from hironaka.util.geomThom import thom_points, thom_points_homogeneous, thom_monomial_ideal
 from hironaka.util.searchThom import search_tree_morin
 
 
 class TestThom(unittest.TestCase):
     def test_game(self):
-        N = 5
+        N = 3
         host = ZeillingerLex()
         agent = AgentMorin()
         points = thom_points_homogeneous(N)
@@ -32,7 +32,7 @@ class TestThom(unittest.TestCase):
         print(game.move_history)
 
     def test_ThomTree(self):
-        points = thom_points_homogeneous(6)
+        points = thom_points_homogeneous(5)
         print(f"Points: {points}")
         dimension = len(points[0])
         initial_points = Points([points], distinguished_points=[len(points) - 1])
@@ -41,7 +41,7 @@ class TestThom(unittest.TestCase):
         tree.create_node(0, 0, data=initial_points)
         MAX_SIZE = 10000
 
-        host = ZeillingerLex()
+        host = WeakSpivakovsky()
         weights = [1] * dimension
         search_tree_morin(initial_points, tree, 0, weights, host, max_size=MAX_SIZE)
         tree.show(data_property="points", idhidden=False)
