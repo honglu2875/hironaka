@@ -5,7 +5,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from hironaka.core import Points
 from hironaka.agent import RandomAgent, ChooseFirstAgent
-from hironaka.gym_env import HironakaAgentEnv
 from hironaka.util import geom
 
 import collections as col
@@ -37,7 +36,7 @@ class hironaka_net(nn.Module):
         # x = torch.flatten(x, 1) # flatten all dimensions except the batch dimension
         x = F.relu(self.fc1(x))
         # x = F.relu(self.fc2(x))
-        x = self.fc2(x)
+        x = F.relu(self.fc2(x))
         x = self.fc3(x)
         x_prob = torch.narrow(x,0,0,8)
         x_reward = torch.narrow(x,0,8,1)
@@ -202,16 +201,12 @@ if __name__ == '__main__':
     agent = ChooseFirstAgent()
     agent2 = RandomAgent()
 
-    test_points = Points(geom.generate_batch_points(n = 10, batch_num= 1, dimension= 3, max_value= 50))
-
-    test_points.get_newton_polytope()
-
     optimizer = torch.optim.SGD(net.parameters(), lr=1e-6)
 
     for i in range(ITERATIONS):
         examples = ([],[])
         for _ in range(10):
-            test_points = Points(geom.generate_batch_points(n=5, batch_num=1, dimension=3, max_value=50))
+            test_points = Points(geom.generate_batch_points(n=10, batch_num=1, dimension=3, max_value=50))
             test_points.get_newton_polytope()
             test_points.rescale()
             mcts_instance = mcts(state= test_points, env = agent2, nn = net, max_depth = 50)
@@ -239,6 +234,7 @@ if __name__ == '__main__':
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+        #TODO: write a pit function to prevent degeneracy of training.
 
         if i%10 == 0:
             print("The current loss is: ", loss.item())
