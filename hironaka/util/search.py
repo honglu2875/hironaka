@@ -1,6 +1,6 @@
 from collections import deque
 
-from hironaka.abs import Points
+from hironaka.core import Points
 from hironaka.host import Host
 
 

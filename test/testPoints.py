@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from hironaka.abs.Points import Points
+from hironaka.core.Points import Points
 from hironaka.src import make_nested_list
 from hironaka.util import generate_points
 

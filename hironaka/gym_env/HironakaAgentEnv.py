@@ -4,7 +4,7 @@ import numpy as np
 from gym import spaces
 
 from hironaka.agent import Agent
-from hironaka.envs.HironakaBase import HironakaBase
+from hironaka.gym_env.HironakaBase import HironakaBase
 
 
 class HironakaAgentEnv(HironakaBase):

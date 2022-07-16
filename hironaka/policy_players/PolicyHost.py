@@ -1,6 +1,6 @@
 import numpy as np
 
-from hironaka.abs import Points
+from hironaka.core import Points
 from hironaka.host import Host
 from hironaka.policy.Policy import Policy
 
