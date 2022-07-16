@@ -13,12 +13,13 @@ from hironaka.util.searchThom import search_tree_morin
 
 class TestThom(unittest.TestCase):
     def test_game(self):
-        N = 3
+        N = 4
         host = ZeillingerLex()
         agent = AgentMorin()
         points = thom_points_homogeneous(N)
         opoints = thom_points(N)
         game = GameMorin(Points([points], distinguished_points=[len(points) - 1]), host, agent)
+        print('Thom monomial ideal:', thom_monomial_ideal(N))
         print('Original Points:', opoints)
         print('Homogeneous Points:', points)
         for i in range(100):
@@ -32,7 +33,7 @@ class TestThom(unittest.TestCase):
         print(game.move_history)
 
     def test_ThomTree(self):
-        points = thom_points_homogeneous(5)
+        points = thom_points_homogeneous(4)
         print(f"Points: {points}")
         dimension = len(points[0])
         initial_points = Points([points], distinguished_points=[len(points) - 1])
@@ -55,13 +56,14 @@ class TestThom(unittest.TestCase):
         assert str(thom_points(2)) == thom_points_2
 
         thom_monomial_idea_3 = \
-            "[-b[0, 0]**3*b[1, 2], 2*b[0, 0]**2*b[1, 1]**2, -b[0, 0]**3*b[2, 2], b[0, 0]*b[1, 1]*b[2, 2]]"
+            "[-b[0, 0]**3*b[1, 2], 2*b[0, 0]**2*b[1, 1]**2, -b[0, 0]**3*b[2, 2], 0, 0, 0, b[0, 0]*b[1, 1]*b[2, 2]]"
         assert str(thom_monomial_ideal(3)) == thom_monomial_idea_3
 
         thom_points_homogeneous_3 = "[[1, 0, 1, 0], [1, 0, 0, 1], [0, 2, 0, 0], [0, 1, 0, 1]]"
         assert str(thom_points_homogeneous(3)) == thom_points_homogeneous_3
 
-        thom_points_homogeneous_4 = "[[2, 1, 0, 1, 0, 0, 0], [2, 0, 2, 0, 0, 0, 0], [2, 0, 0, 0, 2, 0, 0], [1, 2, 1, 0, 0, 0, 0], [2, 0, 1, 0, 0, 1, 0], [2, 0, 1, 0, 0, 0, 1], [2, 0, 0, 1, 1, 0, 0], [2, 0, 0, 0, 1, 0, 1], [0, 4, 0, 0, 0, 0, 0], [1, 2, 0, 0, 0, 1, 0], [1, 2, 0, 0, 0, 0, 1], [1, 1, 1, 0, 1, 0, 0], [1, 1, 0, 0, 2, 0, 0], [0, 3, 0, 0, 1, 0, 0], [1, 1, 0, 0, 1, 0, 1]]"
+        thom_points_homogeneous_4 = \
+            "[[2, 1, 0, 1, 0, 0, 0], [2, 1, 0, 0, 0, 1, 0], [2, 1, 0, 0, 0, 0, 1], [2, 0, 2, 0, 0, 0, 0], [2, 0, 1, 0, 1, 0, 0], [2, 0, 0, 0, 2, 0, 0], [1, 2, 1, 0, 0, 0, 0], [1, 2, 0, 0, 1, 0, 0], [2, 0, 1, 0, 0, 1, 0], [2, 0, 1, 0, 0, 0, 1], [2, 0, 0, 1, 1, 0, 0], [2, 0, 0, 0, 1, 0, 1], [0, 4, 0, 0, 0, 0, 0], [1, 2, 0, 0, 0, 1, 0], [1, 2, 0, 0, 0, 0, 1], [1, 1, 1, 0, 1, 0, 0], [1, 1, 0, 0, 2, 0, 0], [0, 3, 0, 0, 1, 0, 0], [1, 1, 0, 0, 1, 0, 1]]"
         assert str(thom_points_homogeneous(4)) == thom_points_homogeneous_4
 
 

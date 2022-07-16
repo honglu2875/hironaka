@@ -33,7 +33,7 @@ def quadratic_fixed_points(order_of_jets: int):
     P = []
     for s in range(2, order_of_jets + 1):
         for lin_set in combinations(list(range(order_of_jets)), s):
-            P = list(list(L) for L in list(combinations_with_replacement(list(lin_set), 2)) if L[0] + L[1] < order_of_jets - 1)
+            P = list(list(L) for L in list(combinations_with_replacement(list(range(order_of_jets)), 2)) if L[0] + L[1] < order_of_jets - 1)
             if len(P) >= order_of_jets-s:
                 for comb in list(combinations(list(P), order_of_jets - s)):
                     Q.append([list(lin_set), list(comb)])
