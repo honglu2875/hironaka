@@ -10,13 +10,13 @@ from hironaka.host import Zeillinger, RandomHost
 
 register(
     id='hironaka/HironakaHost-v0',
-    entry_point='hironaka.envs:HironakaHostEnv',
+    entry_point='hironaka.gym_env:HironakaHostEnv',
     max_episode_steps=10000,
 )
 
 register(
     id='hironaka/HironakaAgent-v0',
-    entry_point='hironaka.envs:HironakaAgentEnv',
+    entry_point='hironaka.gym_env:HironakaAgentEnv',
     max_episode_steps=10000,
 )
 

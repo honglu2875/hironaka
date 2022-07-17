@@ -4,6 +4,7 @@ from hironaka.agent import RandomAgent
 from hironaka.game import GameHironaka
 from hironaka.host import Zeillinger
 from hironaka.src import *
+from hironaka.core import Points
 
 
 class TestGame(unittest.TestCase):
