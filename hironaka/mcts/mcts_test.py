@@ -28,7 +28,6 @@ class trained_host:
         self.net = torch.load(path)
 
     def select_coord(self, points: Points, debug = False):
-        dim = points.dim
         answer = []
         for i in range(points.batch_size):
             x = MCTS.points_to_tensor(Points([points.points[i]]))

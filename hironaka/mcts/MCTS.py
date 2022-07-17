@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from hironaka.core import Points
 from hironaka.agent import RandomAgent, ChooseFirstAgent
-from hironaka.util import geom
+from hironaka.src import _snippets as geom
 
 import collections as col
 import math
