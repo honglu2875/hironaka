@@ -23,6 +23,7 @@ def search_tree_morin(points: Points, tree, curr_node, curr_weights, host, max_s
             tree.create_node(node_id, node_id, parent=curr_node, data=NoCont('...more...'))
         return tree
     coords = host.select_coord(points)[0]
+    print(coords)
 
     for action in coords:
         if curr_weights[action] > min([curr_weights[i] for i in coords]):
