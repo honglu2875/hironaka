@@ -3,7 +3,7 @@ import logging
 
 from hironaka.core import Points
 from hironaka.gameHironaka import GameHironaka
-from hironaka.util import generate_batch_points
+from hironaka.src import generate_batch_points
 
 
 class HironakaValidator(GameHironaka):
@@ -29,11 +29,9 @@ class HironakaValidator(GameHironaka):
             'dimension': config.get('dimension', 3),
             'max_value': config.get('max_value', 50)
         }
-        value_threshold = config.get('value_threshold', None)
-        step_threshold = config.get('step_threshold', 1000)
 
-        self.value_threshold = value_threshold
-        self.step_threshold = step_threshold
+        self.value_threshold = config.get('value_threshold', None)
+        self.step_threshold = config.get('step_threshold', 1000)
 
         super().__init__(None, host, agent, **config)
         self.reset()

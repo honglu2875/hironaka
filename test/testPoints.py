@@ -3,8 +3,7 @@ import unittest
 import numpy as np
 
 from hironaka.core.Points import Points
-from hironaka.src import make_nested_list
-from hironaka.util import generate_points
+from hironaka.src import make_nested_list, generate_points
 
 
 class TestPoints(unittest.TestCase):
@@ -63,6 +62,7 @@ class TestPoints(unittest.TestCase):
             [[[16, 11, 5, 6], [11, 12, 18, 6], [11, 11, 1, 19], [8, 3, 17, 8], [7, 5, 3, 8]]]
         ))
         q.get_newton_polytope()
+
         assert str(q) == str(p.get_newton_polytope(inplace=False))
         assert str(q) == str(r2)
 
@@ -121,3 +121,42 @@ class TestPoints(unittest.TestCase):
         assert str(points) == str(r)
         # p2.shift([[1, 3]], [3])
         # print(p2)
+
+    def test_value_threshold(self):
+        points = Points([[[5e7, 5e7+1, 1e7], [1, 1, 2]]], value_threshold=int(1e8))
+        assert not points.exceed_threshold()
+        points.shift([[0, 1]], [0])
+        assert points.exceed_threshold()
+
+    def test_reposition(self):
+        points = Points(make_nested_list(
+            [(7, 5, 3, 8), (8, 1, 8, 18), (8, 3, 17, 8),
+             (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)]
+        ))
+        r = Points([[[0, 4, 2, 2], [1, 0, 7, 12], [1, 2, 16, 2], [4, 10, 0, 13], [4, 11, 17, 0], [9, 10, 4, 0]]])
+        points.reposition()
+        a = points.reposition(inplace=False)
+        assert str(points) == str(r)
+        assert str(points) == str(a)
+
+    def test_distinguished_elements(self):
+        points = Points(make_nested_list(
+            [(7, 5, 3, 8), (8, 1, 8, 18), (8, 3, 17, 8),
+             (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)]
+        ), distinguished_points=[2])
+
+        points.get_newton_polytope()
+        d_ind = points.distinguished_points[0]
+        assert tuple(points.points[0][d_ind]) == (8, 3, 17, 8)
+
+        points.shift([[0, 1]], [0])
+        points.get_newton_polytope()
+        d_ind = points.distinguished_points[0]
+        assert tuple(points.points[0][d_ind]) == (11, 3, 17, 8)
+
+        points.shift([[0, 2]], [0])
+        points.shift([[2, 3]], [2])
+        points.shift([[0, 1]], [1])
+        points.get_newton_polytope()
+        d_ind = points.distinguished_points[0]
+        assert d_ind is None

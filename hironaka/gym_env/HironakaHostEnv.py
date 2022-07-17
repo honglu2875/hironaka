@@ -15,8 +15,8 @@ class HironakaHostEnv(HironakaBase):
 
     def __init__(self,
                  host: Host,
-                 invalid_move_penalty: int = -1e-3,
-                 stop_after_invalid_move: bool = False,
+                 invalid_move_penalty: Optional[int] = -1e-3,
+                 stop_after_invalid_move: Optional[bool] = False,
                  config_kwargs: Optional[Dict[str, Any]] = None,
                  **kwargs):
         config_kwargs = dict() if config_kwargs is None else config_kwargs
@@ -39,7 +39,7 @@ class HironakaHostEnv(HironakaBase):
         self.step(action=None)
 
     def step(self, action):
-        super().step(action)
+        super().step(action)  # update self.current_step
 
         stopped = False
         reward = 0
@@ -76,6 +76,10 @@ class HironakaHostEnv(HironakaBase):
     def _get_obs(self):
         coords_multi_bin = self._get_coords_multi_bin()
         f = np.array(self._points.get_features()[0])
-        f = np.pad(f, ((0, self.max_number_points - len(f)), (0, 0)), mode='constant', constant_values=-1)
+        f = np.pad(f,
+                   ((0, self.max_number_points - len(f)),
+                    (0, 0)),
+                   mode='constant',
+                   constant_values=self.padding_value)
         o = {'points': f.astype(np.float32), 'coords': coords_multi_bin}
         return o

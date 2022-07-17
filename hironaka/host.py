@@ -1,9 +1,11 @@
 import abc
 from itertools import combinations
+from typing import Optional
 
 import numpy as np
 
 from .core import Points
+from .policy import Policy
 
 
 class Host(abc.ABC):
@@ -14,9 +16,8 @@ class Host(abc.ABC):
 
 class RandomHost(Host):
     def select_coord(self, points: Points, debug=False):
-        dim = points.dim
-        #This random host will choose 2 different coordinates.
-        return [np.random.choice(list(range(dim)), size=2, replace= False) for _ in range(points.batch_size)]
+        dim = points.dimension
+        return [np.random.choice(list(range(dim)), size=2) for _ in range(points.batch_size)]
 
 
 class Zeillinger(Host):
@@ -38,7 +39,7 @@ class Zeillinger(Host):
 
     def select_coord(self, points: Points, debug=False):
         assert not points.ended
-        dim = points.dim
+        dim = points.dimension
         result = []
         for b in range(points.batch_size):
             pts = points.get_batch(b)
@@ -61,4 +62,22 @@ class Zeillinger(Host):
             else:  # if all coordinates are the same, return the first two.
                 result.append([0, 1])
 
+        return result
+
+
+class PolicyHost(Host):
+    def __init__(self,
+                 policy: Policy,
+                 use_discrete_actions_for_host: Optional[bool] = False,
+                 **kwargs):
+        self._policy = policy
+        self.use_discrete_actions_for_host = kwargs.get('use_discrete_actions_for_host', use_discrete_actions_for_host)
+
+    def select_coord(self, points: Points, debug=False):
+        features = points.get_features()
+
+        coords = self._policy.predict(features)  # return multi-binary array
+        result = []
+        for b in range(coords.shape[0]):
+            result.append(np.where(coords[b] == 1)[0])
         return result

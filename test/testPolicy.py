@@ -5,9 +5,9 @@ from torch import nn
 from hironaka.core import Points
 from hironaka.gameHironaka import GameHironaka
 from hironaka.policy.NNPolicy import NNPolicy
-from hironaka.policy_players.PolicyAgent import PolicyAgent
-from hironaka.policy_players.PolicyHost import PolicyHost
-from hironaka.util import generate_batch_points
+from hironaka.agent import PolicyAgent
+from hironaka.host import PolicyHost
+from hironaka.src import generate_batch_points
 
 
 class NN(nn.Module):
