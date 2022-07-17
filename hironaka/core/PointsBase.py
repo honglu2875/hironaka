@@ -1,4 +1,5 @@
 import abc
+from copy import deepcopy
 from typing import Any, Optional, List
 
 
@@ -35,7 +36,11 @@ class PointsBase(abc.ABC):
     """
     # You MUST define `config_keys` when inheriting.
     # Keys in `config_keys` will be tracked when calling the `copy()` method.
-    config_keys: List[str]
+    subcls_config_keys: List[str]
+    # Keys in `copied_attributes` will be directly copied during `copy()`. They MUST be initialized.
+    copied_attributes: List[str]
+    # Keys in `base_attributes` will be copied. But they are shared in all subclasses and do not need to re-initialize.
+    base_attributes = ['ended_each_batch', 'ended', 'batch_size', 'max_num_points', 'dimension']
 
     def __init__(self,
                  points: Any,
@@ -53,10 +58,6 @@ class PointsBase(abc.ABC):
         else:
             self.config = kwargs
 
-        # Update keys if modified or created in subclass
-        for key in self.config_keys:
-            self.config[key] = getattr(self, key)
-
         # Check the shape of `points`.
         shape = self._get_shape(points)
         if len(shape) == 2:
@@ -66,7 +67,6 @@ class PointsBase(abc.ABC):
             points = self._add_batch_axis(points)
         if len(shape) != 3:
             raise Exception("input dimension must be 2 or 3.")
-
         self.points = points
 
         self.batch_size = self.config.get('points_batch_size', shape[0])
@@ -81,6 +81,13 @@ class PointsBase(abc.ABC):
         # will also be updated on point-changing modifications including `get_newton_polytope`
         self.ended_each_batch = [False] * self.batch_size
 
+        # Update keys in `self.copied_attributes`
+        for key in self.copied_attributes:
+            if hasattr(self, key):
+                self.config[key] = getattr(self, key)
+            else:
+                raise Exception("Must initialize keys in 'subcls_config_keys' before calling super().__init__.")
+
     def copy(self, points: Optional[Any] = None):
         """
             Copy the object.
@@ -93,7 +100,14 @@ class PointsBase(abc.ABC):
             new_points = self._points_copy(self.points)
         else:
             new_points = self._points_copy(points)
-        return self.__class__(new_points, **self.config)
+        new_points = self.__class__(new_points, **self.config)
+
+        for key in self.copied_attributes + self.base_attributes:
+            if hasattr(self, key):
+                setattr(new_points, key, deepcopy(getattr(self, key)))
+            else:
+                raise Exception(f"Attribute {key} is not initialized.")
+        return new_points
 
     def shift(self, coords: List[List[int]], axis: List[int], inplace=True):
         """
@@ -129,7 +143,7 @@ class PointsBase(abc.ABC):
             return None
         else:
             new_points = self.copy(points=r)
-            new_points.ended_each_batch = ended_each_batch
+            new_points.ended_each_batch = ended_each_batch  # TODO: duplicate?
             new_points.ended = ended
             return new_points
 

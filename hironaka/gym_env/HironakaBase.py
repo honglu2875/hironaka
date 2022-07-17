@@ -5,9 +5,8 @@ import gym
 import numpy as np
 from gym import spaces
 
-from hironaka.abs import Points
-from hironaka.src import get_padded_array, get_gym_version_in_float
-from hironaka.util import generate_points
+from hironaka.core import Points
+from hironaka.src import get_padded_array, get_gym_version_in_float, generate_points
 
 ObsType = TypeVar("ObsType")
 ActType = TypeVar("ActType")

@@ -1,6 +1,7 @@
 from typing import List, Union
 
 import numpy as np
+import numbers
 
 
 def get_shape(o):
@@ -12,17 +13,27 @@ def get_shape(o):
         If the nested list/tuple objects are not of uniform shape, this function becomes pointless.
         Therefore, being uniform is an assumption before using this snippet.
             - Anti-example: o = [ ([1,2,3],2,3),(2,3,4) ], it will return (2,3,3).
-        It's intuitively wrong but this function is not responsible for checking the uniformity.
+        It is intuitively wrong but this function is not responsible for checking the uniformity.
+
+        For the last axis, it also removes ONE non-number entries at the end of o[0]...[0].
+            - Example: o = [[1,2,3,'d'],[2,3,4]], it will return (2,3)
+            - Anti-example: o = [[1,2,3,'d','d'],[2,3,4]], it will return (2,4)
+        It is again intuitively tricky, but it is only designed to allow for one non-number mark
+            and sanity check is not our responsibility.
 
         Also, if it hits a length-0 object, it will just stop.
     """
 
     unwrapped = o
     shape = []
+    last = None
     while isinstance(unwrapped, (list, tuple)) and unwrapped:
         shape.append(len(unwrapped))
+        last = unwrapped[-1]
         unwrapped = unwrapped[0]
 
+    if not isinstance(last, numbers.Number):
+        shape[-1] -= 1
     return tuple(shape)
 
 
@@ -155,3 +166,11 @@ def mask_encoded_action(dimension: int):
         result[1 << i] = 0
 
     return result
+
+
+def generate_points(n: int, dimension=3, max_value=50):
+    return [[np.random.randint(max_value) for _ in range(dimension)] for _ in range(n)]
+
+
+def generate_batch_points(n: int, batch_num=1, dimension=3, max_value=50):
+    return [[[np.random.randint(max_value) for _ in range(dimension)] for _ in range(n)] for _ in range(batch_num)]
