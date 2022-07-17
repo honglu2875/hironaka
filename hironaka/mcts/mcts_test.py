@@ -1,5 +1,3 @@
-from hironaka import host
-
 from hironaka.mcts import MCTS
 
 from hironaka.validator import HironakaValidator
@@ -9,12 +7,8 @@ from hironaka import host
 hironaka_net = MCTS.hironaka_net
 
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 from hironaka.core import Points
 from hironaka.agent import RandomAgent, ChooseFirstAgent
-from hironaka.gym_env import HironakaAgentEnv
-from hironaka.util import geom
 
 def action_to_coords(action: int):
     #action is an integer, and coords is a choice of coordinates. We compute the binary expansion of action, and 1 means it choose the corresponding coordidnate.
@@ -63,7 +57,7 @@ if __name__ == '__main__':
     agent = RandomAgent()
 
     test_validator = HironakaValidator(this_host,agent)
-
+    #Type check failed. Need some minor change on my host class.
 
     history = test_validator.playoff(num_steps=1000,verbose= 1)
 

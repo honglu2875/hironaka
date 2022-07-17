@@ -1,5 +1,3 @@
-import collections
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -26,7 +24,7 @@ class hironaka_net(nn.Module):
         # # an affine operation: y = Wx + b
         self.fc1 = nn.Linear(3 * 10, 32)  # input: all coordinates of Points
         self.fc2 = nn.Linear(32, 32)
-        self.fc3 = nn.Linear(32,9) # output: there are 8 = 2^3 action of choosing subsets, and the last number is the expected steps
+        self.fc3 = nn.Linear(32, 9) # output: there are 8 = 2^3 action of choosing subsets, and the last number is the expected steps
 
     def forward(self, x):
         # # Max pooling over a (2, 2) window
@@ -57,6 +55,7 @@ def inverse_hash(s:str):
     x = s.split(",")
     x.pop()
     pt = []
+    temp = []
     for i, piece in enumerate(x):
         if i%3 == 0:
             temp = []
@@ -180,14 +179,14 @@ class mcts:
         self.reward[hashed_s] = current_reward
         return current_reward
 
-def loss_function(x,y):
-    loss = 0
+def loss_function(x,y : list[torch.FloatTensor])->torch.Tensor:
+    loss = torch.zeros(1)
     for i,pred in enumerate(x):
         choice_x = torch.narrow(pred,0,0,8)
         reward_x = torch.narrow(pred,0,8,1)
         choice_y = torch.narrow(y[i],0,0,8)
         reward_y = torch.narrow(y[i],0,8,1)
-        loss += torch.square((reward_x - reward_y)) - torch.dot(choice_y,(choice_x))
+        loss = loss + torch.square((reward_x - reward_y)) - torch.dot(choice_y,(choice_x))
 
     return loss
 
@@ -234,10 +233,10 @@ if __name__ == '__main__':
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            if i % 10 == 0:
+                print("The current loss is: ", loss.item())
         #TODO: write a pit function to prevent degeneracy of training.
 
-        if i%10 == 0:
-            print("The current loss is: ", loss.item())
 
     path = 'test_model.pth'
     torch.save(net, path)
