@@ -2,7 +2,7 @@ import abc
 import logging
 from typing import Optional, Union
 
-from hironaka.abs import Points
+from hironaka.core import Points
 from hironaka.agent import Agent
 from hironaka.host import Host
 

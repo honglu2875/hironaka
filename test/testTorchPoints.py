@@ -2,8 +2,8 @@ import unittest
 
 import torch
 
-from hironaka.abs.PointsTensor import PointsTensor
-from hironaka.src._torch_ops import get_newton_polytope_torch, shift_torch, reposition_torch
+from hironaka.core import PointsTensor
+from hironaka.src import get_newton_polytope_torch, shift_torch, reposition_torch
 
 
 class testTorchPoints(unittest.TestCase):

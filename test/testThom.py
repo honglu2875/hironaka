@@ -2,11 +2,11 @@ import unittest
 
 from treelib import Tree
 
-from hironaka.abs import Points
+from hironaka.core import Points
 from hironaka.agent import AgentMorin
 from hironaka.game import GameMorin
 from hironaka.host import ZeillingerLex, WeakSpivakovsky
-from hironaka.src._thom_snippets import thom_monomial_ideal, thom_points, thom_points_homogeneous
+from hironaka.src import thom_monomial_ideal, thom_points, thom_points_homogeneous
 from hironaka.util import search_tree_morin
 
 

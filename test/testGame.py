@@ -3,7 +3,7 @@ import unittest
 from hironaka.agent import RandomAgent
 from hironaka.game import GameHironaka
 from hironaka.host import Zeillinger
-from hironaka.util import *
+from hironaka.src import *
 
 
 class TestGame(unittest.TestCase):
