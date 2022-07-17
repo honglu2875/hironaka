@@ -1,14 +1,13 @@
 import unittest
 
-import numpy as np
 from treelib import Tree
 
 from hironaka.abs import Points
-from hironaka.agentThom import AgentMorin
-from hironaka.gameThom import GameMorin
-from hironaka.host import Zeillinger, ZeillingerLex, WeakSpivakovsky
-from hironaka.util.geomThom import thom_points, thom_points_homogeneous, thom_monomial_ideal
-from hironaka.util.searchThom import search_tree_morin
+from hironaka.agent import AgentMorin
+from hironaka.game import GameMorin
+from hironaka.host import ZeillingerLex, WeakSpivakovsky
+from hironaka.src._thom_snippets import thom_monomial_ideal, thom_points, thom_points_homogeneous
+from hironaka.util import search_tree_morin
 
 
 class TestThom(unittest.TestCase):
@@ -19,9 +18,22 @@ class TestThom(unittest.TestCase):
         points = thom_points_homogeneous(N)
         opoints = thom_points(N)
         game = GameMorin(Points([points], distinguished_points=[len(points) - 1]), host, agent)
-        print('Thom monomial ideal:', thom_monomial_ideal(N))
-        print('Original Points:', opoints)
-        print('Homogeneous Points:', points)
+
+        r1 = "[2*b[0, 0]**4*b[1, 1]*b[1, 3] - 2*b[0, 0]**4*b[1, 2]**2, -2*b[0, 0]**4*b[1, 2]*b[2, 2], -b[0, 0]**3*b[1, 1]**2*b[1, 2], 4*b[0, 0]**3*b[1, 1]**2*b[2, 2], 2*b[0, 0]**2*b[1, 1]**4, 0, 2*b[0, 0]**4*b[1, 1]*b[2, 3] - 2*b[0, 0]**4*b[1, 2]*b[2, 2], -2*b[0, 0]**4*b[2, 2]**2, -b[0, 0]**3*b[1, 1]**2*b[2, 2], 0, 0, 0, 2*b[0, 0]**4*b[1, 1]*b[3, 3], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, b[0, 0]**3*b[1, 2]*b[2, 3] - b[0, 0]**3*b[1, 3]*b[2, 2], -2*b[0, 0]**2*b[1, 1]**2*b[2, 3] + 2*b[0, 0]**2*b[1, 1]*b[1, 2]*b[2, 2], 2*b[0, 0]**2*b[1, 1]*b[2, 2]**2, b[0, 0]*b[1, 1]**3*b[2, 2], b[0, 0]**3*b[1, 2]*b[3, 3], -2*b[0, 0]**2*b[1, 1]**2*b[3, 3], 0, 0, b[0, 0]**3*b[2, 2]*b[3, 3], 0, 0, 0, 0, 0, 0, 0, b[0, 0]*b[1, 1]*b[2, 2]*b[3, 3]]"
+        ro = [(4, 1, 0, 1, 0, 0, 0), (4, 1, 0, 0, 0, 1, 0), (4, 1, 0, 0, 0, 0, 1), (4, 0, 2, 0, 0, 0, 0),
+              (4, 0, 1, 0, 1, 0, 0), (4, 0, 0, 0, 2, 0, 0), (3, 2, 1, 0, 0, 0, 0), (3, 2, 0, 0, 1, 0, 0),
+              (3, 0, 1, 0, 0, 1, 0), (3, 0, 1, 0, 0, 0, 1), (3, 0, 0, 1, 1, 0, 0), (3, 0, 0, 0, 1, 0, 1),
+              (2, 4, 0, 0, 0, 0, 0), (2, 2, 0, 0, 0, 1, 0), (2, 2, 0, 0, 0, 0, 1), (2, 1, 1, 0, 1, 0, 0),
+              (2, 1, 0, 0, 2, 0, 0), (1, 3, 0, 0, 1, 0, 0), (1, 1, 0, 0, 1, 0, 1)]
+        rhom = [[2, 1, 0, 1, 0, 0, 0], [2, 1, 0, 0, 0, 1, 0], [2, 1, 0, 0, 0, 0, 1], [2, 0, 2, 0, 0, 0, 0],
+                [2, 0, 1, 0, 1, 0, 0], [2, 0, 0, 0, 2, 0, 0], [1, 2, 1, 0, 0, 0, 0], [1, 2, 0, 0, 1, 0, 0],
+                [2, 0, 1, 0, 0, 1, 0], [2, 0, 1, 0, 0, 0, 1], [2, 0, 0, 1, 1, 0, 0], [2, 0, 0, 0, 1, 0, 1],
+                [0, 4, 0, 0, 0, 0, 0], [1, 2, 0, 0, 0, 1, 0], [1, 2, 0, 0, 0, 0, 1], [1, 1, 1, 0, 1, 0, 0],
+                [1, 1, 0, 0, 2, 0, 0], [0, 3, 0, 0, 1, 0, 0], [1, 1, 0, 0, 1, 0, 1]]
+        assert str(thom_monomial_ideal(4)) == r1
+        assert str(opoints) == str(ro)
+        assert str(rhom) == str(points)
+
         for i in range(100):
             print('Game state:', game.state)
             game.step()
@@ -65,5 +77,3 @@ class TestThom(unittest.TestCase):
         thom_points_homogeneous_4 = \
             "[[2, 1, 0, 1, 0, 0, 0], [2, 1, 0, 0, 0, 1, 0], [2, 1, 0, 0, 0, 0, 1], [2, 0, 2, 0, 0, 0, 0], [2, 0, 1, 0, 1, 0, 0], [2, 0, 0, 0, 2, 0, 0], [1, 2, 1, 0, 0, 0, 0], [1, 2, 0, 0, 1, 0, 0], [2, 0, 1, 0, 0, 1, 0], [2, 0, 1, 0, 0, 0, 1], [2, 0, 0, 1, 1, 0, 0], [2, 0, 0, 0, 1, 0, 1], [0, 4, 0, 0, 0, 0, 0], [1, 2, 0, 0, 0, 1, 0], [1, 2, 0, 0, 0, 0, 1], [1, 1, 1, 0, 1, 0, 0], [1, 1, 0, 0, 2, 0, 0], [0, 3, 0, 0, 1, 0, 0], [1, 1, 0, 0, 1, 0, 1]]"
         assert str(thom_points_homogeneous(4)) == thom_points_homogeneous_4
-
-

@@ -10,7 +10,8 @@ class PolicyAgent(Agent):
         self._policy = policy
 
     def move(self, points: Points, coords: List[List[int]], inplace=True):
-        assert len(coords) == points.batch_size  # TODO: wrap the move method for the abstract "Agent" with sanity checks?
+        assert len(
+            coords) == points.batch_size  # TODO: wrap the move method for the abstract "Agent" with sanity checks?
 
         features = points.get_features()
 

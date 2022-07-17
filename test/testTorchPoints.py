@@ -63,7 +63,6 @@ class testTorchPoints(unittest.TestCase):
             ]
         )
 
-
         pts = PointsTensor(p)
 
         pts.get_newton_polytope()

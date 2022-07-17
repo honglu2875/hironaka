@@ -62,6 +62,7 @@ class Zeillinger(Host):
 
         return result
 
+
 class ZeillingerLex(Host):
     # noinspection PyPep8Naming
     @staticmethod
@@ -109,8 +110,9 @@ class ZeillingerLex(Host):
             result.append(coords[0])
         return result
 
+
 class WeakSpivakovsky(Host):
-    def select_coord(self, points:Points, debug=False):
+    def select_coord(self, points: Points, debug=False):
         assert points
         dim = points.dimension
         for b in range(points.batch_size):
@@ -123,7 +125,7 @@ class WeakSpivakovsky(Host):
             "Find a minimal hitting set, brute-force"
             U = set.union(*subsets)
             result = []
-            for i in range(1, len(U)+1):
+            for i in range(1, len(U) + 1):
                 combs = combinations(U, i)
                 for c in combs:
                     if all(set(c) & l for l in subsets):
@@ -131,4 +133,3 @@ class WeakSpivakovsky(Host):
                 if result:
                     break
         return result
-
