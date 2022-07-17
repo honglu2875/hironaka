@@ -4,7 +4,7 @@ import numpy as np
 
 from hironaka.core import Points
 from hironaka.policy.Policy import Policy
-
+from typing import List
 
 class Agent(abc.ABC):
     """
