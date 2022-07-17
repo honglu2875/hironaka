@@ -113,7 +113,7 @@ class ZeillingerLex(Host):
 
 class WeakSpivakovsky(Host):
     def select_coord(self, points: Points, debug=False):
-        assert points
+        assert not points.ended
         result = []
         for b in range(points.batch_size):
             pts = points.get_batch(b)
