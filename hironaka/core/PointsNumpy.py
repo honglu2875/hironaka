@@ -1,7 +1,7 @@
-from hironaka.core.PointsBase import PointsBase
+from .PointsBase import PointsBase
 
 
-class PointsNumpy(PointsBase):  # TODO:INCOMPLETE
+class PointsNumpy(PointsBase):  # INCOMPLETE
     """
         Storing points using numpy arrays.
     """

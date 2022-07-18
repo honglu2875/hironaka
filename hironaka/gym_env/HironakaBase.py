@@ -65,7 +65,8 @@ class HironakaBase(gym.Env, abc.ABC):
                                                       shape=(self.max_number_points, self.dimension),
                                                       dtype=np.float32)
         else:
-            self.point_observation_space = spaces.Box(low=-1.0, high=1.0, shape=(self.max_number_points, self.dimension),
+            self.point_observation_space = spaces.Box(low=-1.0, high=1.0,
+                                                      shape=(self.max_number_points, self.dimension),
                                                       dtype=np.float32)
 
         # Configs to pass down to other functions

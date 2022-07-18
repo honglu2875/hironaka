@@ -3,7 +3,7 @@ import unittest
 from torch import nn
 
 from hironaka.core import Points
-from hironaka.gameHironaka import GameHironaka
+from hironaka.game import GameHironaka
 from hironaka.policy.NNPolicy import NNPolicy
 from hironaka.agent import PolicyAgent
 from hironaka.host import PolicyHost

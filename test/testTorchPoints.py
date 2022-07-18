@@ -2,7 +2,7 @@ import unittest
 
 import torch
 
-from hironaka.core.PointsTensor import PointsTensor
+from hironaka.core import PointsTensor
 from hironaka.src import get_newton_polytope_torch, shift_torch, reposition_torch
 
 
@@ -71,7 +71,6 @@ class testTorchPoints(unittest.TestCase):
                 [[0, 1, 3, 5], [1, 1, 1, 1], [9, 8, 2, 1], [-1, -1, -1, -1]]
             ]
         )
-
 
         pts = PointsTensor(p)
 

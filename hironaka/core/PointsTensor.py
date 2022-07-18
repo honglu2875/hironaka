@@ -3,7 +3,7 @@ from typing import List, Any, Dict, Optional, Union
 import numpy as np
 import torch
 
-from hironaka.core.PointsBase import PointsBase
+from .PointsBase import PointsBase
 from hironaka.src import get_batched_padded_array, rescale_torch
 from hironaka.src import shift_torch, get_newton_polytope_torch, reposition_torch
 

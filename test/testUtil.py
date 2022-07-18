@@ -73,4 +73,4 @@ class TestUtil(unittest.TestCase):
 
     def test_get_shape_extra_character(self):
         p = [[1, 2, 3, 'd'], [2, 3, 4]]
-        assert get_shape(p) == (2,3)
+        assert get_shape(p) == (2, 3)

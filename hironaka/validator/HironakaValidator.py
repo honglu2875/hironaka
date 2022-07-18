@@ -1,8 +1,8 @@
-from typing import Optional, Dict, Any
 import logging
+from typing import Optional, Dict, Any
 
 from hironaka.core import Points
-from hironaka.gameHironaka import GameHironaka
+from hironaka.game import GameHironaka
 from hironaka.src import generate_batch_points
 
 

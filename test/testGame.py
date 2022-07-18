@@ -1,10 +1,10 @@
 import unittest
 
 from hironaka.agent import RandomAgent
-from hironaka.gameHironaka import GameHironaka
+from hironaka.game import GameHironaka
 from hironaka.host import Zeillinger
+from hironaka.core import Points
 from hironaka.src import generate_points, generate_batch_points
-from hironaka.util import *
 
 
 class TestGame(unittest.TestCase):
