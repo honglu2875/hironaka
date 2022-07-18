@@ -1,3 +1,5 @@
+from typing import List
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -182,7 +184,7 @@ class MCTS:
         self.reward[hashed_s] = current_reward
         return current_reward
 
-def loss_function(x,y : list[torch.FloatTensor])->torch.Tensor:
+def loss_function(x,y : List[torch.FloatTensor])->torch.Tensor:
     loss = torch.zeros(1)
     for i,pred in enumerate(x):
         choice_x = torch.narrow(pred,0,0,8)
