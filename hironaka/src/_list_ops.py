@@ -78,7 +78,7 @@ def get_newton_polytope_lst(points: List[List[List[float]]], inplace=True):
     result = get_newton_polytope_approx_lst(result, inplace=False, get_ended=False)
 
     if inplace:
-        points[:, :, :] = result
+        points[:] = result
     else:
         return result
 

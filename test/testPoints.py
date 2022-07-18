@@ -160,3 +160,22 @@ class TestPoints(unittest.TestCase):
         points.get_newton_polytope()
         d_ind = points.distinguished_points[0]
         assert d_ind is None
+
+    def test_true_newton_polytope(self):
+        points = Points(make_nested_list(
+            [(7, 5, 3, 8), (8, 1, 8, 18), (8, 3, 17, 8),
+             (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)]
+        ), use_precise_newton_polytope=True)
+
+        r = [[[27, 11, 5, 6], [23, 12, 18, 6], [22, 11, 1, 19], [12, 5, 3, 8], [11, 3, 17, 8], [9, 1, 8, 18]]]
+
+        points.shift([[0, 1]], [0])
+        points.get_newton_polytope()
+        assert str(points.points) == str(r)
+
+        points = Points([[[0.,1.],[1.,0.],[0.9,0.9]]], use_precise_newton_polytope=True)
+
+        r = [[[1.0, 0.0], [0.0, 1.0]]]
+
+        points.get_newton_polytope()
+        assert str(points.points) == str(r)

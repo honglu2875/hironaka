@@ -15,8 +15,8 @@ class Points(PointsBase):
     copied_attributes = ['distinguished_points']
 
     def __init__(self,
-                 points: Union[List[List[List[int]]], np.ndarray],
-                 value_threshold: Optional[int] = 1e8,
+                 points: Union[List[List[List[float]]], np.ndarray],
+                 value_threshold: Optional[float] = 1e8,
                  use_precise_newton_polytope: Optional[bool] = False,
                  distinguished_points: Optional[Union[List[int], None]] = None,
                  config_kwargs: Optional[Dict[str, Any]] = None,
@@ -27,12 +27,13 @@ class Points(PointsBase):
         self.distinguished_points = distinguished_points
 
         # Be lenient and allow numpy array as input.
-        # The input might already be -1 padded arrays. Thus, we do a thorough check to clean that up.
+        # The input might already be a padded arrays. Thus, we do a thorough check to clean that up.
+        # WARNING: padding value must be *STRICTLY* negative for the numpy array!
         if isinstance(points, np.ndarray):
             points = points.tolist()
             assert isinstance(points, list)
             for p in points:
-                while p[-1][0] == -1:
+                while p[-1][0] < 0:
                     p.pop()
                     assert len(p) != 0  # Should not be empty batch
 
