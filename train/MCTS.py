@@ -13,10 +13,11 @@ ITERATIONS = 1000
 
 #WARNING: this only works for 1st batch, dim = 3 and maximal 10 points for now!
 
-class hironaka_net(nn.Module):
+
+class HironakaNet(nn.Module):
 
     def __init__(self):
-        super(hironaka_net, self).__init__()
+        super(HironakaNet, self).__init__()
         # # 1 input image channel, 6 output channels, 5x5 square convolution
         # # kernel
         #self.conv1 = nn.Conv2d(1, 6, 5)
@@ -67,6 +68,7 @@ def inverse_hash(s:str):
 
     return pt
 
+
 def points_to_tensor(s:Points):
     state = s.points[0]
     coords = []
@@ -93,7 +95,8 @@ def action_to_coords(action: int):
         action = action // 2
     return coords
 
-class mcts:
+
+class MCTS:
     def __init__(self, state, env, nn, max_depth = 20):
         self.initial_state = state
         self.env = env
@@ -191,10 +194,9 @@ def loss_function(x,y : list[torch.FloatTensor])->torch.Tensor:
     return loss
 
 
-
 if __name__ == '__main__':
 
-    net = hironaka_net()
+    net = HironakaNet()
 
     coords = action_to_coords(3)
     agent = ChooseFirstAgent()
@@ -208,7 +210,7 @@ if __name__ == '__main__':
             test_points = Points(geom.generate_batch_points(n=10, batch_num=1, dimension=3, max_value=50))
             test_points.get_newton_polytope()
             test_points.rescale()
-            mcts_instance = mcts(state= test_points, env = agent2, nn = net, max_depth = 50)
+            mcts_instance = MCTS(state= test_points, env = agent2, nn = net, max_depth = 50)
             mcts_instance.run(iteration = 20)
             new_examples = mcts_instance.get_examples()
             examples[0].extend(new_examples[0])
