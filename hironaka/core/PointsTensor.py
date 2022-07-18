@@ -13,8 +13,8 @@ class PointsTensor(PointsBase):
     copied_attributes = ['distinguished_points']
 
     def __init__(self,
-                 points: Union[torch.Tensor, List[List[List[int]]], np.ndarray],
-                 value_threshold: Optional[int] = 1e8,
+                 points: Union[torch.Tensor, List[List[List[float]]], np.ndarray],
+                 value_threshold: Optional[float] = 1e8,
                  device_key: Optional[str] = 'cpu',
                  padding_value: Optional[float] = -1.0,
                  distinguished_points: Optional[List[int]] = None,
@@ -23,7 +23,7 @@ class PointsTensor(PointsBase):
         config = kwargs if config_kwargs is None else {**config_kwargs, **kwargs}
         self.value_threshold = value_threshold
 
-        assert padding_value < 0, f"'padding_value' must be a negative number. Got {padding_value} instead."
+        assert padding_value <= 0, f"'padding_value' must be a non-positive number. Got {padding_value} instead."
 
         if isinstance(points, list):
             points = torch.FloatTensor(
