@@ -1,4 +1,5 @@
 import unittest
+from typing import List
 
 from train import MCTS
 
@@ -15,7 +16,7 @@ from train.MCTS import HironakaNet, MCTS
 
 ITERATIONS = 50
 
-def loss_function(x,y : list[torch.FloatTensor])->torch.Tensor:
+def loss_function(x,y : List[torch.FloatTensor])->torch.Tensor:
     loss = torch.zeros(1)
     for i,pred in enumerate(x):
         choice_x = torch.narrow(pred,0,0,8)
