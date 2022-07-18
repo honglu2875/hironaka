@@ -167,6 +167,7 @@ def mask_encoded_action(dimension: int):
 
     return result
 
+
 def generate_points(n: int, dimension=3, max_value=50):
     return [[np.random.randint(max_value) for _ in range(dimension)] for _ in range(n)]
 

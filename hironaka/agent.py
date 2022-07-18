@@ -1,10 +1,9 @@
 import abc
+from typing import List
 
 import numpy as np
-
 from hironaka.core import Points
 from hironaka.policy.Policy import Policy
-from typing import List
 
 class Agent(abc.ABC):
     """
@@ -45,8 +44,7 @@ class PolicyAgent(Agent):
         self._policy = policy
 
     def move(self, points: Points, coords: List[List[int]], inplace=True):
-        assert len(
-            coords) == points.batch_size  # TODO: wrap the move method for the abstract "Agent" with sanity checks?
+        assert len(coords) == points.batch_size  # TODO: wrap the move method for the abstract "Agent" with sanity checks?
 
         features = points.get_features()
 
@@ -82,3 +80,4 @@ class AgentMorin(Agent):
             weights[:] = next_weights
             return [action]
         return [action], [next_weights]
+

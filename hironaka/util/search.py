@@ -22,8 +22,6 @@ def search_depth(points: Points, host: Host, debug=False):
         max_depth = max(max_depth, depth)
         coords = host.select_coord(current, debug=debug)
 
-        # print(current, depth)
-
         for i in coords[0]:
             nxt = current.copy()
             nxt.shift(coords, [i])

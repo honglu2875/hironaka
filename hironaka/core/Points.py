@@ -12,7 +12,7 @@ class Points(PointsBase):
         When dealing with small batches, small dimension and small point numbers, list is much better than numpy.
     """
     subcls_config_keys = ['value_threshold', 'use_precise_newton_polytope']
-    copied_attributes = ['distinguished_points', 'ended_each_batch', 'ended']
+    copied_attributes = ['distinguished_points']
 
     def __init__(self,
                  points: Union[List[List[List[int]]], np.ndarray],

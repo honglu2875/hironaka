@@ -1,7 +1,6 @@
-dataclasses==0.6
 numpy==1.22.4
 treelib==1.6.1
 gym==0.22
 torch~=1.12.0
-sympy~=1.10.1
 scipy~=1.8.1
+PyYAML~=6.0

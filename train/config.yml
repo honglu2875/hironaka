@@ -1,0 +1,22 @@
+global:
+  dimension: 3
+  max_value: 20
+  masked: true
+  max_number_points: 20
+  use_cuda: true
+  normalized: false
+  value_threshold: 100000000
+  step_threshold: 200 # HironakaAgentEnv, Validator only
+  fixed_penalty_crossing_threshold: 0
+  stop_at_threshold: true # HironakaAgentEnv, Validator only
+  improve_efficiency: true
+  scale_observation: true
+  reward_based_on_point_reduction: true
+  use_discrete_actions_for_host: true
+training:
+  epoch: 1
+  batch_size: 32
+  save_frequency: 1 # save model every {save_frequency} epochs.
+  total_timestep: 10000
+models:
+  version_string: 'vanilla_v0'
