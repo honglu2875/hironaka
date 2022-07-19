@@ -56,7 +56,7 @@ class TestThom(unittest.TestCase):
         weights = [1] * dimension
         search_tree_morin(initial_points, tree, 0, weights, host, max_size=MAX_SIZE)
         tree.show(data_property="points", idhidden=False)
-        tree.depth()
+        assert tree.size() == 30
 
     def test_thom_points(self):
         thom_points_homogeneous_2 = "[[0, 1]]"
@@ -75,3 +75,5 @@ class TestThom(unittest.TestCase):
         thom_points_homogeneous_4 = \
             "[[2, 1, 0, 1, 0, 0, 0], [2, 1, 0, 0, 0, 1, 0], [2, 1, 0, 0, 0, 0, 1], [2, 0, 2, 0, 0, 0, 0], [2, 0, 1, 0, 1, 0, 0], [2, 0, 0, 0, 2, 0, 0], [1, 2, 1, 0, 0, 0, 0], [1, 2, 0, 0, 1, 0, 0], [2, 0, 1, 0, 0, 1, 0], [2, 0, 1, 0, 0, 0, 1], [2, 0, 0, 1, 1, 0, 0], [2, 0, 0, 0, 1, 0, 1], [0, 4, 0, 0, 0, 0, 0], [1, 2, 0, 0, 0, 1, 0], [1, 2, 0, 0, 0, 0, 1], [1, 1, 1, 0, 1, 0, 0], [1, 1, 0, 0, 2, 0, 0], [0, 3, 0, 0, 1, 0, 0], [1, 1, 0, 0, 1, 0, 1]]"
         assert str(thom_points_homogeneous(4)) == thom_points_homogeneous_4
+
+

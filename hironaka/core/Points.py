@@ -15,7 +15,7 @@ class Points(PointsBase):
     copied_attributes = ['distinguished_points']
 
     def __init__(self,
-                 points: Union[List[List[List[float]]], np.ndarray],
+                 points: Union[List[List[List[float]]], List[List[float]], np.ndarray],
                  value_threshold: Optional[float] = 1e8,
                  use_precise_newton_polytope: Optional[bool] = False,
                  distinguished_points: Optional[Union[List[int], None]] = None,

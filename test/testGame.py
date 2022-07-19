@@ -1,6 +1,6 @@
 import unittest
 
-from hironaka.agent import RandomAgent
+from hironaka.agent import RandomAgent, ChooseFirstAgent
 from hironaka.game import GameHironaka
 from hironaka.host import Zeillinger
 from hironaka.core import Points
@@ -31,3 +31,10 @@ class TestGame(unittest.TestCase):
             print(game.state)
 
         game.print_history()
+
+    def test_agent_ignore_batch(self):
+        points = Points([[0, 1], [1, 0]])
+        agent = ChooseFirstAgent(ignore_batch_dimension=True)
+        assert agent.move(points, [0, 1], inplace=False) == 0
+        agent.move(points, [0, 1])
+        assert str(points.points) == "[[[1, 0]]]"

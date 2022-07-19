@@ -140,7 +140,7 @@ class GameMorin(Game):
             self.logger.info(self.state)
 
         coords = self.host.select_coord(self.state)
-        action = self.agent.move(self.state, self.weights, coords, inplace=True)
+        action = self.agent.move(self.state, coords, self.weights, inplace=True)
 
         if verbose:
             self._show(coords, action, None, self.state.ended)
