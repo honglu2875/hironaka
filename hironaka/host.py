@@ -1,4 +1,5 @@
 import abc
+import logging
 from itertools import combinations
 from typing import Optional
 
@@ -9,13 +10,33 @@ from hironaka.policy.Policy import Policy
 
 
 class Host(abc.ABC):
-    @abc.abstractmethod
+    """
+        A host that returns the subset of coordinates according to the given set of points.
+        Must implement:
+            _select_coord
+    """
+    logger = None
+
+    def __init__(self, ignore_batch_dimension=False, **kwargs):
+        if self.logger is None:
+            self.logger = logging.getLogger(__class__.__name__)
+
+        # If the agent only has one batch and wants to ignore batch dimension in the parameters, set it to True.
+        self.ignore_batch_dimension = ignore_batch_dimension
+
     def select_coord(self, points: Points, debug=False):
+        if self.ignore_batch_dimension:
+            return self._select_coord(points)[0]
+        else:
+            return self._select_coord(points)
+
+    @abc.abstractmethod
+    def _select_coord(self, points: Points):
         pass
 
 
 class RandomHost(Host):
-    def select_coord(self, points: Points, debug=False):
+    def _select_coord(self, points: Points):
         dim = points.dimension
         return [np.random.choice(list(range(dim)), size=2) for _ in range(points.batch_size)]
 
@@ -37,8 +58,9 @@ class Zeillinger(Host):
             sum([vt[i] == mn for i in range(len(vt))])
         return L, S
 
-    def select_coord(self, points: Points, debug=False):
+    def _select_coord(self, points: Points):
         assert not points.ended
+
         dim = points.dimension
         result = []
         for b in range(points.batch_size):
@@ -52,9 +74,6 @@ class Zeillinger(Host):
                 vector = tuple([pair[0][i] - pair[1][i] for i in range(dim)])
                 char_vectors.append((vector, self.get_char_vector(vector)))
             char_vectors.sort(key=(lambda x: x[1]))
-
-            if debug:
-                print(char_vectors)
 
             result.append(self._get_coord(char_vectors))
         return result
@@ -75,7 +94,9 @@ class PolicyHost(Host):
         self._policy = policy
         self.use_discrete_actions_for_host = kwargs.get('use_discrete_actions_for_host', use_discrete_actions_for_host)
 
-    def select_coord(self, points: Points, debug=False):
+        super().__init__(**kwargs)
+
+    def _select_coord(self, points: Points):
         features = points.get_features()
 
         coords = self._policy.predict(features)  # return multi-binary array
@@ -100,7 +121,7 @@ class ZeillingerLex(Zeillinger):
 
 
 class WeakSpivakovsky(Host):
-    def select_coord(self, points: Points, debug=False):
+    def _select_coord(self, points: Points):
         assert not points.ended
         result = []
         for b in range(points.batch_size):
