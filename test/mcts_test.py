@@ -14,7 +14,7 @@ from hironaka.core import Points
 from hironaka.agent import RandomAgent, ChooseFirstAgent
 from train.MCTS import HironakaNet, MCTS
 
-ITERATIONS = 50
+ITERATIONS = 2
 
 def loss_function(x,y : List[torch.FloatTensor])->torch.Tensor:
     loss = torch.zeros(1)
@@ -121,8 +121,7 @@ def train_network():
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            if i % 10 == 0:
-                print("The current loss is: ", loss.item())
+            print("The current loss is: ", loss.item())
 
     return net
 

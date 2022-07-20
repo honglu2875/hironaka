@@ -71,7 +71,7 @@ class PointsBase(abc.ABC):
 
         self.batch_size = self.config.get('points_batch_size', shape[0])
         self.dimension = self.config.get('dimension', shape[2])
-        self.max_num_points = self.config.get('max_number_points', self._get_max_num_points())
+        self.max_num_points = self.config.get('max_num_points', self._get_max_num_points())
 
         # self.ended represents whether the whole game (for all batches) has ended
         # will be updated on point-changing modifications including `get_newton_polytope`

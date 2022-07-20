@@ -3,9 +3,11 @@ from typing import List
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 from hironaka.core import Points
 from hironaka.agent import RandomAgent, ChooseFirstAgent
 from hironaka.src import _snippets as geom
+from hironaka.core import PointsTensor
 
 import collections as col
 import math
@@ -14,7 +16,6 @@ c_puct = 0.5 #explore hyperparameter
 ITERATIONS = 1000
 
 #WARNING: this only works for 1st batch, dim = 3 and maximal 10 points for now!
-
 
 class HironakaNet(nn.Module):
 
@@ -33,10 +34,9 @@ class HironakaNet(nn.Module):
         # # Max pooling over a (2, 2) window
         #x = F.max_pool2d(F.relu(self.conv1(x)), (2, 2))
         # # If the size is a square, you can specify with a single number
-        #x = F.max_pool2d(F.relu(self.conv2(x)), 2)
-        # x = torch.flatten(x, 1) # flatten all dimensions except the batch dimension
+        # x = F.max_pool2d(F.relu(self.conv2(x)), 2)
+        x = torch.flatten(x) # flatten all dimensions except the batch dimension
         x = F.relu(self.fc1(x))
-        # x = F.relu(self.fc2(x))
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
         x_prob = torch.narrow(x,0,0,8)
@@ -45,9 +45,10 @@ class HironakaNet(nn.Module):
         x = torch.cat((x_prob,x_reward), dim = 0)
         return x
 
-def hashify(s:Points):
+def hashify(s:PointsTensor):
     hashed_str = ""
-    for point in s.points[0]:
+    current_points = s.points[0].tolist()
+    for point in current_points:
         for coord in point:
             hashed_str += '%.12f' % coord
             hashed_str += ','
@@ -100,7 +101,8 @@ def action_to_coords(action: int):
 
 class MCTS:
     def __init__(self, state, env, nn, max_depth = 20):
-        self.initial_state = state
+
+        self.initial_state = state if isinstance(state, PointsTensor) else PointsTensor(state.points, max_num_points = 10) #Turn points into PointsTensor
         self.env = env
         self.nn = nn
         self.max_depth = max_depth
@@ -143,7 +145,7 @@ class MCTS:
 
         if not (hashed_s in self.visited):
             self.visited[hashed_s] = 1
-            result = self.nn(points_to_tensor(s))
+            result = self.nn(s.points[0])
             self.P[hashed_s] = result[:8]
             current_reward = result[8].item()
             self.Q[hashed_s] = [0 for _ in range(8)]
@@ -198,50 +200,55 @@ def loss_function(x,y : List[torch.FloatTensor])->torch.Tensor:
 
 if __name__ == '__main__':
 
-    net = HironakaNet()
-
-    coords = action_to_coords(3)
-    agent = ChooseFirstAgent()
-    agent2 = RandomAgent()
-
-    optimizer = torch.optim.SGD(net.parameters(), lr=1e-6)
-
-    for i in range(ITERATIONS):
-        examples = ([],[])
-        for _ in range(10):
-            test_points = Points(geom.generate_batch_points(n=10, batch_num=1, dimension=3, max_value=50))
-            test_points.get_newton_polytope()
-            test_points.rescale()
-            mcts_instance = MCTS(state= test_points, env = agent2, nn = net, max_depth = 50)
-            mcts_instance.run(iteration = 20)
-            new_examples = mcts_instance.get_examples()
-            examples[0].extend(new_examples[0])
-            examples[1].extend(new_examples[1])
-        data, y = examples
-        new_data = []
-        for points in data:
-            temp = []
-            for point in points:
-                temp += point
-            new_data.append(temp)
-
-        data = [torch.FloatTensor(_) for _ in new_data]
-        y = [torch.FloatTensor(_) for _ in y]
-        pred = []
-        for batch, x in enumerate(data):
-            this_pred = net(x)
-            pred.append(this_pred)
-
-        if pred:
-            loss = loss_function(pred, y)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            if i % 10 == 0:
-                print("The current loss is: ", loss.item())
-        #TODO: write a pit function to prevent degeneracy of training.
+    print(hashify(PointsTensor([[[0,0,1],[0,1,0]]], max_num_points = 2)))
 
 
-    path = 'test_model.pth'
-    torch.save(net, path)
-    print("Saved model as ", path)
+
+    #
+    # net = HironakaNet()
+    #
+    # coords = action_to_coords(3)
+    # agent = ChooseFirstAgent()
+    # agent2 = RandomAgent()
+    #
+    # optimizer = torch.optim.SGD(net.parameters(), lr=1e-6)
+    #
+    # for i in range(ITERATIONS):
+    #     examples = ([],[])
+    #     for _ in range(10):
+    #         test_points = Points(geom.generate_batch_points(n=10, batch_num=1, dimension=3, max_value=50))
+    #         test_points.get_newton_polytope()
+    #         test_points.rescale()
+    #         mcts_instance = MCTS(state= test_points, env = agent2, nn = net, max_depth = 50)
+    #         mcts_instance.run(iteration = 20)
+    #         new_examples = mcts_instance.get_examples()
+    #         examples[0].extend(new_examples[0])
+    #         examples[1].extend(new_examples[1])
+    #     data, y = examples
+    #     new_data = []
+    #     for points in data:
+    #         temp = []
+    #         for point in points:
+    #             temp += point
+    #         new_data.append(temp)
+    #
+    #     data = [torch.FloatTensor(_) for _ in new_data]
+    #     y = [torch.FloatTensor(_) for _ in y]
+    #     pred = []
+    #     for batch, x in enumerate(data):
+    #         this_pred = net(x)
+    #         pred.append(this_pred)
+    #
+    #     if pred:
+    #         loss = loss_function(pred, y)
+    #         optimizer.zero_grad()
+    #         loss.backward()
+    #         optimizer.step()
+    #         if i % 10 == 0:
+    #             print("The current loss is: ", loss.item())
+    #     #TODO: write a pit function to prevent degeneracy of training.
+    #
+    #
+    # path = 'test_model.pth'
+    # torch.save(net, path)
+    # print("Saved model as ", path)
