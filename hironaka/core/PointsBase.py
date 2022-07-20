@@ -61,7 +61,7 @@ class PointsBase(abc.ABC):
         # Check the shape of `points`.
         shape = self._get_shape(points)
         if len(shape) == 2:
-            print("Input is required to be 3-dimensional: batch, number_of_points, coordinates.")
+            print("Input is required to be 3-dimensional: batch, max_num_points, coordinates.")
             print("A batch dimension is automatically added.")
             shape = (1, *shape)
             points = self._add_batch_axis(points)
@@ -71,7 +71,7 @@ class PointsBase(abc.ABC):
 
         self.batch_size = self.config.get('points_batch_size', shape[0])
         self.dimension = self.config.get('dimension', shape[2])
-        self.max_num_points = self.config.get('max_number_points', self._get_max_num_points())
+        self.max_num_points = self.config.get('max_num_points', self._get_max_num_points())
 
         # self.ended represents whether the whole game (for all batches) has ended
         # will be updated on point-changing modifications including `get_newton_polytope`

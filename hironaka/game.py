@@ -114,7 +114,7 @@ class GameHironaka(Game):
 
 
 class GameMorin(Game):
-    """The agent is Thom (picks the action coordinate with smallest weight), but the game terminates with a
+    """The agent is Thom (picks the action coordinate with the smallest weight), but the game terminates with a
     label 'NO CONTRIBUTION' if the distinguished Porteous point is not a vertex of the Newton polytope
     after the shift"""
 
@@ -140,7 +140,7 @@ class GameMorin(Game):
             self.logger.info(self.state)
 
         coords = self.host.select_coord(self.state)
-        action = self.agent.move(self.state, self.weights, coords, inplace=True)
+        action = self.agent.move(self.state, coords, self.weights, inplace=True)
 
         if verbose:
             self._show(coords, action, None, self.state.ended)
