@@ -61,7 +61,7 @@ class PointsBase(abc.ABC):
         # Check the shape of `points`.
         shape = self._get_shape(points)
         if len(shape) == 2:
-            print("Input is required to be 3-dimensional: batch, number_of_points, coordinates.")
+            print("Input is required to be 3-dimensional: batch, max_num_points, coordinates.")
             print("A batch dimension is automatically added.")
             shape = (1, *shape)
             points = self._add_batch_axis(points)
