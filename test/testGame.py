@@ -42,5 +42,7 @@ class TestGame(unittest.TestCase):
         points = Points([[0, 1, 2], [2, 1, 0]])
         host = Zeillinger(ignore_batch_dimension=True)
         assert str(host.select_coord(points)) == "[0, 2]"
+
+        # TODO: WeakSpivakovsky must be fixed first!!!
         #host = WeakSpivakovsky(ignore_batch_dimension=False)
         #print(host.select_coord(points))

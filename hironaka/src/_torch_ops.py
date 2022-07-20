@@ -11,7 +11,7 @@ def get_newton_polytope_approx_torch(points: torch.Tensor,
     assert len(points.shape) == 3
     batch_size, max_num_points, dimension = points.shape
 
-    available_points = (points >= 0)
+    available_points = (points.ge(0))
 
     # get a filter matrix
     filter_matrix = available_points.unsqueeze(2).repeat(1, 1, max_num_points, 1) & \

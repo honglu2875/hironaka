@@ -79,7 +79,7 @@ class PointsTensor(PointsBase):
         return reposition_torch(points, inplace=inplace, padding_value=self.padding_value)
 
     def _rescale(self, points: torch.Tensor, inplace: Optional[bool] = True):
-        r = rescale_torch(points, inplace=inplace, padding_value=self.padding_value)
+        return rescale_torch(points, inplace=inplace, padding_value=self.padding_value)
 
     def _points_copy(self, points: torch.Tensor):
         return points.clone().detach()
