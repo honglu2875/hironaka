@@ -89,6 +89,8 @@ def shift_lst(points: List[List[List[float]]], coords: List[List[int]], axis: Li
     """
 
     batch_num, _, dim = get_shape(points)
+    assert len(coords) == batch_num
+    assert len(axis) == batch_num
 
     assert batch_num
 

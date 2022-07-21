@@ -77,7 +77,7 @@ class RandomAgent(Agent):
     USE_REPOSITION: Final[bool] = False
 
     def _get_actions(self, points, batch_coords, batch_weights):
-        return [np.random.choice(coord, size=1)[0] if len(coord) > 1 else None for coord in batch_coords]
+        return [np.random.choice(coord, size=1)[0].tolist() if len(coord) > 1 else None for coord in batch_coords]
 
 
 class ChooseFirstAgent(Agent):

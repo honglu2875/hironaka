@@ -2,7 +2,7 @@ import unittest
 
 from hironaka.agent import RandomAgent, ChooseFirstAgent
 from hironaka.game import GameHironaka
-from hironaka.host import Zeillinger, WeakSpivakovsky
+from hironaka.host import Zeillinger, WeakSpivakovsky, RandomHost
 from hironaka.core import Points
 from hironaka.src import generate_points, generate_batch_points
 
@@ -11,7 +11,7 @@ class TestGame(unittest.TestCase):
     def test_random_games(self):
         points = Points(generate_points(5))
         agent = RandomAgent()
-        host = Zeillinger()
+        host = RandomHost()
         game = GameHironaka(points, host, agent)
 
         print(game.state)
@@ -23,7 +23,7 @@ class TestGame(unittest.TestCase):
     def test_random_batch_games(self):
         points = Points(generate_batch_points(5, batch_num=5))
         agent = RandomAgent()
-        host = Zeillinger()
+        host = RandomHost()
         game = GameHironaka(points, host, agent)
 
         print(game.state)

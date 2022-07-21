@@ -38,7 +38,7 @@ class Host(abc.ABC):
 class RandomHost(Host):
     def _select_coord(self, points: Points):
         dim = points.dimension
-        return [np.random.choice(list(range(dim)), size=2) for _ in range(points.batch_size)]
+        return [np.random.choice(list(range(dim)), size=2).tolist() for _ in range(points.batch_size)]
 
 
 class Zeillinger(Host):

@@ -84,7 +84,7 @@ class GameHironaka(Game):
 
             In particular,
             1. the host selects coordinates
-                (use: Host.selectCoord(state));
+                (use: Host.select_coord(state));
             2. the agent makes one move according to the selected coordinates
                 (use: Agent.move(state, coords)).
 

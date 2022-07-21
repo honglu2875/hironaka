@@ -2,6 +2,7 @@ import numbers
 from typing import List, Union
 
 import numpy as np
+import sys
 
 
 def get_shape(o):
@@ -111,6 +112,17 @@ def get_gym_version_in_float():
     try:
         import gym
         r = float(".".join(gym.__version__.split(".")[:2]))
+    finally:
+        return r
+
+
+def get_python_version_in_float():
+    """
+        This tries to get the python version in float number.
+    """
+    r = 0
+    try:
+        r = float(".".join(sys.version.split(".")[:2]))
     finally:
         return r
 
