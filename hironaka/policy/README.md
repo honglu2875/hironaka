@@ -7,7 +7,7 @@ __init__
 predict
 `
 
-Note that `input_preprocess_for_host` and `input_preprocess_for_agent` are merely helper functions for input preprocessing of list-based observations (e.g., class `Points`).
+Note that `input_preprocess_for_host` and `input_preprocess_for_agent` are merely helper functions for input preprocessing of list-based observations (e.g., class `ListPoints`).
 Feel free to override them for different purposes.
 
 ## .NNPolicy

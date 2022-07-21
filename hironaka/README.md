@@ -12,5 +12,4 @@ Submodules:
 
 Python scripts and non-essential functions:
 
- - [.train/](../train)
  - [.util/](util)
