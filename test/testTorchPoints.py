@@ -2,7 +2,7 @@ import unittest
 
 import torch
 
-from hironaka.core import PointsTensor
+from hironaka.core import TensorPoints
 from hironaka.src import get_newton_polytope_torch, shift_torch, reposition_torch
 
 
@@ -72,7 +72,7 @@ class testTorchPoints(unittest.TestCase):
             ]
         )
 
-        pts = PointsTensor(p)
+        pts = TensorPoints(p)
 
         pts.get_newton_polytope()
         assert str(pts) == str(self.r)

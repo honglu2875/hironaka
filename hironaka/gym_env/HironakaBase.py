@@ -5,7 +5,7 @@ import gym
 import numpy as np
 from gym import spaces
 
-from hironaka.core import Points
+from hironaka.core import ListPoints
 from hironaka.src import get_padded_array, get_gym_version_in_float, generate_points
 
 ObsType = TypeVar("ObsType")
@@ -89,12 +89,12 @@ class HironakaBase(gym.Env, abc.ABC):
             super().reset(seed=seed)
 
         if points is None:
-            self._points = Points(
+            self._points = ListPoints(
                 [generate_points(self.max_number_points, **self.config_for_generate_points)],
                 value_threshold=self.value_threshold
             )
         else:
-            self._points = Points(points, **self.config_for_points)
+            self._points = ListPoints(points, **self.config_for_points)
 
         self._points.get_newton_polytope()
         if self.scale_observation:
