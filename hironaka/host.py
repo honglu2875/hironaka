@@ -5,7 +5,7 @@ from typing import Optional
 
 import numpy as np
 
-from hironaka.core import Points
+from hironaka.core import ListPoints
 from hironaka.policy.Policy import Policy
 
 
@@ -24,19 +24,19 @@ class Host(abc.ABC):
         # If the agent only has one batch and wants to ignore batch dimension in the parameters, set it to True.
         self.ignore_batch_dimension = ignore_batch_dimension
 
-    def select_coord(self, points: Points, debug=False):
+    def select_coord(self, points: ListPoints, debug=False):
         if self.ignore_batch_dimension:
             return self._select_coord(points)[0]
         else:
             return self._select_coord(points)
 
     @abc.abstractmethod
-    def _select_coord(self, points: Points):
+    def _select_coord(self, points: ListPoints):
         pass
 
 
 class RandomHost(Host):
-    def _select_coord(self, points: Points):
+    def _select_coord(self, points: ListPoints):
         dim = points.dimension
         return [np.random.choice(list(range(dim)), size=2).tolist() for _ in range(points.batch_size)]
 
@@ -58,7 +58,7 @@ class Zeillinger(Host):
             sum([vt[i] == mn for i in range(len(vt))])
         return L, S
 
-    def _select_coord(self, points: Points):
+    def _select_coord(self, points: ListPoints):
         assert not points.ended
 
         dim = points.dimension
@@ -96,13 +96,13 @@ class PolicyHost(Host):
 
         super().__init__(**kwargs)
 
-    def _select_coord(self, points: Points):
+    def _select_coord(self, points: ListPoints):
         features = points.get_features()
 
         coords = self._policy.predict(features)  # return multi-binary array
         result = []
         for b in range(coords.shape[0]):
-            result.append(np.where(coords[b] == 1)[0])
+            result.append(np.where(coords[b] == 1)[0].tolist())
         return result
 
 
@@ -121,7 +121,7 @@ class ZeillingerLex(Zeillinger):
 
 
 class WeakSpivakovsky(Host):
-    def _select_coord(self, points: Points):
+    def _select_coord(self, points: ListPoints):
         assert not points.ended
         result = []
         for b in range(points.batch_size):

@@ -1,7 +1,7 @@
 import logging
 from typing import Optional, Dict, Any
 
-from hironaka.core import Points
+from hironaka.core import ListPoints
 from hironaka.game import GameHironaka
 from hironaka.src import generate_batch_points
 
@@ -57,7 +57,7 @@ class HironakaValidator(GameHironaka):
         return len_history
 
     def reset(self):
-        self.state = Points(generate_batch_points(**self.points_config), value_threshold=self.value_threshold)
+        self.state = ListPoints(generate_batch_points(**self.points_config), value_threshold=self.value_threshold)
         if self.scale_observation:
             self.state.rescale()
         self.stopped = False

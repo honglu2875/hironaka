@@ -7,7 +7,7 @@ from hironaka.src import shift_lst, get_newton_polytope_lst, get_shape, scale_po
     get_newton_polytope_approx_lst
 
 
-class Points(PointsBase):
+class ListPoints(PointsBase):
     """
         When dealing with small batches, small dimension and small point numbers, list is much better than numpy.
     """

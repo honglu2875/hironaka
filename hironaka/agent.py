@@ -3,7 +3,7 @@ import logging
 from typing import List, Final
 
 import numpy as np
-from hironaka.core import Points
+from hironaka.core import ListPoints
 from hironaka.policy.Policy import Policy
 
 
@@ -31,7 +31,7 @@ class Agent(abc.ABC):
             if not hasattr(self, s) or getattr(self, s) is None:
                 raise NotImplementedError(f"Please specify {s} for the subclass.")
 
-    def move(self, points: Points, coords, weights=None, inplace=True):
+    def move(self, points: ListPoints, coords, weights=None, inplace=True):
         if self.USE_WEIGHTS and weights is None:
             raise Exception("Please specify weights in the parameters.")
         if not self.USE_WEIGHTS and weights is not None:

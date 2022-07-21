@@ -8,7 +8,7 @@ from hironaka.src import get_batched_padded_array, rescale_torch
 from hironaka.src import shift_torch, get_newton_polytope_torch, reposition_torch
 
 
-class PointsTensor(PointsBase):
+class TensorPoints(PointsBase):
     subcls_config_keys = ['value_threshold', 'device_key', 'padding_value']
     copied_attributes = ['distinguished_points']
 

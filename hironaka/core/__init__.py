@@ -1,3 +1,3 @@
-from .Points import *
-from .PointsTensor import *
+from .ListPoints import *
+from .TensorPoints import *
 

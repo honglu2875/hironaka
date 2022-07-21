@@ -2,7 +2,7 @@ import abc
 import logging
 from typing import Optional, Union
 
-from hironaka.core import Points
+from hironaka.core import ListPoints
 from hironaka.agent import Agent
 from hironaka.host import Host
 
@@ -66,7 +66,7 @@ class Game(abc.ABC):
 
 class GameHironaka(Game):
     def __init__(self,
-                 state: Union[Points, None],
+                 state: Union[ListPoints, None],
                  host: Host,
                  agent: Agent,
                  scale_observation: Optional[bool] = True,
@@ -119,7 +119,7 @@ class GameMorin(Game):
     after the shift"""
 
     def __init__(self,
-                 state: Union[Points, None],
+                 state: Union[ListPoints, None],
                  host: Host,
                  agent: Agent,
                  scale_observation: Optional[bool] = True,
