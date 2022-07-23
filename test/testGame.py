@@ -1,9 +1,9 @@
 import unittest
 
 from hironaka.agent import RandomAgent, ChooseFirstAgent
-from hironaka.game import GameHironaka
-from hironaka.host import Zeillinger, WeakSpivakovsky, RandomHost
 from hironaka.core import ListPoints
+from hironaka.game import GameHironaka
+from hironaka.host import Zeillinger, RandomHost
 from hironaka.src import generate_points, generate_batch_points
 
 
@@ -44,5 +44,5 @@ class TestGame(unittest.TestCase):
         assert str(host.select_coord(points)) == "[0, 2]"
 
         # TODO: WeakSpivakovsky must be fixed first!!!
-        #host = WeakSpivakovsky(ignore_batch_dimension=False)
-        #print(host.select_coord(points))
+        # host = WeakSpivakovsky(ignore_batch_dimension=False)
+        # print(host.select_coord(points))

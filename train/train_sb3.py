@@ -1,7 +1,7 @@
+import argparse
 import logging
 import os
 import pathlib
-import argparse
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.resolve()))
@@ -82,7 +82,7 @@ def main(config_file: str):
         # Validation
 
         if i % save_frequency == 0:
-            print(f"Epoch {i*5}")
+            print(f"Epoch {i * 5}")
             print("agent validation:")
             agents = [nnagent, RandomAgent(), ChooseFirstAgent()]
             # agents = []

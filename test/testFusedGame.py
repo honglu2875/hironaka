@@ -5,11 +5,9 @@ import torch
 from gym import register
 from stable_baselines3 import DQN
 
-from hironaka.agent import RandomAgent, ChooseFirstAgent
-from hironaka.game import GameHironaka
-from hironaka.host import Zeillinger, WeakSpivakovsky, RandomHost
-from hironaka.core import ListPoints, TensorPoints
-from hironaka.src import generate_points, generate_batch_points
+from hironaka.agent import ChooseFirstAgent
+from hironaka.core import TensorPoints
+from hironaka.host import Zeillinger
 from hironaka.util import FusedGame
 
 register(
@@ -44,7 +42,7 @@ config = {
 sb3_policy_config = {
     "net_arch": [32, 32],
     "normalize_images": False,
-    }
+}
 
 
 class TestFusedGame(unittest.TestCase):

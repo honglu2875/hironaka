@@ -2,8 +2,8 @@ import unittest
 
 from treelib import Tree
 
-from hironaka.core import ListPoints
 from hironaka.agent import AgentMorin
+from hironaka.core import ListPoints
 from hironaka.game import GameMorin
 from hironaka.host import ZeillingerLex, WeakSpivakovsky
 from hironaka.src import thom_monomial_ideal, thom_points, thom_points_homogeneous
@@ -75,5 +75,3 @@ class TestThom(unittest.TestCase):
         thom_points_homogeneous_4 = \
             "[[2, 1, 0, 1, 0, 0, 0], [2, 1, 0, 0, 0, 1, 0], [2, 1, 0, 0, 0, 0, 1], [2, 0, 2, 0, 0, 0, 0], [2, 0, 1, 0, 1, 0, 0], [2, 0, 0, 0, 2, 0, 0], [1, 2, 1, 0, 0, 0, 0], [1, 2, 0, 0, 1, 0, 0], [2, 0, 1, 0, 0, 1, 0], [2, 0, 1, 0, 0, 0, 1], [2, 0, 0, 1, 1, 0, 0], [2, 0, 0, 0, 1, 0, 1], [0, 4, 0, 0, 0, 0, 0], [1, 2, 0, 0, 0, 1, 0], [1, 2, 0, 0, 0, 0, 1], [1, 1, 1, 0, 1, 0, 0], [1, 1, 0, 0, 2, 0, 0], [0, 3, 0, 0, 1, 0, 0], [1, 1, 0, 0, 1, 0, 1]]"
         assert str(thom_points_homogeneous(4)) == thom_points_homogeneous_4
-
-

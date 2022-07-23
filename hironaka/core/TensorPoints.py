@@ -3,9 +3,9 @@ from typing import List, Any, Dict, Optional, Union
 import numpy as np
 import torch
 
-from .PointsBase import PointsBase
 from hironaka.src import get_batched_padded_array, rescale_torch
 from hironaka.src import shift_torch, get_newton_polytope_torch, reposition_torch
+from .PointsBase import PointsBase
 
 
 class TensorPoints(PointsBase):
@@ -27,9 +27,9 @@ class TensorPoints(PointsBase):
 
         if isinstance(points, list):
             points = torch.FloatTensor(
-                    get_batched_padded_array(points,
-                                             new_length=config['max_num_points'],
-                                             constant_value=padding_value))
+                get_batched_padded_array(points,
+                                         new_length=config['max_num_points'],
+                                         constant_value=padding_value))
         elif isinstance(points, np.ndarray):
             points = torch.FloatTensor(points)
         elif isinstance(points, torch.Tensor):

@@ -12,7 +12,7 @@ class PointsWrapper:
 
     def __init__(self, points, distinguished_point=None):
         distinguished_point = [distinguished_point] if distinguished_point is not None else None
-        self.points = ListPoints([points], distinguished_points = distinguished_point, **self.points_config)
+        self.points = ListPoints([points], distinguished_points=distinguished_point, **self.points_config)
 
         self.points.get_newton_polytope()
         self.track_dist_point = distinguished_point is not None

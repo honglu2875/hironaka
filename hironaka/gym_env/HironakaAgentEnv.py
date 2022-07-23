@@ -4,8 +4,8 @@ import numpy as np
 from gym import spaces
 
 from hironaka.agent import Agent
-from .HironakaBase import HironakaBase
 from hironaka.src import decode_action
+from .HironakaBase import HironakaBase
 
 
 class HironakaAgentEnv(HironakaBase):

@@ -1,9 +1,8 @@
 import numbers
+import sys
 from typing import List, Union, Optional
 
 import numpy as np
-import sys
-
 import torch
 
 
@@ -202,7 +201,7 @@ def remove_repeated(points: torch.Tensor, padding_value: Optional[float] = -1.):
     difference = points.unsqueeze(2).repeat(1, 1, max_num_points, 1) - \
                  points.unsqueeze(1).repeat(1, max_num_points, 1, 1)
 
-    upper_tri = ~torch.triu(torch.ones(max_num_points, max_num_points).type(torch.bool), diagonal=0)\
+    upper_tri = ~torch.triu(torch.ones(max_num_points, max_num_points).type(torch.bool), diagonal=0) \
         .unsqueeze(0).repeat(batch_size, 1, 1).to(device)
     repeated_points = ((difference.eq(0).all(3) & upper_tri).any(2)).unsqueeze(2).repeat(1, 1, dimension)
     # Always modify inplace

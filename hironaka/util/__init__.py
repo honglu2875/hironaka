@@ -1,2 +1,2 @@
-from .search import *
 from .FusedGame import *
+from .search import *
