@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import numpy as np
 import torch
@@ -9,11 +9,10 @@ from hironaka.src import mask_encoded_action
 
 class FusedGame:
     """
-        A fused game class processing a large batch of games. It avoids all the wrappers other than `TensorPoints`.
-        Aim to maximize speed and simplify training/validation.
+        A fused game class processing a large batch of games. It avoids all the wrappers (especially gym) other than
+        `TensorPoints`. Aim to maximize speed and simplify training/validation.
 
         """
-    _TYPE = torch.float32
 
     def __init__(self,
                  host_net: torch.nn.Module,
@@ -41,7 +40,7 @@ class FusedGame:
              exploration_rate=0.2):
         """
             Progress the game and return:
-                observations, actions (depending on sample_for), rewards, next_observations
+                observations, actions (depending on sample_for), rewards, dones, next_observations
         """
         assert sample_for in ["host", "agent"], f"sample_for must be one of 'host' and 'agent'. Got {sample_for}."
 
@@ -60,15 +59,20 @@ class FusedGame:
         if sample_for == "host":
             output_obs = observations[~done].copy()
             output_actions = chosen_actions.cpu().detach().numpy()
+            next_observations = next_observations[~done].copy()
         else:
             output_obs = {"points": observations[~done].copy(),
                           "coords": host_move.cpu().detach().numpy()[~done].copy()}
+            host_move, _ = self._host_move(points, masked=masked, exploration_rate=exploration_rate)
+            next_observations = {"points": next_observations[~done].copy(),
+                                 "coords": host_move.cpu().detach().numpy()[~done].copy()}
             output_actions = agent_move.cpu().detach().numpy()
 
         return output_obs, \
                output_actions[~done].copy(), \
-               self._reward(sample_for, observations[~done], next_observations[~done], next_done[~done]).copy(), \
-               next_observations[~done].copy()
+               self._reward(sample_for, output_obs, next_observations, next_done[~done]).copy(), \
+               next_done[~done].copy(), \
+               next_observations
 
     def _host_move(self, points: TensorPoints, masked=True, exploration_rate=0.0) -> Tuple[torch.Tensor, torch.Tensor]:
 
@@ -112,8 +116,8 @@ class FusedGame:
 
     @staticmethod
     def _reward(sample_for: str,
-                obs: torch.Tensor,
-                next_obs: torch.Tensor,
+                obs: Union[torch.Tensor, dict],
+                next_obs: Union[torch.Tensor, dict],
                 next_done: np.ndarray) -> np.ndarray:
         if sample_for == "host":
             return next_done.astype(float)
