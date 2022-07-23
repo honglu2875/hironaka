@@ -1,8 +1,9 @@
 import abc
 import logging
-from typing import List, Final
+from typing import Final
 
 import numpy as np
+
 from hironaka.core import ListPoints
 from hironaka.policy.Policy import Policy
 
@@ -127,4 +128,3 @@ class AgentMorin(Agent):
         next_weights = [weights[i] if i not in changing_coordinate else 0
                         for i in range(len(weights))]
         return [next_weights]
-

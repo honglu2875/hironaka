@@ -2,8 +2,8 @@ import abc
 import logging
 from typing import Optional, Union
 
-from hironaka.core import ListPoints
 from hironaka.agent import Agent
+from hironaka.core import ListPoints
 from hironaka.host import Host
 
 

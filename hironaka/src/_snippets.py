@@ -1,8 +1,9 @@
 import numbers
-from typing import List, Union
+import sys
+from typing import List, Union, Optional
 
 import numpy as np
-import sys
+import torch
 
 
 def get_shape(o):
@@ -186,3 +187,25 @@ def generate_points(n: int, dimension=3, max_value=50):
 
 def generate_batch_points(n: int, batch_num=1, dimension=3, max_value=50):
     return [[[np.random.randint(max_value) for _ in range(dimension)] for _ in range(n)] for _ in range(batch_num)]
+
+
+def remove_repeated(points: torch.Tensor, padding_value: Optional[float] = -1.):
+    """
+        A crucial tensor operation to remove extra repeating points and leave the first one.
+        Always inplace.
+    """
+    batch_size, max_num_points, dimension = points.shape
+    device = points.device
+
+    # get the difference matrix for the second axis
+    difference = points.unsqueeze(2).repeat(1, 1, max_num_points, 1) - \
+                 points.unsqueeze(1).repeat(1, max_num_points, 1, 1)
+
+    upper_tri = ~torch.triu(torch.ones(max_num_points, max_num_points).type(torch.bool), diagonal=0) \
+        .unsqueeze(0).repeat(batch_size, 1, 1).to(device)
+    repeated_points = ((difference.eq(0).all(3) & upper_tri).any(2)).unsqueeze(2).repeat(1, 1, dimension)
+    # Always modify inplace
+    r = points * ~repeated_points + torch.full(points.shape, padding_value).to(device) * repeated_points
+    points[:, :, :] = r
+
+    return None

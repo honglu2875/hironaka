@@ -2,9 +2,9 @@ from typing import List, Any, Dict, Optional, Union
 
 import numpy as np
 
-from .PointsBase import PointsBase
 from hironaka.src import shift_lst, get_newton_polytope_lst, get_shape, scale_points, reposition_lst, \
     get_newton_polytope_approx_lst
+from .PointsBase import PointsBase
 
 
 class ListPoints(PointsBase):
@@ -61,13 +61,14 @@ class ListPoints(PointsBase):
                points: Any,
                coords: List[List[int]],
                axis: List[int],
-               inplace: Optional[bool] = True):
+               inplace: Optional[bool] = True,
+               **kwargs):
         return shift_lst(points, coords, axis, inplace=inplace)
 
-    def _reposition(self, points: Any, inplace: Optional[bool] = True):
+    def _reposition(self, points: Any, inplace: Optional[bool] = True, **kwargs):
         return reposition_lst(points, inplace=inplace)
 
-    def _get_newton_polytope(self, points: Any, inplace: Optional[bool] = True):
+    def _get_newton_polytope(self, points: Any, inplace: Optional[bool] = True, **kwargs):
         # Mark distinguished points
         if self.distinguished_points is not None:
             # Apply marks to the distinguished points before the operation
@@ -100,7 +101,7 @@ class ListPoints(PointsBase):
     def _get_shape(self, points: Any):
         return get_shape(points)
 
-    def _rescale(self, points: Any, inplace: Optional[bool] = True):
+    def _rescale(self, points: Any, inplace: Optional[bool] = True, **kwargs):
         return scale_points(points, inplace=inplace)
 
     def _points_copy(self, points: Any):

@@ -2,34 +2,36 @@ from typing import Optional, Union, List
 
 import torch
 
-from hironaka.src import batched_coord_list_to_binary
+from hironaka.src import batched_coord_list_to_binary, remove_repeated
 
 
 def get_newton_polytope_approx_torch(points: torch.Tensor,
                                      inplace: Optional[bool] = True,
                                      padding_value: Optional[float] = -1.):
     assert len(points.shape) == 3
-    batch_size, max_num_points, dimension = points.shape
+    remove_repeated(points, padding_value=padding_value)
 
-    available_points = (points.ge(0))
+    batch_size, max_num_points, dimension = points.shape
+    device = points.device
+    available_points = points.ge(0)
 
     # get a filter matrix
     filter_matrix = available_points.unsqueeze(2).repeat(1, 1, max_num_points, 1) & \
                     available_points.unsqueeze(1).repeat(1, max_num_points, 1, 1)
-    # get the difference matrix for the point-indexing axis
+    # get the difference matrix for the second axis
     difference = points.unsqueeze(2).repeat(1, 1, max_num_points, 1) - \
                  points.unsqueeze(1).repeat(1, max_num_points, 1, 1)
 
     # filter the diagonal
-    diag_filter = ~torch.diag(torch.ones(max_num_points)).type(torch.BoolTensor)
+    diag_filter = ~torch.diag(torch.ones(max_num_points)).type(torch.BoolTensor).to(device)
     diag_filter = torch.reshape(diag_filter, (1, max_num_points, max_num_points, 1)) \
         .repeat(batch_size, 1, 1, dimension)
 
     # get the points that need to be removed
-    points_to_remove = ((difference >= 0) & diag_filter & filter_matrix).all(3).any(2)
+    points_to_remove = (difference.ge(0) & diag_filter & filter_matrix).all(3).any(2)
     points_to_remove = points_to_remove.unsqueeze(2).repeat(1, 1, dimension)
 
-    r = points * ~points_to_remove + torch.full(points.shape, padding_value) * points_to_remove
+    r = points * ~points_to_remove + torch.full(points.shape, padding_value).to(device) * points_to_remove
 
     if inplace:
         points[:, :, :] = r
@@ -48,7 +50,8 @@ def shift_torch(points: torch.Tensor,
                 coord: Union[torch.Tensor, List[List[int]]],
                 axis: Union[torch.Tensor, List[int]],
                 inplace: Optional[bool] = True,
-                padding_value: Optional[float] = -1.):
+                padding_value: Optional[float] = -1.,
+                ignore_ended_games: Optional[bool] = True):
     """
         note:
             If coord is a list, it is assumed to be lists of chosen coordinates.
@@ -57,17 +60,18 @@ def shift_torch(points: torch.Tensor,
                 dimension is 3, coord = [[1,2]] is equivalent to coord = Tensor([[0,1,1]])
     """
     _TENSOR_TYPE = torch.float32
+    device = points.device
 
     assert len(points.shape) == 3
     batch_size, max_num_points, dimension = points.shape
 
     if isinstance(coord, list):
-        coord = torch.FloatTensor(batched_coord_list_to_binary(coord, dimension))
+        coord = torch.FloatTensor(batched_coord_list_to_binary(coord, dimension)).to(device)
     elif not isinstance(coord, torch.Tensor):
         raise Exception(f"unsupported input type for coord. Got {type(coord)}.")
-    if isinstance(axis, (list, torch.Tensor)):
-        axis = torch.FloatTensor(axis)
-    else:
+    if isinstance(axis, list):
+        axis = torch.FloatTensor(axis).to(device)
+    elif not isinstance(axis, torch.Tensor):
         raise Exception(f"unsupported input type for axis. Got {type(axis)},")
 
     # Initial sanity check
@@ -77,22 +81,26 @@ def shift_torch(points: torch.Tensor,
     assert torch.all(torch.all(points.ge(0), 2).eq(torch.any(points.ge(0), 2)))
 
     # Get filter
-    available_points = (points >= 0)
+    available_points = points.ge(0)
 
     # Turn each axis label into (0, 0, ... 1, ..., 0) where only the given location is 1.
-    src = torch.full((batch_size, 1), 1.).type(_TENSOR_TYPE)
+    src = torch.full((batch_size, 1), 1.).to(device).type(_TENSOR_TYPE)
     index = axis.unsqueeze(1).type(torch.int64)  # index must be int64
-    axis_binary = torch.scatter(torch.zeros(batch_size, dimension), 1, index, src).type(_TENSOR_TYPE)
-    assert torch.all(axis_binary - coord).le(0)
+    axis_binary = torch.scatter(torch.zeros(batch_size, dimension).to(device), 1, index, src).type(_TENSOR_TYPE)
+    # For each element in the batch, record a mask for valid actions.
+    valid_actions_mask = torch.all((axis_binary - coord).le(0), dim=1)
+    axis_binary *= valid_actions_mask.reshape(-1, 1)  # Apply the valid action mask.
+    if ignore_ended_games:
+        axis_binary *= torch.sum(points[:, :, 0].ge(0), 1).ge(2).reshape(-1, 1)  # Filter by whether game ended
 
     # Generate transition matrices
     trans_matrix = axis_binary.unsqueeze(2) * coord.unsqueeze(1) + \
-                   torch.diag(torch.ones(dimension)).repeat(batch_size, 1, 1) - \
+                   torch.diag(torch.ones(dimension)).repeat(batch_size, 1, 1).to(device) - \
                    axis_binary.unsqueeze(2) * axis_binary.unsqueeze(1)
     trans_matrix = trans_matrix.unsqueeze(1).repeat(1, max_num_points, 1, 1)
 
     transformed_points = torch.matmul(trans_matrix, points.unsqueeze(3)).squeeze(3)
-    r = (transformed_points * available_points) + torch.full(points.shape, padding_value) * ~available_points
+    r = (transformed_points * available_points) + torch.full(points.shape, padding_value).to(device) * ~available_points
 
     if inplace:
         points[:, :, :] = r
