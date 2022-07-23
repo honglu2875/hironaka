@@ -6,10 +6,9 @@ Submodules:
  - [hironaka.core](core)
  - [hironaka.gym_env](gym_env)
  - [hironaka.policy](policy)
- - [hironaka.policy_players](policy_players)
  - [hironaka.src](src)
  - [hironaka.validator](validator)
 
-Python scripts and non-essential functions:
+Non-essential (but still important!) functions and classes:
 
- - [.util/](util)
+ - [hironaka.util](util)

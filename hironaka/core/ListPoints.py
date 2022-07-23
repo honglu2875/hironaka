@@ -61,13 +61,14 @@ class ListPoints(PointsBase):
                points: Any,
                coords: List[List[int]],
                axis: List[int],
-               inplace: Optional[bool] = True):
+               inplace: Optional[bool] = True,
+               **kwargs):
         return shift_lst(points, coords, axis, inplace=inplace)
 
-    def _reposition(self, points: Any, inplace: Optional[bool] = True):
+    def _reposition(self, points: Any, inplace: Optional[bool] = True, **kwargs):
         return reposition_lst(points, inplace=inplace)
 
-    def _get_newton_polytope(self, points: Any, inplace: Optional[bool] = True):
+    def _get_newton_polytope(self, points: Any, inplace: Optional[bool] = True, **kwargs):
         # Mark distinguished points
         if self.distinguished_points is not None:
             # Apply marks to the distinguished points before the operation
@@ -100,7 +101,7 @@ class ListPoints(PointsBase):
     def _get_shape(self, points: Any):
         return get_shape(points)
 
-    def _rescale(self, points: Any, inplace: Optional[bool] = True):
+    def _rescale(self, points: Any, inplace: Optional[bool] = True, **kwargs):
         return scale_points(points, inplace=inplace)
 
     def _points_copy(self, points: Any):

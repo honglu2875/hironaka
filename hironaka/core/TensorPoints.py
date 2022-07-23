@@ -45,7 +45,7 @@ class TensorPoints(PointsBase):
 
         super().__init__(points, **config)
         self.device = torch.device(self.device_key)
-        self.points.to(self.device)
+        self.points = self.points.to(self.device)
 
     def exceed_threshold(self) -> bool:
         """
@@ -62,23 +62,32 @@ class TensorPoints(PointsBase):
         num_points = torch.sum(self.points[:, :, 0].ge(0), dim=1)
         return num_points.cpu().tolist()
 
+    def get_features(self):
+        sorted_args = torch.argsort(self.points[:, :, 0], dim=1, descending=True)
+        return self.points.gather(1, sorted_args.unsqueeze(-1).repeat(1, 1, self.dimension)).clone()
+
     def _shift(self,
                points: torch.Tensor,
-               coords: List[List[int]],
-               axis: List[int],
-               inplace: Optional[bool] = True):
-        return shift_torch(points, coords, axis, inplace=inplace, padding_value=self.padding_value)
+               coords: Union[torch.Tensor, List[List[int]]],
+               axis: Union[torch.Tensor, List[int]],
+               inplace: Optional[bool] = True,
+               ignore_ended_games: Optional[bool] = True,
+               **kwargs):
+        return shift_torch(points, coords, axis,
+                           inplace=inplace,
+                           padding_value=self.padding_value,
+                           ignore_ended_games=ignore_ended_games)
 
-    def _get_newton_polytope(self, points: torch.Tensor, inplace: Optional[bool] = True):
+    def _get_newton_polytope(self, points: torch.Tensor, inplace: Optional[bool] = True, **kwargs):
         return get_newton_polytope_torch(points, inplace=inplace, padding_value=self.padding_value)
 
     def _get_shape(self, points: torch.Tensor):
         return points.shape
 
-    def _reposition(self, points: torch.Tensor, inplace: Optional[bool] = True):
+    def _reposition(self, points: torch.Tensor, inplace: Optional[bool] = True, **kwargs):
         return reposition_torch(points, inplace=inplace, padding_value=self.padding_value)
 
-    def _rescale(self, points: torch.Tensor, inplace: Optional[bool] = True):
+    def _rescale(self, points: torch.Tensor, inplace: Optional[bool] = True, **kwargs):
         return rescale_torch(points, inplace=inplace, padding_value=self.padding_value)
 
     def _points_copy(self, points: torch.Tensor):
@@ -90,6 +99,10 @@ class TensorPoints(PointsBase):
     def _get_batch_ended(self, points: torch.Tensor):
         num_points = torch.sum(points[:, :, 0].ge(0), 1)
         return num_points.le(1).cpu().detach().tolist()
+
+    @property
+    def ended_batch_in_tensor(self):
+        return torch.sum(self.points[:, :, 0].ge(0), 1).le(1)
 
     def __repr__(self):
         return str(self.points)
