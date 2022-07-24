@@ -40,7 +40,7 @@ class PointsBase(abc.ABC):
     # Keys in `copied_attributes` will be directly copied during `copy()`. They MUST be initialized.
     copied_attributes: List[str]
     # Keys in `base_attributes` will be copied. But they are shared in all subclasses and do not need to re-initialize.
-    base_attributes = ['ended_each_batch', 'ended', 'batch_size', 'max_num_points', 'dimension']
+    base_attributes = ['batch_size', 'max_num_points', 'dimension']
 
     def __init__(self,
                  points: Any,
@@ -61,7 +61,7 @@ class PointsBase(abc.ABC):
         # Check the shape of `points`.
         shape = self._get_shape(points)
         if len(shape) == 2:
-            print("Input is required to be 3-dimensional: batch, number_of_points, coordinates.")
+            print("Input is required to be 3-dimensional: batch, max_num_points, coordinates.")
             print("A batch dimension is automatically added.")
             shape = (1, *shape)
             points = self._add_batch_axis(points)
@@ -72,14 +72,6 @@ class PointsBase(abc.ABC):
         self.batch_size = self.config.get('points_batch_size', shape[0])
         self.dimension = self.config.get('dimension', shape[2])
         self.max_num_points = self.config.get('max_num_points', self._get_max_num_points())
-
-        # self.ended represents whether the whole game (for all batches) has ended
-        # will be updated on point-changing modifications including `get_newton_polytope`
-        self.ended = False
-
-        # self.ended_each_batch represents the game status of each batch
-        # will also be updated on point-changing modifications including `get_newton_polytope`
-        self.ended_each_batch = [False] * self.batch_size
 
         # Update keys in `self.copied_attributes`
         for key in self.copied_attributes:
@@ -109,49 +101,53 @@ class PointsBase(abc.ABC):
                 raise Exception(f"Attribute {key} is not initialized.")
         return new_points
 
-    def shift(self, coords: List[List[int]], axis: List[int], inplace=True):
+    def shift(self, coords: List[List[int]], axis: List[int], inplace=True, **kwargs):
         """
             Shift each batch according to the list of coords and axis.
         """
-        r = self._shift(self.points, coords, axis, inplace=inplace)
+        r = self._shift(self.points, coords, axis, inplace=inplace, **kwargs)
         if inplace:
             return None
         else:
             return self.copy(points=r)
 
-    def reposition(self, inplace=True):
+    @property
+    def ended(self):
+        # self.ended represents whether the whole game (for all batches) has ended
+        return all(self._get_batch_ended(self.points))
+
+    @property
+    def ended_batch(self):
+        # self.ended_each_batch represents the game status of each batch
+        return self._get_batch_ended(self.points)
+
+    def reposition(self, inplace=True, **kwargs):
         """
             Reposition batches of points so that each batch touches all the coordinate planes.
         """
-        r = self._reposition(self.points, inplace=inplace)
+        r = self._reposition(self.points, inplace=inplace, **kwargs)
         if inplace:
             return None
         else:
             return self.copy(points=r)
 
-    def get_newton_polytope(self, inplace=True):
+    def get_newton_polytope(self, inplace=True, **kwargs):
         """
             Get the Newton Polytope for points in each batch.
         """
-        r = self._get_newton_polytope(self.points, inplace=inplace)
-        ended_each_batch = self._get_batch_ended(self.points)
-        ended = all(ended_each_batch)
+        r = self._get_newton_polytope(self.points, inplace=inplace, **kwargs)
 
         if inplace:
-            self.ended_each_batch = ended_each_batch
-            self.ended = ended
             return None
         else:
             new_points = self.copy(points=r)
-            new_points.ended_each_batch = ended_each_batch  # TODO: duplicate?
-            new_points.ended = ended
             return new_points
 
-    def rescale(self, inplace=True):
+    def rescale(self, inplace=True, **kwargs):
         """
             Rescale each batch.
         """
-        r = self._rescale(self.points, inplace=inplace)
+        r = self._rescale(self.points, inplace=inplace, **kwargs)
         if inplace:
             return None
         else:
@@ -185,7 +181,7 @@ class PointsBase(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def _get_newton_polytope(self, points: Any, inplace: Optional[bool] = True):
+    def _get_newton_polytope(self, points: Any, inplace: Optional[bool] = True, **kwargs):
         """
             Get the Newton polytope.
             Parameters:
@@ -201,7 +197,8 @@ class PointsBase(abc.ABC):
                points: Any,
                coords: List[List[int]],
                axis: List[int],
-               inplace: Optional[bool] = True):
+               inplace: Optional[bool] = True,
+               **kwargs):
         """
             Shift the points.
             Parameters:
@@ -215,7 +212,7 @@ class PointsBase(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def _reposition(self, points: Any, inplace: Optional[bool] = True):
+    def _reposition(self, points: Any, inplace: Optional[bool] = True, **kwargs):
         """
             Reposition batches of points so that each batch touches all the coordinate planes.
             Parameters:
@@ -227,7 +224,7 @@ class PointsBase(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def _rescale(self, points: Any, inplace: Optional[bool] = True):
+    def _rescale(self, points: Any, inplace: Optional[bool] = True, **kwargs):
         """
             Rescale the points.
             Parameters:

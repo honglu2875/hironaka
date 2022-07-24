@@ -1,23 +1,44 @@
 import abc
+import logging
 from itertools import combinations
 from typing import Optional
 
 import numpy as np
 
-from .core import Points
-from .policy import Policy
+from hironaka.core import ListPoints
+from hironaka.policy.Policy import Policy
 
 
 class Host(abc.ABC):
+    """
+        A host that returns the subset of coordinates according to the given set of points.
+        Must implement:
+            _select_coord
+    """
+    logger = None
+
+    def __init__(self, ignore_batch_dimension=False, **kwargs):
+        if self.logger is None:
+            self.logger = logging.getLogger(__class__.__name__)
+
+        # If the agent only has one batch and wants to ignore batch dimension in the parameters, set it to True.
+        self.ignore_batch_dimension = ignore_batch_dimension
+
+    def select_coord(self, points: ListPoints, debug=False):
+        if self.ignore_batch_dimension:
+            return self._select_coord(points)[0]
+        else:
+            return self._select_coord(points)
+
     @abc.abstractmethod
-    def select_coord(self, points: Points, debug=False):
+    def _select_coord(self, points: ListPoints):
         pass
 
 
 class RandomHost(Host):
-    def select_coord(self, points: Points, debug=False):
+    def _select_coord(self, points: ListPoints):
         dim = points.dimension
-        return [np.random.choice(list(range(dim)), size=2, replace=False) for _ in range(points.batch_size)]
+        return [np.random.choice(list(range(dim)), size=2).tolist() for _ in range(points.batch_size)]
 
 
 class Zeillinger(Host):
@@ -37,8 +58,9 @@ class Zeillinger(Host):
             sum([vt[i] == mn for i in range(len(vt))])
         return L, S
 
-    def select_coord(self, points: Points, debug=False):
+    def _select_coord(self, points: ListPoints):
         assert not points.ended
+
         dim = points.dimension
         result = []
         for b in range(points.batch_size):
@@ -53,16 +75,15 @@ class Zeillinger(Host):
                 char_vectors.append((vector, self.get_char_vector(vector)))
             char_vectors.sort(key=(lambda x: x[1]))
 
-            if debug:
-                print(char_vectors)
-
-            r = [np.argmin(char_vectors[0][0]), np.argmax(char_vectors[0][0])]
-            if r[0] != r[1]:
-                result.append(r)
-            else:  # if all coordinates are the same, return the first two.
-                result.append([0, 1])
-
+            result.append(self._get_coord(char_vectors))
         return result
+
+    def _get_coord(self, char_vectors):
+        r = [np.argmin(char_vectors[0][0]), np.argmax(char_vectors[0][0])]
+        if r[0] != r[1]:
+            return r
+        else:  # if all coordinates are the same, return the first two.
+            return [0, 1]
 
 
 class PolicyHost(Host):
@@ -73,11 +94,51 @@ class PolicyHost(Host):
         self._policy = policy
         self.use_discrete_actions_for_host = kwargs.get('use_discrete_actions_for_host', use_discrete_actions_for_host)
 
-    def select_coord(self, points: Points, debug=False):
+        super().__init__(**kwargs)
+
+    def _select_coord(self, points: ListPoints):
         features = points.get_features()
 
         coords = self._policy.predict(features)  # return multi-binary array
         result = []
         for b in range(coords.shape[0]):
-            result.append(np.where(coords[b] == 1)[0])
+            result.append(np.where(coords[b] == 1)[0].tolist())
+        return result
+
+
+class ZeillingerLex(Zeillinger):
+    def _get_coord(self, char_vectors):  # TODO: efficiency can be improved
+        coords = []
+        for char_vector in char_vectors:
+            if char_vector[1] == char_vectors[0][1]:
+                r = [np.argmin(char_vector[0]), np.argmax(char_vector[0])]
+                if r[0] != r[1]:
+                    coords.append(r)
+                else:  # if all coordinates are the same, return the first two.
+                    coords.append([0, 1])
+        coords.sort()
+        return coords[0]
+
+
+class WeakSpivakovsky(Host):
+    def _select_coord(self, points: ListPoints):
+        assert not points.ended
+        result = []
+        for b in range(points.batch_size):
+            pts = points.get_batch(b)
+            if len(pts) <= 1:
+                result.append([])
+                continue
+            "For each point we store the subset of nonzero coordinates"
+            subsets = [set(np.nonzero(point)[0]) for point in pts]
+            "Find a minimal hitting set, brute-force"
+            U = set.union(*subsets)
+            result = []
+            for i in range(1, len(U) + 1):
+                combs = combinations(U, i)
+                for c in combs:
+                    if all(set(c) & l for l in subsets):
+                        result.append(c)
+                if result:
+                    break
         return result

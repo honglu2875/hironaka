@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from hironaka.core.Points import Points
+from hironaka.core import ListPoints
 from hironaka.src import make_nested_list, generate_points
 
 
@@ -10,20 +10,20 @@ class TestPoints(unittest.TestCase):
     def test_define_point(self):
         points = generate_points(5)
         print(points)
-        points = Points(points)
+        points = ListPoints(points)
         print(points)
 
     def test_operations(self):
         # host = Zeillinger()
-        points = Points(make_nested_list(
+        points = ListPoints(make_nested_list(
             [(7, 5, 3, 8), (8, 1, 8, 18), (8, 3, 17, 8),
              (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)]
         ))
-        p2 = Points(make_nested_list(
+        p2 = ListPoints(make_nested_list(
             [(0, 1, 0, 1), (0, 2, 0, 0), (1, 0, 0, 1),
              (1, 0, 1, 0), (1, 1, 0, 0), (2, 0, 0, 0)]))
 
-        result = Points(make_nested_list(
+        result = ListPoints(make_nested_list(
             [[[7, 5, 11, 8],
               [8, 1, 26, 18],
               [8, 3, 25, 8],
@@ -39,11 +39,11 @@ class TestPoints(unittest.TestCase):
         # print(p2)
 
     def test_operations2(self):
-        p = Points(make_nested_list(
+        p = ListPoints(make_nested_list(
             [(7, 5, 3, 8), (8, 9, 8, 18), (8, 3, 17, 8),
              (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)]
         ))
-        q = Points(make_nested_list(
+        q = ListPoints(make_nested_list(
             [(7, 5, 3, 8), (8, 9, 8, 18), (8, 3, 17, 8),
              (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)]
         ))
@@ -58,7 +58,7 @@ class TestPoints(unittest.TestCase):
               [-1, -1, -1, -1]]]
         ))
         """
-        r2 = Points(make_nested_list(
+        r2 = ListPoints(make_nested_list(
             [[[16, 11, 5, 6], [11, 12, 18, 6], [11, 11, 1, 19], [8, 3, 17, 8], [7, 5, 3, 8]]]
         ))
         q.get_newton_polytope()
@@ -67,7 +67,7 @@ class TestPoints(unittest.TestCase):
         assert str(q) == str(r2)
 
     def test_features(self):
-        p = Points(make_nested_list(
+        p = ListPoints(make_nested_list(
             [(7, 5, 3, 8), (8, 9, 8, 18), (8, 3, 17, 8),
              (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)]
         ))
@@ -77,7 +77,7 @@ class TestPoints(unittest.TestCase):
         assert str(p.get_sym_features()) == str(r)
 
     def test_get_batch(self):
-        p = Points(make_nested_list(
+        p = ListPoints(make_nested_list(
             [[(7, 5, 3, 8), (8, 9, 8, 18), (8, 3, 17, 8),
               (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)],
              [(0, 1, 0, 1), (0, 2, 0, 0), (1, 0, 0, 1),
@@ -88,7 +88,7 @@ class TestPoints(unittest.TestCase):
         assert str(p.get_batch(1)) == str(r)
 
     def test_numpy_input_without_use_np(self):
-        p = Points(np.array(
+        p = ListPoints(np.array(
             [[[7, 5, 11, 8],
               [8, 1, 26, 18],
               [8, 3, 25, 8],
@@ -105,7 +105,7 @@ class TestPoints(unittest.TestCase):
         assert str(p.points) == str(r)
 
     def test_scale(self):
-        points = Points(make_nested_list(
+        points = ListPoints(make_nested_list(
             [(7, 5, 3, 8), (8, 1, 8, 18), (8, 3, 17, 8),
              (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)]
         ))
@@ -123,24 +123,24 @@ class TestPoints(unittest.TestCase):
         # print(p2)
 
     def test_value_threshold(self):
-        points = Points([[[5e7, 5e7+1, 1e7], [1, 1, 2]]], value_threshold=int(1e8))
+        points = ListPoints([[[5e7, 5e7 + 1, 1e7], [1, 1, 2]]], value_threshold=int(1e8))
         assert not points.exceed_threshold()
         points.shift([[0, 1]], [0])
         assert points.exceed_threshold()
 
     def test_reposition(self):
-        points = Points(make_nested_list(
+        points = ListPoints(make_nested_list(
             [(7, 5, 3, 8), (8, 1, 8, 18), (8, 3, 17, 8),
              (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)]
         ))
-        r = Points([[[0, 4, 2, 2], [1, 0, 7, 12], [1, 2, 16, 2], [4, 10, 0, 13], [4, 11, 17, 0], [9, 10, 4, 0]]])
+        r = ListPoints([[[0, 4, 2, 2], [1, 0, 7, 12], [1, 2, 16, 2], [4, 10, 0, 13], [4, 11, 17, 0], [9, 10, 4, 0]]])
         points.reposition()
         a = points.reposition(inplace=False)
         assert str(points) == str(r)
         assert str(points) == str(a)
 
     def test_distinguished_elements(self):
-        points = Points(make_nested_list(
+        points = ListPoints(make_nested_list(
             [(7, 5, 3, 8), (8, 1, 8, 18), (8, 3, 17, 8),
              (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)]
         ), distinguished_points=[2])
@@ -160,3 +160,22 @@ class TestPoints(unittest.TestCase):
         points.get_newton_polytope()
         d_ind = points.distinguished_points[0]
         assert d_ind is None
+
+    def test_true_newton_polytope(self):
+        points = ListPoints(make_nested_list(
+            [(7, 5, 3, 8), (8, 1, 8, 18), (8, 3, 17, 8),
+             (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)]
+        ), use_precise_newton_polytope=True)
+
+        r = [[[27, 11, 5, 6], [23, 12, 18, 6], [22, 11, 1, 19], [12, 5, 3, 8], [11, 3, 17, 8], [9, 1, 8, 18]]]
+
+        points.shift([[0, 1]], [0])
+        points.get_newton_polytope()
+        assert str(points.points) == str(r)
+
+        points = ListPoints([[[0., 1.], [1., 0.], [0.9, 0.9]]], use_precise_newton_polytope=True)
+
+        r = [[[1.0, 0.0], [0.0, 1.0]]]
+
+        points.get_newton_polytope()
+        assert str(points.points) == str(r)

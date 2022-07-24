@@ -1,9 +1,9 @@
 from typing import List
 
 import numpy as np
+from scipy.spatial import ConvexHull
 
 from ._snippets import get_shape
-from scipy.spatial import ConvexHull
 
 
 def get_newton_polytope_approx_lst(points: List[List[List[float]]], inplace=True, get_ended=False):
@@ -78,7 +78,7 @@ def get_newton_polytope_lst(points: List[List[List[float]]], inplace=True):
     result = get_newton_polytope_approx_lst(result, inplace=False, get_ended=False)
 
     if inplace:
-        points[:, :, :] = result
+        points[:] = result
     else:
         return result
 
@@ -89,6 +89,8 @@ def shift_lst(points: List[List[List[float]]], coords: List[List[int]], axis: Li
     """
 
     batch_num, _, dim = get_shape(points)
+    assert len(coords) == batch_num
+    assert len(axis) == batch_num
 
     assert batch_num
 
