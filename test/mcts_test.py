@@ -7,10 +7,10 @@ from hironaka.validator import HironakaValidator
 
 from hironaka import host
 
-from hironaka.src import _snippets as geom
+from hironaka.src import _snippets as snip
 
 import torch
-from hironaka.core import Points
+from hironaka.core import TensorPoints
 from hironaka.agent import RandomAgent, ChooseFirstAgent
 from train.MCTS import HironakaNet, MCTS
 
@@ -42,7 +42,7 @@ def action_to_coords(action: int):
 
 #TODO: Use PointTensor in both MCTS and test.
 
-def points_to_tensor(s:Points):
+def points_to_tensor(s:TensorPoints):
     state = s.points[0]
     coords = []
     for point in state:
@@ -58,11 +58,14 @@ def points_to_tensor(s:Points):
 class trained_host(host.Host):
     def __init__(self,net):
         self.net = net
+        super().__init__()
 
-    def select_coord(self, points: Points, debug = False):
+    def _select_coord(self, points: TensorPoints, debug = False):
         answer = []
+        if not isinstance(points, TensorPoints):
+            points = TensorPoints(points.points, max_num_points = 10)
         for i in range(points.batch_size):
-            x = points_to_tensor(Points([points.points[i]]))
+            x = points.points[0]
             result = self.net(x)
             prob_vector = torch.narrow(result,0,0,8)
             prob_vector = prob_vector.tolist()
@@ -75,6 +78,9 @@ class trained_host(host.Host):
                     choice = _
 
             coords = action_to_coords(choice)
+            print(prob_vector)
+            print(reward_vector)
+            print(coords)
             answer.append(coords)
 
         return answer
@@ -93,7 +99,7 @@ def train_network():
     for i in range(ITERATIONS):
         examples = ([], [])
         for _ in range(10):
-            test_points = Points(geom.generate_batch_points(n=10, batch_num=1, dimension=3, max_value=50))
+            test_points = TensorPoints(snip.generate_batch_points(n = 10, dimension=3, max_value=50), max_num_points = 10)
             test_points.get_newton_polytope()
             test_points.rescale()
             mcts_instance = MCTS(state=test_points, env=agent, nn=net, max_depth=50)
@@ -125,22 +131,22 @@ def train_network():
 
     return net
 
-class MctsTest(unittest.TestCase):
-    def test_training(self):
-        net = train_network()
-        this_host = trained_host(net)
-        agent = ChooseFirstAgent()
-        test_validator = HironakaValidator(this_host, agent)
-        history = test_validator.playoff(num_steps=1000,verbose= 1)
-        print(len(history))
+# class MctsTest(unittest.TestCase):
+#     def test_training(self):
+#         net = train_network()
+#         this_host = trained_host(net)
+#         agent = ChooseFirstAgent()
+#         test_validator = HironakaValidator(this_host, agent)
+#         history = test_validator.playoff(num_steps=1000,verbose= 1)
+#         print(len(history))
 
 
 if __name__ == '__main__':
-    path = 'test_model.pth'
+    path = 'train/test_model.pth'
     net = torch.load(path)
     this_host = trained_host(net)
 
-    agent = ChooseFirstAgent()
+    agent = RandomAgent()
 
     test_validator = HironakaValidator(this_host,agent)
     #Type check failed. Need some minor change on my host class.
