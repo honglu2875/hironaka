@@ -55,12 +55,12 @@ class TensorPoints(PointsBase):
             return torch.max(self.points) >= self.value_threshold
         return False
 
-    def get_num_points(self) -> List[int]:
+    def get_num_points(self) -> torch.Tensor:
         """
             The number of points for each batch.
         """
         num_points = torch.sum(self.points[:, :, 0].ge(0), dim=1)
-        return num_points.cpu().tolist()
+        return num_points
 
     def get_features(self):
         sorted_args = torch.argsort(self.points[:, :, 0], dim=1, descending=True)

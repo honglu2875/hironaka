@@ -2,6 +2,7 @@ import abc
 import logging
 from typing import Optional, Union
 
+from hironaka.Points import Points
 from hironaka.agent import Agent
 from hironaka.core import ListPoints
 from hironaka.host import Host
@@ -15,9 +16,9 @@ class Game(abc.ABC):
 
     @abc.abstractmethod
     def __init__(self,
-                 state,
-                 host,
-                 agent,
+                 state: Union[ListPoints, Points],
+                 host: Host,
+                 agent: Agent,
                  **kwargs):
         """
             state: initial state
@@ -27,7 +28,11 @@ class Game(abc.ABC):
         if self.logger is None:
             self.logger = logging.getLogger(__class__.__name__)
 
-        self.state = state
+        if isinstance(state, Points):
+            self.state = state.points
+        else:
+            self.state = state
+
         self.dimension = state.dimension if state is not None else None
         self.host = host
         self.agent = agent

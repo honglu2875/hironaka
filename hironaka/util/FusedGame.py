@@ -44,8 +44,8 @@ class FusedGame:
         """
         assert sample_for in ["host", "agent"], f"sample_for must be one of 'host' and 'agent'. Got {sample_for}."
 
-        observations = points.get_features().cpu().detach().numpy().copy()
-        done = np.array(points.ended_batch)
+        observations = points.get_features()
+        done = points.ended_batch_in_tensor
 
         e_r = exploration_rate if sample_for == "host" else 0.0
         host_move, chosen_actions = self._host_move(points, masked=masked, exploration_rate=e_r)
@@ -53,25 +53,26 @@ class FusedGame:
         agent_move = self._agent_move(points, host_move, masked=masked,
                                       scale_observation=scale_observation, inplace=True, exploration_rate=e_r)
 
-        next_done = np.array(points.ended_batch)
-        next_observations = points.get_features().cpu().detach().numpy().copy()
+        next_done = points.ended_batch_in_tensor
+        next_observations = points.get_features()
 
         if sample_for == "host":
-            output_obs = observations[~done].copy()
-            output_actions = chosen_actions.cpu().detach().numpy()
-            next_observations = next_observations[~done].copy()
+            output_obs = observations[~done].clone()
+            output_actions = chosen_actions[~done].clone()
+            next_observations = next_observations[~done].clone()
         else:
-            output_obs = {"points": observations[~done].copy(),
-                          "coords": host_move.cpu().detach().numpy()[~done].copy()}
+            output_obs = {"points": observations[~done].clone(),
+                          "coords": host_move[~done].clone()}
             host_move, _ = self._host_move(points, masked=masked, exploration_rate=exploration_rate)
-            next_observations = {"points": next_observations[~done].copy(),
-                                 "coords": host_move.cpu().detach().numpy()[~done].copy()}
-            output_actions = agent_move.cpu().detach().numpy()
+            output_actions = agent_move[~done].clone()
+            next_observations = {"points": next_observations[~done].clone(),
+                                 "coords": host_move[~done].clone()}
+        next_done = next_done[~done].clone()
 
         return output_obs, \
-               output_actions[~done].copy(), \
-               self._reward(sample_for, output_obs, next_observations, next_done[~done]).copy(), \
-               next_done[~done].copy(), \
+               output_actions, \
+               self._rewards(sample_for, output_obs, next_observations, next_done), \
+               next_done, \
                next_observations
 
     def _host_move(self, points: TensorPoints, masked=True, exploration_rate=0.0) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -115,14 +116,14 @@ class FusedGame:
         return actions
 
     @staticmethod
-    def _reward(sample_for: str,
-                obs: Union[torch.Tensor, dict],
-                next_obs: Union[torch.Tensor, dict],
-                next_done: np.ndarray) -> np.ndarray:
+    def _rewards(sample_for: str,
+                 obs: Union[torch.Tensor, dict],
+                 next_obs: Union[torch.Tensor, dict],
+                 next_done: torch.Tensor) -> torch.Tensor:
         if sample_for == "host":
-            return next_done.astype(float)
+            return next_done.clone().type(torch.float)
         elif sample_for == "agent":
-            return (~next_done).astype(float)
+            return (~next_done).clone().type(torch.float)
 
     @staticmethod
     def decode_tensor(t, masked=True) -> Tuple[torch.Tensor, torch.Tensor]:

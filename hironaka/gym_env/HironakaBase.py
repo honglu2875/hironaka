@@ -36,7 +36,7 @@ class HironakaBase(gym.Env, abc.ABC):
     @abc.abstractmethod
     def __init__(self,
                  dimension: Optional[int] = 3,
-                 max_number_points: Optional[int] = 10,
+                 max_num_points: Optional[int] = 10,
                  max_value: Optional[int] = 10,
                  padding_value: Optional[float] = -1e-8,
                  value_threshold: Optional[float] = None,
@@ -48,7 +48,7 @@ class HironakaBase(gym.Env, abc.ABC):
                  reward_based_on_point_reduction: Optional[bool] = True,
                  **kwargs):
         self.dimension = dimension
-        self.max_number_points = max_number_points
+        self.max_num_points = max_num_points
         self.max_value = max_value
         self.padding_value = padding_value
         self.value_threshold = value_threshold
@@ -62,11 +62,11 @@ class HironakaBase(gym.Env, abc.ABC):
         # Use self.point_observation_space in the definition of observations
         if self.scale_observation:
             self.point_observation_space = spaces.Box(low=-1.0, high=np.inf,
-                                                      shape=(self.max_number_points, self.dimension),
+                                                      shape=(self.max_num_points, self.dimension),
                                                       dtype=np.float32)
         else:
             self.point_observation_space = spaces.Box(low=-1.0, high=1.0,
-                                                      shape=(self.max_number_points, self.dimension),
+                                                      shape=(self.max_num_points, self.dimension),
                                                       dtype=np.float32)
 
         # Configs to pass down to other functions
@@ -90,7 +90,7 @@ class HironakaBase(gym.Env, abc.ABC):
 
         if points is None:
             self._points = ListPoints(
-                [generate_points(self.max_number_points, **self.config_for_generate_points)],
+                [generate_points(self.max_num_points, **self.config_for_generate_points)],
                 value_threshold=self.value_threshold
             )
         else:
@@ -147,7 +147,7 @@ class HironakaBase(gym.Env, abc.ABC):
             a utility method that returns -1 padded point information.
             return: numpy array of shape (self.max_number_points, self.dimension)
         """
-        return get_padded_array(self._points.get_features()[0], new_length=self.max_number_points,
+        return get_padded_array(self._points.get_features()[0], new_length=self.max_num_points,
                                 constant_value=constant_value).astype(np.float32)
 
     def _get_coords_multi_bin(self) -> np.ndarray:

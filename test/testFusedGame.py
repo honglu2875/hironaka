@@ -26,7 +26,7 @@ config = {
     "dimension": 3,
     "max_value": 20,
     "masked": True,
-    "max_number_points": 20,
+    "max_num_points": 20,
     "use_cuda": True,
     "normalized": False,
     "value_threshold": 1e8,
