@@ -39,8 +39,10 @@ Every turn,
 - The agent chooses a number $i\in I$.
 
 $i, I$ together changes the `state` $S$ to the next according to the following linear change of variables:
+
 $$x_j \mapsto \begin{cases}x_j, &\qquad\text{if } i\neq j \newline \sum\limits_{k\in I} x_k, &\qquad\text{if }i=j
 \end{cases},$$
+
 for points $(x_1,\cdots,x_n)\in \mathbb Z^n$. We subsequently apply Newton polytope to the transformed points and only
 keep the vertices.
 

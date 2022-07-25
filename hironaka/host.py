@@ -137,12 +137,12 @@ class WeakSpivakovsky(Host):
             subsets = [set(np.nonzero(point)[0]) for point in pts]
             "Find a minimal hitting set, brute-force"
             U = set.union(*subsets)
-            result = []
-            for i in range(1, len(U) + 1):
+            for i in range(2, len(U)+1):
                 combs = combinations(U, i)
                 for c in combs:
                     if all(set(c) & l for l in subsets):
-                        result.append(c)
-                if result:
+                        result.append(list(c))
+                        break
+                if len(result) > b:  # Found result for this batch. Break.
                     break
         return result

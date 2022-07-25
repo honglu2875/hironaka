@@ -6,7 +6,7 @@ from hironaka.Points import Points
 from hironaka.agent import RandomAgent, ChooseFirstAgent
 from hironaka.core import ListPoints
 from hironaka.game import GameHironaka
-from hironaka.host import Zeillinger, RandomHost
+from hironaka.host import Zeillinger, RandomHost, WeakSpivakovsky
 from hironaka.src import generate_points, generate_batch_points
 
 
@@ -46,9 +46,10 @@ class TestGame(unittest.TestCase):
         host = Zeillinger(ignore_batch_dimension=True)
         assert str(host.select_coord(points)) == "[0, 2]"
 
-        # TODO: WeakSpivakovsky must be fixed first!!!
-        # host = WeakSpivakovsky(ignore_batch_dimension=False)
-        # print(host.select_coord(points))
+    def test_spivakovsky_host(self):
+        points = ListPoints([[0, 1, 2], [2, 1, 0]])
+        host = WeakSpivakovsky(ignore_batch_dimension=False)
+        assert len(host.select_coord(points)[0]) > 1
 
     def test_wrappers(self):
         random_agent = RandomAgent(ignore_batch_dimension=True)
