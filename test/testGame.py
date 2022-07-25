@@ -58,7 +58,6 @@ class TestGame(unittest.TestCase):
         choose_first_agent = ChooseFirstAgent(
             ignore_batch_dimension=True)  # this guy always chooses the first coordinate
 
-
         for host in [random_host, zeillinger]:
             for agent in [random_agent, choose_first_agent]:
                 points = Points(generate_points(5))

@@ -19,6 +19,7 @@ class Game(abc.ABC):
                  state: Union[ListPoints, Points],
                  host: Host,
                  agent: Agent,
+                 scale_observation: Optional[bool] = True,
                  **kwargs):
         """
             state: initial state
@@ -39,6 +40,12 @@ class Game(abc.ABC):
 
         self.coord_history = []
         self.move_history = []
+
+        self.state.get_newton_polytope()  # Clear up extra points
+        self.stopped = self.state.ended
+        self.scale_observation = scale_observation
+        if self.scale_observation:
+            self.state.rescale()
 
     @abc.abstractmethod
     def step(self, verbose: int = 0) -> bool:
@@ -71,17 +78,14 @@ class Game(abc.ABC):
 
 class GameHironaka(Game):
     def __init__(self,
-                 state: Union[ListPoints, None],
+                 state: Union[ListPoints, Points],
                  host: Host,
                  agent: Agent,
-                 scale_observation: Optional[bool] = True,
                  **kwargs):
         if self.logger is None:
             self.logger = logging.getLogger(__class__.__name__)
 
         super().__init__(state, host, agent, **kwargs)
-        self.scale_observation = scale_observation
-        self.stopped = False
 
     def step(self, verbose: int = 0) -> bool:
         """
@@ -124,18 +128,15 @@ class GameMorin(Game):
     after the shift"""
 
     def __init__(self,
-                 state: Union[ListPoints, None],
+                 state: Union[ListPoints, Points],
                  host: Host,
                  agent: Agent,
-                 scale_observation: Optional[bool] = True,
                  **kwargs):
         if self.logger is None:
             self.logger = logging.getLogger(__class__.__name__)
 
         super().__init__(state, host, agent, **kwargs)
         self.weights = [[1] * self.state.dimension for _ in range(self.state.batch_size)]
-        self.scale_observation = scale_observation
-        self.stopped = False
 
     def step(self, verbose: int = 0) -> bool:
         if self.stopped:
