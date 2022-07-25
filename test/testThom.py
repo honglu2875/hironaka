@@ -63,7 +63,7 @@ class TestThom(unittest.TestCase):
         points = [list(np.array(thom_points(4)[i])+[np.dot([0,1,1,1,1,1,1],np.array(thom_points(4)[i]))-4,0,0,0,0,0,0]) for i in range(len(thom_points(4)))]
         print(f"Points: {points}")
         dimension = len(points[0])
-        initial_points = Points([points], distinguished_points=[len(points) - 1])
+        initial_points = ListPoints([points], distinguished_points=[len(points) - 1])
 
         tree = Tree()
         tree.create_node(0, 0, data=initial_points)
