@@ -1,7 +1,7 @@
 from hironaka.core import ListPoints
 
 
-class PointsWrapper:
+class Points:
     """
         A simple wrapper allowing for simple usage of basic functions of `ListPoints`
     """
@@ -13,6 +13,7 @@ class PointsWrapper:
     def __init__(self, points, distinguished_point=None):
         distinguished_point = [distinguished_point] if distinguished_point is not None else None
         self.points = ListPoints([points], distinguished_points=distinguished_point, **self.points_config)
+        self.dimension = self.points.dimension
 
         self.points.get_newton_polytope()
         self.track_dist_point = distinguished_point is not None
@@ -24,6 +25,10 @@ class PointsWrapper:
         self.points.get_newton_polytope()
         return True
 
+    def __repr__(self):
+        return str(self.points.points[0])
+
     @property
-    def has_ended(self):
+    def ended(self):
         return self.points.ended
+

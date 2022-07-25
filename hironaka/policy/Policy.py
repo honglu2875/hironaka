@@ -24,7 +24,7 @@ class Policy(abc.ABC):
     @abc.abstractmethod
     def __init__(self,
                  mode: str,
-                 max_number_points: int,
+                 max_num_points: int,
                  padding_value: Optional[float] = -1e-8,
                  dimension: Optional[int] = 3,
                  normalized: Optional[bool] = False,
@@ -36,7 +36,7 @@ class Policy(abc.ABC):
             raise Exception(f'"mode" must be one of {self.allowed_modes}. Got {mode} instead.')
         self.mode = mode
         self.dimension = dimension
-        self.max_number_points = max_number_points
+        self.max_num_points = max_num_points
         self.padding_value = padding_value
         self.normalized = normalized
 
@@ -57,7 +57,7 @@ class Policy(abc.ABC):
         """
         feature_tensor = torch.flatten(
             torch.FloatTensor(
-                get_batched_padded_array(features, self.max_number_points, constant_value=self.padding_value)
+                get_batched_padded_array(features, self.max_num_points, constant_value=self.padding_value)
             ), start_dim=1)  # TODO: maybe add a GPU option for the process?
         if self.normalized:
             return torch.nn.functional.normalize(feature_tensor, p=1.0)
@@ -73,7 +73,7 @@ class Policy(abc.ABC):
 
         feature_tensor = torch.flatten(
             torch.FloatTensor(
-                get_batched_padded_array(features[0], self.max_number_points, constant_value=self.padding_value)
+                get_batched_padded_array(features[0], self.max_num_points, constant_value=self.padding_value)
             ), start_dim=1)
         if self.normalized:
             feature_tensor = torch.nn.functional.normalize(feature_tensor, p=1.0)

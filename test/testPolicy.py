@@ -38,8 +38,8 @@ class TestUtil(unittest.TestCase):
         for _ in range(50):
             nnet = NN(4 * 11, 4)
             nn_a = NN(4 * 11 + 4, 4)
-            pl_h = NNPolicy(nnet, mode='host', eval_mode=True, max_number_points=11, dimension=4)
-            pl_a = NNPolicy(nn_a, mode='agent', eval_mode=True, max_number_points=11, dimension=4)
+            pl_h = NNPolicy(nnet, mode='host', eval_mode=True, max_num_points=11, dimension=4)
+            pl_a = NNPolicy(nn_a, mode='agent', eval_mode=True, max_num_points=11, dimension=4)
             out_h = pl_h.predict(pt)
             out_a = pl_a.predict((pt, coords))
             for i in range(2):
@@ -50,8 +50,8 @@ class TestUtil(unittest.TestCase):
     def test_policy_agents(self):
         nn = NN(4 * 11, 4)
         nn_a = NN(4 * 11 + 4, 4)
-        pl_h = NNPolicy(nn, mode='host', eval_mode=True, max_number_points=11, dimension=4)
-        pl_a = NNPolicy(nn_a, mode='agent', eval_mode=True, max_number_points=11, dimension=4)
+        pl_h = NNPolicy(nn, mode='host', eval_mode=True, max_num_points=11, dimension=4)
+        pl_a = NNPolicy(nn_a, mode='agent', eval_mode=True, max_num_points=11, dimension=4)
 
         agent = PolicyAgent(pl_a)
         host = PolicyHost(pl_h)

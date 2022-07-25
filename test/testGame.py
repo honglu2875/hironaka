@@ -1,5 +1,8 @@
 import unittest
+import logging
+import sys
 
+from hironaka.Points import Points
 from hironaka.agent import RandomAgent, ChooseFirstAgent
 from hironaka.core import ListPoints
 from hironaka.game import GameHironaka
@@ -47,3 +50,23 @@ class TestGame(unittest.TestCase):
         points = ListPoints([[0, 1, 2], [2, 1, 0]])
         host = WeakSpivakovsky(ignore_batch_dimension=False)
         assert len(host.select_coord(points)[0]) > 1
+
+    def test_wrappers(self):
+        random_agent = RandomAgent(ignore_batch_dimension=True)
+        random_host = RandomHost(ignore_batch_dimension=True)
+        zeillinger = Zeillinger(ignore_batch_dimension=True)
+        choose_first_agent = ChooseFirstAgent(
+            ignore_batch_dimension=True)  # this guy always chooses the first coordinate
+
+        for host in [random_host, zeillinger]:
+            for agent in [random_agent, choose_first_agent]:
+                points = Points(generate_points(5))
+
+                game = GameHironaka(points, host, agent, scale_observation=False)
+                game.logger.setLevel(logging.INFO)
+                if not game.logger.hasHandlers():
+                    game.logger.addHandler(logging.StreamHandler(stream=sys.stdout))
+                print(f"{host.__class__.__name__} is playing against {agent.__class__.__name__}")
+                while game.step(verbose=1):
+                    print(game.state)
+                game.print_history()

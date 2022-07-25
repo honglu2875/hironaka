@@ -18,7 +18,6 @@ class TestThom(unittest.TestCase):
         agent = AgentMorin()
         points = thom_points_homogeneous(N)
         opoints = thom_points(N)
-        game = GameMorin(ListPoints([points], distinguished_points=[len(points) - 1]), host, agent)
 
         ro = [(4, 1, 0, 1, 0, 0, 0), (4, 1, 0, 0, 0, 1, 0), (4, 1, 0, 0, 0, 0, 1), (4, 0, 2, 0, 0, 0, 0),
               (4, 0, 1, 0, 1, 0, 0), (4, 0, 0, 0, 2, 0, 0), (3, 2, 1, 0, 0, 0, 0), (3, 2, 0, 0, 1, 0, 0),
@@ -33,6 +32,7 @@ class TestThom(unittest.TestCase):
         assert str(opoints) == str(ro)
         assert str(rhom) == str(points)
 
+        game = GameMorin(ListPoints([points], distinguished_points=[len(points) - 1]), host, agent)
         for i in range(100):
             print('Game state:', game.state)
             game.step()
