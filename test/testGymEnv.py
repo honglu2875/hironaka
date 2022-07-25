@@ -4,8 +4,8 @@ import gym
 import numpy as np
 from gym.envs.registration import register
 
-from hironaka.core import Points
 from hironaka.agent import RandomAgent
+from hironaka.core import ListPoints
 from hironaka.host import Zeillinger, RandomHost
 
 register(
@@ -31,7 +31,8 @@ class TestEnv(unittest.TestCase):
         env.render()
         stopped = False
         while not stopped:
-            action = agent.move(Points(np.expand_dims(o.get('points'), axis=0)), [np.where(o.get('coords') == 1)[0]],
+            action = agent.move(ListPoints(np.expand_dims(o.get('points'), axis=0)),
+                                [np.where(o.get('coords') == 1)[0]],
                                 inplace=False)
             o, r, stopped, info = env.step(action[0])
             print(f"Reward: {r}")
@@ -49,7 +50,7 @@ class TestEnv(unittest.TestCase):
         env.render()
         stopped = False
         while not stopped:
-            action = host.select_coord(Points(np.expand_dims(o, axis=0)))[0]
+            action = host.select_coord(ListPoints(np.expand_dims(o, axis=0)))[0]
             action_input = np.zeros(dim)
             action_input[action] = 1
             o, r, stopped, info = env.step(action_input)

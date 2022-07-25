@@ -2,11 +2,11 @@ import unittest
 
 from torch import nn
 
-from hironaka.core import Points
-from hironaka.game import GameHironaka
-from hironaka.policy.NNPolicy import NNPolicy
 from hironaka.agent import PolicyAgent
+from hironaka.core import ListPoints
+from hironaka.game import GameHironaka
 from hironaka.host import PolicyHost
+from hironaka.policy.NNPolicy import NNPolicy
 from hironaka.src import generate_batch_points
 
 
@@ -56,7 +56,7 @@ class TestUtil(unittest.TestCase):
         agent = PolicyAgent(pl_a)
         host = PolicyHost(pl_h)
 
-        game = GameHironaka(Points(generate_batch_points(11, dimension=4)), host, agent)
+        game = GameHironaka(ListPoints(generate_batch_points(11, dimension=4)), host, agent)
 
         print(game.state)
         for _ in range(10):

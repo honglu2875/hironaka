@@ -1,7 +1,7 @@
 from .PointsBase import PointsBase
 
 
-class PointsNumpy(PointsBase):  # INCOMPLETE
+class NumpyPoints(PointsBase):  # INCOMPLETE
     """
         Storing points using numpy arrays.
     """

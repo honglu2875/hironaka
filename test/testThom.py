@@ -3,8 +3,8 @@ import unittest
 from treelib import Tree
 import numpy as np
 
-from hironaka.core import Points
 from hironaka.agent import AgentMorin
+from hironaka.core import ListPoints
 from hironaka.game import GameMorin
 from hironaka.host import ZeillingerLex, WeakSpivakovsky
 from hironaka.src import thom_monomial_ideal, thom_points, thom_points_homogeneous
@@ -18,7 +18,7 @@ class TestThom(unittest.TestCase):
         agent = AgentMorin()
         points = thom_points_homogeneous(N)
         opoints = thom_points(N)
-        game = GameMorin(Points([points], distinguished_points=[len(points) - 1]), host, agent)
+        game = GameMorin(ListPoints([points], distinguished_points=[len(points) - 1]), host, agent)
 
         ro = [(4, 1, 0, 1, 0, 0, 0), (4, 1, 0, 0, 0, 1, 0), (4, 1, 0, 0, 0, 0, 1), (4, 0, 2, 0, 0, 0, 0),
               (4, 0, 1, 0, 1, 0, 0), (4, 0, 0, 0, 2, 0, 0), (3, 2, 1, 0, 0, 0, 0), (3, 2, 0, 0, 1, 0, 0),
@@ -47,7 +47,7 @@ class TestThom(unittest.TestCase):
         points = thom_points_homogeneous(4)
         print(f"Points: {points}")
         dimension = len(points[0])
-        initial_points = Points([points], distinguished_points=[len(points) - 1])
+        initial_points = ListPoints([points], distinguished_points=[len(points) - 1])
 
         tree = Tree()
         tree.create_node(0, 0, data=initial_points)
@@ -73,7 +73,7 @@ class TestThom(unittest.TestCase):
         weights = [1,1,2,2,3,3,3]
         search_tree_morin(initial_points, tree, 0, weights, host, max_size=MAX_SIZE)
         tree.show(data_property="points", idhidden=False)
-        tree.depth()
+        assert tree.size() == 30
 
     def test_thom_points(self):
         thom_points_homogeneous_2 = "[[0, 1]]"

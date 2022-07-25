@@ -2,12 +2,12 @@ from typing import List, Any, Dict, Optional, Union
 
 import numpy as np
 
-from .PointsBase import PointsBase
 from hironaka.src import shift_lst, get_newton_polytope_lst, get_shape, scale_points, reposition_lst, \
     get_newton_polytope_approx_lst
+from .PointsBase import PointsBase
 
 
-class Points(PointsBase):
+class ListPoints(PointsBase):
     """
         When dealing with small batches, small dimension and small point numbers, list is much better than numpy.
     """
@@ -15,8 +15,8 @@ class Points(PointsBase):
     copied_attributes = ['distinguished_points']
 
     def __init__(self,
-                 points: Union[List[List[List[int]]], np.ndarray],
-                 value_threshold: Optional[int] = 1e8,
+                 points: Union[List[List[List[float]]], List[List[float]], np.ndarray],
+                 value_threshold: Optional[float] = 1e8,
                  use_precise_newton_polytope: Optional[bool] = False,
                  distinguished_points: Optional[Union[List[int], None]] = None,
                  config_kwargs: Optional[Dict[str, Any]] = None,
@@ -27,12 +27,13 @@ class Points(PointsBase):
         self.distinguished_points = distinguished_points
 
         # Be lenient and allow numpy array as input.
-        # The input might already be -1 padded arrays. Thus, we do a thorough check to clean that up.
+        # The input might already be a padded arrays. Thus, we do a thorough check to clean that up.
+        # WARNING: padding value must be *STRICTLY* negative for the numpy array!
         if isinstance(points, np.ndarray):
             points = points.tolist()
             assert isinstance(points, list)
             for p in points:
-                while p[-1][0] == -1:
+                while p[-1][0] < 0:
                     p.pop()
                     assert len(p) != 0  # Should not be empty batch
 
@@ -60,13 +61,14 @@ class Points(PointsBase):
                points: Any,
                coords: List[List[int]],
                axis: List[int],
-               inplace: Optional[bool] = True):
+               inplace: Optional[bool] = True,
+               **kwargs):
         return shift_lst(points, coords, axis, inplace=inplace)
 
-    def _reposition(self, points: Any, inplace: Optional[bool] = True):
+    def _reposition(self, points: Any, inplace: Optional[bool] = True, **kwargs):
         return reposition_lst(points, inplace=inplace)
 
-    def _get_newton_polytope(self, points: Any, inplace: Optional[bool] = True):
+    def _get_newton_polytope(self, points: Any, inplace: Optional[bool] = True, **kwargs):
         # Mark distinguished points
         if self.distinguished_points is not None:
             # Apply marks to the distinguished points before the operation
@@ -99,7 +101,7 @@ class Points(PointsBase):
     def _get_shape(self, points: Any):
         return get_shape(points)
 
-    def _rescale(self, points: Any, inplace: Optional[bool] = True):
+    def _rescale(self, points: Any, inplace: Optional[bool] = True, **kwargs):
         return scale_points(points, inplace=inplace)
 
     def _points_copy(self, points: Any):

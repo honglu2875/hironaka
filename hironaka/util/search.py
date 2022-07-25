@@ -2,11 +2,11 @@ from collections import deque, namedtuple
 
 import numpy as np
 
-from hironaka.core import Points
+from hironaka.core import ListPoints
 from hironaka.host import Host
 
 
-def search_depth(points: Points, host: Host, debug=False):
+def search_depth(points: ListPoints, host: Host, debug=False):
     """
         Given the host, return the maximal length of the game that an agent can achieve.
     """
@@ -52,7 +52,7 @@ def search_tree(points, tree, curr_node, host, max_size=100):
     return tree
 
 
-def search_tree_morin(points: Points, tree, curr_node, curr_weights, host, max_size=100):
+def search_tree_morin(points: ListPoints, tree, curr_node, curr_weights, host, max_size=100):
     """
         Perform a full tree search and store the full result in a Tree object.
     """
