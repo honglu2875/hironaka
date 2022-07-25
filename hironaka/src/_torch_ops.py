@@ -5,7 +5,9 @@ import torch
 from hironaka.src import batched_coord_list_to_binary
 
 
-def get_newton_polytope_approx_torch(points: torch.Tensor, inplace: Optional[bool] = True):
+def get_newton_polytope_approx_torch(points: torch.Tensor,
+                                     inplace: Optional[bool] = True,
+                                     padding_value: Optional[float] = -1.):
     assert len(points.shape) == 3
     batch_size, max_num_points, dimension = points.shape
 
@@ -27,21 +29,26 @@ def get_newton_polytope_approx_torch(points: torch.Tensor, inplace: Optional[boo
     points_to_remove = ((difference >= 0) & diag_filter & filter_matrix).all(3).any(2)
     points_to_remove = points_to_remove.unsqueeze(2).repeat(1, 1, dimension)
 
+    r = points * ~points_to_remove + torch.full(points.shape, padding_value) * points_to_remove
+
     if inplace:
-        points[:, :, :] = points * ~points_to_remove + torch.full(points.shape, -1.0) * points_to_remove
+        points[:, :, :] = r
         return None
     else:
-        return points * ~points_to_remove + torch.full(points.shape, -1.0) * points_to_remove
+        return r
 
 
-def get_newton_polytope_torch(points: torch.Tensor, inplace: Optional[bool] = True):
-    return get_newton_polytope_approx_torch(points, inplace=inplace)
+def get_newton_polytope_torch(points: torch.Tensor,
+                              inplace: Optional[bool] = True,
+                              padding_value: Optional[float] = -1.):
+    return get_newton_polytope_approx_torch(points, inplace=inplace, padding_value=padding_value)
 
 
 def shift_torch(points: torch.Tensor,
                 coord: Union[torch.Tensor, List[List[int]]],
                 axis: Union[torch.Tensor, List[int]],
-                inplace=True):
+                inplace: Optional[bool] = True,
+                padding_value: Optional[float] = -1.):
     """
         note:
             If coord is a list, it is assumed to be lists of chosen coordinates.
@@ -85,25 +92,37 @@ def shift_torch(points: torch.Tensor,
     trans_matrix = trans_matrix.unsqueeze(1).repeat(1, max_num_points, 1, 1)
 
     transformed_points = torch.matmul(trans_matrix, points.unsqueeze(3)).squeeze(3)
-    result = (transformed_points * available_points) + torch.full(points.shape, -1.0) * ~available_points
+    r = (transformed_points * available_points) + torch.full(points.shape, padding_value) * ~available_points
 
     if inplace:
-        points[:, :, :] = result
+        points[:, :, :] = r
         return None
     else:
-        return result
+        return r
 
 
-def reposition_torch(points: torch.Tensor, inplace: Optional[bool] = True):
+def reposition_torch(points: torch.Tensor,
+                     inplace: Optional[bool] = True,
+                     padding_value: Optional[float] = -1.):
     available_points = points.ge(0)
     maximum = torch.max(points)
 
     preprocessed = points * available_points + torch.full(points.shape, maximum + 1) * ~available_points
     coordinate_minimum = torch.amin(preprocessed, 1)
     unfiltered_result = points - coordinate_minimum.unsqueeze(1).repeat(1, points.shape[1], 1)
-    result = unfiltered_result * available_points + torch.full(points.shape, -1.0) * ~available_points
+    r = unfiltered_result * available_points + torch.full(points.shape, padding_value) * ~available_points
     if inplace:
-        points[:, :, :] = result
+        points[:, :, :] = r
         return None
     else:
-        return result
+        return r
+
+
+def rescale_torch(points: torch.Tensor, inplace: Optional[bool] = True, padding_value: Optional[float] = -1.):
+    available_points = points.ge(0)
+    r = points * available_points / torch.reshape(torch.amax(points, (1, 2)), (-1, 1, 1)) + \
+        padding_value * ~available_points
+    if inplace:
+        points[:, :, :] = r
+    else:
+        return r

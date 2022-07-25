@@ -1,7 +1,7 @@
+import numbers
 from typing import List, Union
 
 import numpy as np
-import numbers
 
 
 def get_shape(o):
@@ -131,9 +131,9 @@ def scale_points(points: List[List[List[int]]], inplace=True):
 
         for point in points[b]:
             if inplace:
-                point[:] = [x/m for x in point]
+                point[:] = [x / m for x in point]
             else:
-                new_points[b].append([x/m for x in point])
+                new_points[b].append([x / m for x in point])
 
     if not inplace:
         return new_points
@@ -160,9 +160,17 @@ def decode_action(code: int, dimension: int):
 def mask_encoded_action(dimension: int):
     assert isinstance(dimension, int), f"Got {type(dimension)}."
 
-    result = np.ones(2**dimension)
+    result = np.ones(2 ** dimension)
     result[0] = 0
     for i in range(dimension):
         result[1 << i] = 0
 
     return result
+
+
+def generate_points(n: int, dimension=3, max_value=50):
+    return [[np.random.randint(max_value) for _ in range(dimension)] for _ in range(n)]
+
+
+def generate_batch_points(n: int, batch_num=1, dimension=3, max_value=50):
+    return [[[np.random.randint(max_value) for _ in range(dimension)] for _ in range(n)] for _ in range(batch_num)]

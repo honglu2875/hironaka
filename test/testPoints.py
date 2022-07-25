@@ -2,9 +2,8 @@ import unittest
 
 import numpy as np
 
-from hironaka.abs.Points import Points
-from hironaka.src import make_nested_list
-from hironaka.util import generate_points
+from hironaka.core import Points
+from hironaka.src import make_nested_list, generate_points
 
 
 class TestPoints(unittest.TestCase):
@@ -124,7 +123,7 @@ class TestPoints(unittest.TestCase):
         # print(p2)
 
     def test_value_threshold(self):
-        points = Points([[[5e7, 5e7+1, 1e7], [1, 1, 2]]], value_threshold=int(1e8))
+        points = Points([[[5e7, 5e7 + 1, 1e7], [1, 1, 2]]], value_threshold=int(1e8))
         assert not points.exceed_threshold()
         points.shift([[0, 1]], [0])
         assert points.exceed_threshold()

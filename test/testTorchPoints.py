@@ -2,8 +2,8 @@ import unittest
 
 import torch
 
-from hironaka.abs.PointsTensor import PointsTensor
-from hironaka.src._torch_ops import get_newton_polytope_torch, shift_torch, reposition_torch
+from hironaka.core import PointsTensor
+from hironaka.src import get_newton_polytope_torch, shift_torch, reposition_torch
 
 
 class testTorchPoints(unittest.TestCase):
@@ -37,6 +37,16 @@ class testTorchPoints(unittest.TestCase):
                         [-1., -1., -1., -1.],
                         [-1., -1., -1., -1.]]])
 
+    rs = torch.Tensor([[[ 0.0000,  0.2000,  0.1000,  0.1000],
+         [-1.0000, -1.0000, -1.0000, -1.0000],
+         [ 0.3000,  0.0000,  0.0000,  0.0000],
+         [ 0.0000,  1.0000,  0.5000,  0.0000]],
+
+        [[ 0.0000,  0.0000,  0.4000,  1.0000],
+         [ 0.2000,  0.0000,  0.0000,  0.0000],
+         [-1.0000, -1.0000, -1.0000, -1.0000],
+         [-1.0000, -1.0000, -1.0000, -1.0000]]])
+
     def test_functions(self):
         p = torch.FloatTensor(
             [
@@ -44,7 +54,6 @@ class testTorchPoints(unittest.TestCase):
                 [[0, 1, 3, 5], [1, 1, 1, 1], [9, 8, 2, 1], [-1, -1, -1, -1]]
             ]
         )
-
         assert torch.all(get_newton_polytope_torch(p, inplace=False).eq(self.r))
         get_newton_polytope_torch(p, inplace=True)
         assert torch.all(p.eq(self.r))
@@ -63,7 +72,6 @@ class testTorchPoints(unittest.TestCase):
             ]
         )
 
-
         pts = PointsTensor(p)
 
         pts.get_newton_polytope()
@@ -72,3 +80,5 @@ class testTorchPoints(unittest.TestCase):
         assert str(pts) == str(self.r2)
         pts.reposition()
         assert str(pts) == str(self.r3)
+        pts.rescale()
+        assert str(pts) == str(self.rs)

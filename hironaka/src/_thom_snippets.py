@@ -2,7 +2,7 @@ from itertools import combinations, combinations_with_replacement
 
 import numpy as np
 import sympy as sp
-from sympy import MatrixSymbol, Matrix, Poly
+from sympy import Matrix, MatrixSymbol, Poly
 
 
 def quadratic_part(order_of_jets: int):
@@ -19,9 +19,9 @@ def quadratic_part(order_of_jets: int):
     blower = Matrix(blower)
     for s in range(order_of_jets - 1):
         V = Matrix(np.zeros((order_of_jets, order_of_jets)))
-        for t in range(s+1):
-            V = V + Matrix((blower.row(t).transpose()*blower.row(s-t)))
-        W.append(Matrix(np.triu(V+V.transpose()-Matrix(np.diag(np.array(V.diagonal())[0])))))
+        for t in range(s + 1):
+            V = V + Matrix((blower.row(t).transpose() * blower.row(s - t)))
+        W.append(Matrix(np.triu(V + V.transpose() - Matrix(np.diag(np.array(V.diagonal())[0])))))
     return [blower, W]
 
 
@@ -33,8 +33,9 @@ def quadratic_fixed_points(order_of_jets: int):
     P = []
     for s in range(2, order_of_jets + 1):
         for lin_set in combinations(list(range(order_of_jets)), s):
-            P = list(list(L) for L in list(combinations_with_replacement(list(range(order_of_jets)), 2)) if L[0] + L[1] < order_of_jets - 1)
-            if len(P) >= order_of_jets-s:
+            P = list(list(L) for L in list(combinations_with_replacement(list(range(order_of_jets)), 2)) if
+                     L[0] + L[1] < order_of_jets - 1)
+            if len(P) >= order_of_jets - s:
                 for comb in list(combinations(list(P), order_of_jets - s)):
                     Q.append([list(lin_set), list(comb)])
     return Q
@@ -69,7 +70,7 @@ def thom_points(order_of_jets: int):
     else:
         P = Q[0]  # QUESTION: Really starts at 1?????
         for i in range(0, len(Q)):
-            P = P+Q[i]
+            P = P + Q[i]
     return Poly(P).monoms()
 
 
@@ -82,6 +83,6 @@ def thom_points_homogeneous(order_of_jets: int):
     max_deg = np.amax([np.sum(TP[i][1:]) for i in range(len(TP))])
     for point in TP:
         pt = np.array(point)
-        pt[0] = max_deg-np.sum(point[1:])
+        pt[0] = max_deg - np.sum(point[1:])
         P.append(pt.tolist())
     return P

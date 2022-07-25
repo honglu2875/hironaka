@@ -1,4 +1,4 @@
-from hironaka.abs.PointsBase import PointsBase
+from .PointsBase import PointsBase
 
 
 class PointsNumpy(PointsBase):  # INCOMPLETE

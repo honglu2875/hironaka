@@ -2,7 +2,7 @@ from typing import List, Any, Dict, Optional, Union
 
 import numpy as np
 
-from hironaka.abs.PointsBase import PointsBase
+from .PointsBase import PointsBase
 from hironaka.src import shift_lst, get_newton_polytope_lst, get_shape, scale_points, reposition_lst, \
     get_newton_polytope_approx_lst
 
@@ -12,7 +12,7 @@ class Points(PointsBase):
         When dealing with small batches, small dimension and small point numbers, list is much better than numpy.
     """
     subcls_config_keys = ['value_threshold', 'use_precise_newton_polytope']
-    copied_attributes = ['distinguished_points', 'ended_each_batch', 'ended']
+    copied_attributes = ['distinguished_points']
 
     def __init__(self,
                  points: Union[List[List[List[int]]], np.ndarray],

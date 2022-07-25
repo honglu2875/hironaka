@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional
 import numpy as np
 from gym import spaces
 
-from hironaka.envs.HironakaBase import HironakaBase
+from .HironakaBase import HironakaBase
 from hironaka.host import Host
 
 
