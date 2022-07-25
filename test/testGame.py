@@ -46,4 +46,4 @@ class TestGame(unittest.TestCase):
     def test_spivakovsky_host(self):
         points = ListPoints([[0, 1, 2], [2, 1, 0]])
         host = WeakSpivakovsky(ignore_batch_dimension=False)
-        assert len(host.select_coord(points)) > 1
+        assert len(host.select_coord(points)[0]) > 1
