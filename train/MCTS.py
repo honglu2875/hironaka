@@ -23,6 +23,8 @@ class HironakaNet(nn.Module):
 
     def __init__(self, dim = 3):
         super(HironakaNet, self).__init__()
+        self.dim = dim
+        self.choices = 2 ** dim - dim - 1
         # # 1 input image channel, 6 output channels, 5x5 square convolution
         # # kernel
         #self.conv1 = nn.Conv2d(1, 6, 5)
@@ -30,7 +32,7 @@ class HironakaNet(nn.Module):
         # # an affine operation: y = Wx + b
         self.fc1 = nn.Linear(dim * 10, 64)  # input: all coordinates of Points
         self.fc2 = nn.Linear(64, 32)
-        self.fc3 = nn.Linear(32, 2**dim + 1) # output: there are 8 = 2^3 action of choosing subsets, and the last number is the expected steps
+        self.fc3 = nn.Linear(32, 2**dim - dim) # output: there are 8 = 2^3 action of choosing subsets, and the last number is the expected steps
 
     def forward(self, x):
         # # Max pooling over a (2, 2) window
@@ -41,17 +43,34 @@ class HironakaNet(nn.Module):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
-        x_prob = torch.narrow(x,0,0,8)
-        x_reward = torch.narrow(x,0,8,1)
+        x_prob = torch.narrow(x,0,0,self.choices)
+        x_reward = torch.narrow(x,0,self.choices,1)
         x_prob = F.softmax(x_prob,dim = 0)
         x = torch.cat((x_prob,x_reward), dim = 0)
         return x
 
 class trained_host(host.Host):
-    def __init__(self,net):
+    def __init__(self,net: HironakaNet):
         self.net = net
+        self.dim = net.dim
         super().__init__()
 
+        self.action_translate = []
+        for i in range(1,2**self.dim):
+            if not ((i & (i-1) == 0)): # Check if i is NOT a power of 2
+                self.action_translate.append(i)
+
+    def _action_to_coords(self, action: int):
+
+        current_coord = 0
+        coords = []
+        action = self.action_translate[action]
+        while action != 0:
+            if action % 2:
+                coords.append(current_coord)
+            current_coord += 1
+            action = action // 2
+        return coords
     def _select_coord(self, points: TensorPoints, debug = False):
         answer = []
         if not isinstance(points, TensorPoints):
@@ -59,21 +78,21 @@ class trained_host(host.Host):
         for i in range(points.batch_size):
             x = points.points[0]
             result = self.net(x)
-            prob_vector = torch.narrow(result,0,0,8)
+            prob_vector = torch.narrow(result,0,0,self.net.choices)
             prob_vector = prob_vector.tolist()
-            reward_vector = torch.narrow(result,0,8,1)
+            reward_vector = torch.narrow(result,0,self.net.choices,1)
             reward = reward_vector.item()
             current_prob, choice = -float("inf"), -1
             for _,prob in enumerate(prob_vector):
-                if prob > current_prob and not _ in {0,1,3,7}:
+                if prob > current_prob:
                     current_prob = prob
                     choice = _
 
-            coords = action_to_coords(choice)
+            coords = self._action_to_coords(choice)
             answer.append(coords)
 
         return answer
-
+#todo: decide how to deal with hash. Either put them as a method in training, or as a method in Points classes.
 def hashify(s:TensorPoints):
     hashed_str = ""
     current_points = s.points[0].tolist()
@@ -84,55 +103,28 @@ def hashify(s:TensorPoints):
 
     return hashed_str
 
-def inverse_hash(s:str):
+def inverse_hash(s:str, dim = 3):
     x = s.split(",")
     x.pop()
     pt = []
     temp = []
     for i, piece in enumerate(x):
-        if i%3 == 0:
+        if i%dim == 0:
             temp = []
         temp.append(float(piece))
-        if i%3 == 2:
+        if i%dim == dim - 1:
             pt.append(temp)
     while len(pt) < 10:
-        pt.append([0.,0.,0.])
+        pt.append([0. for _ in range(dim)])
 
     return pt
 
 
-def points_to_tensor(s:TensorPoints):
-    state = s.points[0]
-    coords = []
-    for point in state:
-        for coord in point:
-            coords.append(coord)
-
-    while len(coords) < 30:
-        coords.append(0)
-
-    converted = torch.FloatTensor(coords)
-    return converted
-
-def action_to_coords(action: int):
-    #action is an integer, and coords is a choice of coordinates. We compute the binary expansion of action, and 1 means it choose the corresponding coordidnate.
-
-    current_coord = 0
-    coords = []
-    action += 1
-    while action != 0:
-        if action%2:
-            coords.append(current_coord)
-        current_coord += 1
-        action = action // 2
-    return coords
-
-
 class MCTS:
-    #todo: add dimensions into mcts.
     def __init__(self, state, env, nn, max_depth = 20, c_puct = 0.5):
 
         self.initial_state = state if isinstance(state, TensorPoints) else TensorPoints(state.points, max_num_points = 10) #Turn points into PointsTensor
+        self.dim = state.dimension
         self.env = env
         self.nn = nn
         self.max_depth = max_depth
@@ -143,6 +135,15 @@ class MCTS:
         self.visited = col.defaultdict()
         self.c_puct = c_puct
 
+        #A pre-calculated table to convert action to coordinates
+
+        self.action_translate = []
+        for i in range(1,2**self.dim):
+            if not ((i & (i-1) == 0)): # Check if i is NOT a power of 2
+                self.action_translate.append(i)
+
+        #self.action_translate gives a table, whose value at index i is the 10-digits convertion of the i-th valid action.
+
     def run(self, iteration = 100):
         for _ in range(iteration):
             state = self.initial_state.copy()
@@ -151,11 +152,22 @@ class MCTS:
     def get_examples(self):
         examples = ([],[])
         for _ in self.Q.keys():
-            examples[0].append(inverse_hash(_))
+            examples[0].append(inverse_hash(_, self.dim))
             examples[1].append(self.Q[_] + [self.reward[_]])
 
         return examples
 
+    def _action_to_coords(self, action: int):
+
+        current_coord = 0
+        coords = []
+        action = self.action_translate[action]
+        while action != 0:
+            if action % 2:
+                coords.append(current_coord)
+            current_coord += 1
+            action = action // 2
+        return coords
 
     def _search(self,s:TensorPoints,depth = 0):
         if torch.isnan(s.points[0][0][0]):
@@ -178,19 +190,16 @@ class MCTS:
             # if torch.isnan(result[0]):
             #     logging.warning("nan probablity detected! The current points are")
             #     print(s.points[0])
-            self.P[hashed_s] = result[:8]
-            current_reward = result[8].item()
-            self.Q[hashed_s] = [0 for _ in range(8)]
-            self.N[hashed_s] = [0 for _ in range(8)]
+            self.P[hashed_s] = result[:self.nn.choices]
+            current_reward = result[self.nn.choices].item()
+            self.Q[hashed_s] = [0 for _ in range(self.nn.choices)]
+            self.N[hashed_s] = [0 for _ in range(self.nn.choices)]
             self.reward[hashed_s] = current_reward
             return current_reward
 
         max_u, best_action = -float("inf"), -1
         # change this part to argmax.
-        for action in range(7):
-            if (action in {0,1,3}):
-                continue
-            #Abstract the action choosing function later.
+        for action in range(self.nn.choices):
             u = self.Q[hashed_s][action] + self.c_puct * self.P[hashed_s][action] * math.sqrt(sum(self.N[hashed_s])) / (
                         1 + self.N[hashed_s][action])
             if u > max_u:
@@ -198,15 +207,12 @@ class MCTS:
 
         this_action = best_action
 
-        #if I can actively avoid choosing a single coordinate in an elegant way, then it should speed up training dramatically.
-
-        coords = [action_to_coords(this_action)]
+        coords = [self._action_to_coords(this_action)]
 
 
         next_s = s.copy()
         self.env.move(next_s, coords)
         next_s.rescale()
-        # print("action taken, current length is ", len(s.points[0]))
 
         current_reward = self._search(next_s, depth + 1)
 
@@ -225,11 +231,11 @@ class MCTSTrainer:
     def _loss_function(self,x,y : List[torch.FloatTensor]):
         loss = torch.zeros(1)
         for i, pred in enumerate(x):
-            choice_x = torch.narrow(pred, 0, 0, 8)
-            reward_x = torch.narrow(pred, 0, 8, 1)
-            choice_y = torch.narrow(y[i], 0, 0, 8)
+            choice_x = torch.narrow(pred, 0, 0, self.net.choices)
+            reward_x = torch.narrow(pred, 0, self.net.choices, 1)
+            choice_y = torch.narrow(y[i], 0, 0, self.net.choices)
             choice_y = F.softmax(choice_y, dim=0)
-            reward_y = torch.narrow(y[i], 0, 8, 1)
+            reward_y = torch.narrow(y[i], 0, self.net.choices, 1)
             loss = loss + torch.square((reward_x - reward_y)) - torch.dot(choice_y, (choice_x))
 
         return loss
@@ -238,9 +244,9 @@ class MCTSTrainer:
         return trained_host(self.net)
 
     def _arena(self, new_host, old_host:host.Host, steps = 1000, agent = ChooseFirstAgent()) -> bool:
-        test_validator = HironakaValidator(new_host, agent)
+        test_validator = HironakaValidator(new_host, agent, dimension = self.dim)
         new_host_record = test_validator.playoff(num_steps=steps, verbose=0)
-        test_validator = HironakaValidator(old_host, agent)
+        test_validator = HironakaValidator(old_host, agent, dimension = self.dim)
         old_host_record = test_validator.playoff(num_steps=steps, verbose=0)
         return (len(new_host_record) > len(old_host_record))
 
@@ -297,7 +303,7 @@ class MCTSTrainer:
 
 if __name__ == '__main__':
 
-    trainer = MCTSTrainer(dim = 3)
+    trainer = MCTSTrainer(dim = 4)
     trainer.train(ITERATIONS= 10, agent = ChooseFirstAgent())
 
     path = 'test_model.pth'
