@@ -13,7 +13,7 @@ from hironaka.util import search_tree_morin
 
 class TestThom(unittest.TestCase):
     def test_game(self):
-        N = 3
+        N = 4
         host = WeakSpivakovsky()
         agent = AgentMorin()
         points = thom_points_homogeneous(N)
@@ -70,10 +70,10 @@ class TestThom(unittest.TestCase):
         MAX_SIZE = 10000
 
         host = WeakSpivakovsky()
-        weights = [1,1,2,2,3,3,3]
+        weights = [1,1,2,3,2,3,3]
         search_tree_morin(initial_points, tree, 0, weights, host, max_size=MAX_SIZE)
         tree.show(data_property="points", idhidden=False)
-        assert tree.size() == 30
+        assert tree.size() == 37
 
     def test_thom_points(self):
         thom_points_homogeneous_2 = "[[0, 1]]"
