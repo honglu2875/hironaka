@@ -1,6 +1,7 @@
 import unittest
 
 from treelib import Tree
+import numpy as np
 
 from hironaka.core import Points
 from hironaka.agent import AgentMorin
