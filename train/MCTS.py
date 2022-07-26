@@ -1,5 +1,6 @@
 import copy
 import logging
+import random
 from typing import List
 
 import torch
@@ -71,6 +72,7 @@ class trained_host(host.Host):
             current_coord += 1
             action = action // 2
         return coords
+
     def _select_coord(self, points: TensorPoints, debug = False):
         answer = []
         if not isinstance(points, TensorPoints):
@@ -89,6 +91,8 @@ class trained_host(host.Host):
                     choice = _
 
             coords = self._action_to_coords(choice)
+            print(prob_vector)
+            print(coords)
             answer.append(coords)
 
         return answer
@@ -98,7 +102,7 @@ def hashify(s:TensorPoints):
     current_points = s.points[0].tolist()
     for point in current_points:
         for coord in point:
-            hashed_str += '%.10f' % coord
+            hashed_str += '%.5f' % coord
             hashed_str += ','
 
     return hashed_str
@@ -121,7 +125,7 @@ def inverse_hash(s:str, dim = 3):
 
 
 class MCTS:
-    def __init__(self, state, env, nn, max_depth = 20, c_puct = 0.5):
+    def __init__(self, state, env, nn, max_depth = 15, c_puct = 0.5):
 
         self.initial_state = state if isinstance(state, TensorPoints) else TensorPoints(state.points, max_num_points = 10) #Turn points into PointsTensor
         self.dim = state.dimension
@@ -152,8 +156,12 @@ class MCTS:
     def get_examples(self):
         examples = ([],[])
         for _ in self.Q.keys():
-            examples[0].append(inverse_hash(_, self.dim))
-            examples[1].append(self.Q[_] + [self.reward[_]])
+            if not all(v == 0 for v in self.Q[_]):
+                examples[0].append(inverse_hash(_, self.dim))
+                examples[1].append(self.Q[_] + [self.reward[_]])
+                print("The current board is ",examples[0][-1])
+                print("The current Q-table is ",self.Q[_])
+                print("The current N-table is ",self.N[_])
 
         return examples
 
@@ -177,20 +185,18 @@ class MCTS:
 
         if s.ended:
             current_reward = 1
+            print("We actually win! The depth is ", depth)
             self.reward[hashed_s] = current_reward
             return 1
 
         if depth >= self.max_depth:
-            # if it goes too deep, give the host a penalty and move back.
-            return 0
+            print("Max depth reached!")
+            return -1
 
         if not (hashed_s in self.visited):
             self.visited[hashed_s] = 1
             result = self.nn(s.points[0])
-            # if torch.isnan(result[0]):
-            #     logging.warning("nan probablity detected! The current points are")
-            #     print(s.points[0])
-            self.P[hashed_s] = result[:self.nn.choices]
+            self.P[hashed_s] = result[:self.nn.choices].tolist()
             current_reward = result[self.nn.choices].item()
             self.Q[hashed_s] = [0 for _ in range(self.nn.choices)]
             self.N[hashed_s] = [0 for _ in range(self.nn.choices)]
@@ -198,21 +204,29 @@ class MCTS:
             return current_reward
 
         max_u, best_action = -float("inf"), -1
-        # change this part to argmax.
-        for action in range(self.nn.choices):
-            u = self.Q[hashed_s][action] + self.c_puct * self.P[hashed_s][action] * math.sqrt(sum(self.N[hashed_s])) / (
+
+        if all(v == 0 for v in self.Q[hashed_s]):
+            best_action = random.randint(0,self.nn.choices-1)
+            logging.warning("Random choice triggered!")
+        else:
+            for action in range(0, self.nn.choices):
+                u = self.Q[hashed_s][action] + self.c_puct * self.P[hashed_s][action] * math.sqrt(sum(self.N[hashed_s])) / (
                         1 + self.N[hashed_s][action])
-            if u > max_u:
-                max_u, best_action = u, action
+
+                if math.isnan(u):
+                    logging.warning("u is nan!")
+
+                if u > max_u:
+                    max_u, best_action = u, action
 
         this_action = best_action
 
         coords = [self._action_to_coords(this_action)]
 
-
         next_s = s.copy()
         self.env.move(next_s, coords)
         next_s.rescale()
+        next_s = TensorPoints(next_s.get_features())
 
         current_reward = self._search(next_s, depth + 1)
 
@@ -250,14 +264,19 @@ class MCTSTrainer:
         old_host_record = test_validator.playoff(num_steps=steps, verbose=0)
         return (len(new_host_record) > len(old_host_record))
 
-    def train(self, ITERATIONS = 1000, c_puct = 0.5, lr = 1e-6, agent = ChooseFirstAgent()):
+    def train(self, ITERATIONS = 1000, c_puct = 0.5, lr = 1e-6, agent = ChooseFirstAgent(), use_arena = False):
         for i in range(ITERATIONS):
             examples = ([], [])
             for _ in range(10):
-                test_points = TensorPoints(snip.generate_batch_points(n=10, dimension=self.dim, max_value=50),
-                                           max_num_points=10)
-                test_points.get_newton_polytope()
-                test_points.rescale()
+                while True:
+                    test_points = TensorPoints(snip.generate_batch_points(n=10, dimension=self.dim, max_value=50),
+                                               max_num_points=10)
+                    test_points.get_newton_polytope()
+                    test_points.rescale()
+                    test_points = TensorPoints(test_points.get_features())
+                    if not test_points.ended:
+                        break
+
                 mcts_instance = MCTS(state=test_points, env=agent, nn=self.net, max_depth=50, c_puct = c_puct)
                 mcts_instance.run(iteration=20)
                 new_examples = mcts_instance.get_examples()
@@ -275,12 +294,12 @@ class MCTSTrainer:
             y = [torch.FloatTensor(_) for _ in y]
             pred = []
             old_model = copy.deepcopy(self.net)
-            optimizer = torch.optim.SGD(self.net.parameters(), lr = lr)
+            optimizer = torch.optim.SGD(self.net.parameters(), lr = lr, momentum= 0.9)
 
             for batch, x in enumerate(data):
                 this_pred = self.net(x)
                 pred.append(this_pred)
-
+            #todo: Try the alpha_zero training process.
             if pred:
                 loss = self._loss_function(pred, y)
                 optimizer.zero_grad()
@@ -289,11 +308,9 @@ class MCTSTrainer:
                 if i % 10 == 0:
                     print("The current loss is: ", loss.item())
 
-            if not self._arena(trained_host(self.net), trained_host(old_model), steps = 1000, agent = agent):
+            if use_arena and not self._arena(trained_host(self.net), trained_host(old_model), steps = 1000, agent = agent):
                 self.net = copy.deepcopy(old_model)
-                print("Old model wins!")
-            else:
-                print("New model wins!")
+
             print("We are in iteration ", i)
 
     def save_model(self,path:str):
@@ -303,8 +320,8 @@ class MCTSTrainer:
 
 if __name__ == '__main__':
 
-    trainer = MCTSTrainer(dim = 4)
-    trainer.train(ITERATIONS= 10, agent = ChooseFirstAgent())
+    trainer = MCTSTrainer(dim=3)
+    trainer.train(ITERATIONS=100, agent=ChooseFirstAgent(), c_puct=0.5, lr=1e-2)
 
     path = 'test_model.pth'
     trainer.save_model(path = path)

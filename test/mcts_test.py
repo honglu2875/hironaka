@@ -12,7 +12,7 @@ from hironaka.src import _snippets as snip
 import torch
 from hironaka.core import TensorPoints
 from hironaka.agent import RandomAgent, ChooseFirstAgent
-from train.MCTS import HironakaNet, MCTS
+from train.MCTS import HironakaNet, MCTS, trained_host
 
 ITERATIONS = 2
 
@@ -54,37 +54,6 @@ def points_to_tensor(s:TensorPoints):
 
     converted = torch.FloatTensor(coords)
     return converted
-
-class trained_host(host.Host):
-    def __init__(self,net):
-        self.net = net
-        super().__init__()
-
-    def _select_coord(self, points: TensorPoints, debug = False):
-        answer = []
-        if not isinstance(points, TensorPoints):
-            points = TensorPoints(points.points, max_num_points = 10)
-        for i in range(points.batch_size):
-            x = points.points[0]
-            result = self.net(x)
-            prob_vector = torch.narrow(result,0,0,8)
-            prob_vector = prob_vector.tolist()
-            reward_vector = torch.narrow(result,0,8,1)
-            reward = reward_vector.item()
-            current_prob, choice = -float("inf"), -1
-            for _,prob in enumerate(prob_vector):
-                if prob > current_prob and not _ in {0,1,3,7}:
-                    current_prob = prob
-                    choice = _
-
-            coords = action_to_coords(choice)
-            print(prob_vector)
-            print(reward_vector)
-            print(coords)
-            answer.append(coords)
-
-        return answer
-
 
 def train_network():
     net = HironakaNet()
@@ -148,7 +117,7 @@ if __name__ == '__main__':
 
     agent = RandomAgent()
 
-    test_validator = HironakaValidator(this_host,agent)
+    test_validator = HironakaValidator(this_host,agent, dimension = net.dim, step_threshold = 20)
     #Type check failed. Need some minor change on my host class.
 
     history = test_validator.playoff(num_steps=1000,verbose= 1)
@@ -157,7 +126,7 @@ if __name__ == '__main__':
 
     random_host = host.RandomHost()
 
-    test_validator = HironakaValidator(random_host, agent)
+    test_validator = HironakaValidator(random_host, agent, dimension = net.dim, step_threshold = 20)
 
     history = test_validator.playoff(num_steps=1000,verbose=1)
 
@@ -165,7 +134,7 @@ if __name__ == '__main__':
 
     Zeillinger = host.Zeillinger()
 
-    test_validator = HironakaValidator(Zeillinger, agent)
+    test_validator = HironakaValidator(Zeillinger, agent, dimension = net.dim, step_threshold = 20)
 
     history = test_validator.playoff(num_steps=1000,verbose=1)
 
