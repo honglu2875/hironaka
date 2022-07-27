@@ -1,4 +1,4 @@
-import copy
+
 import logging
 import random
 from typing import List
@@ -91,7 +91,6 @@ class trained_host(host.Host):
                     choice = _
 
             coords = self._action_to_coords(choice)
-            print(prob_vector)
             print(coords)
             answer.append(coords)
 
@@ -148,22 +147,25 @@ class MCTS:
 
         #self.action_translate gives a table, whose value at index i is the 10-digits convertion of the i-th valid action.
 
-    def run(self, iteration = 100):
+    def run(self, iteration = 100, state = None):
         for _ in range(iteration):
-            state = self.initial_state.copy()
-            self._search(state)
+            if not state:
+                this_state = self.initial_state.copy()
+            else:
+                this_state = state.copy()
+            self._search(this_state)
 
-    def get_examples(self):
-        examples = ([],[])
-        for _ in self.Q.keys():
-            if not all(v == 0 for v in self.Q[_]):
-                examples[0].append(inverse_hash(_, self.dim))
-                examples[1].append(self.Q[_] + [self.reward[_]])
-                print("The current board is ",examples[0][-1])
-                print("The current Q-table is ",self.Q[_])
-                print("The current N-table is ",self.N[_])
+    def get_sample(self,state:TensorPoints):
+        this_key = hashify(state)
 
-        return examples
+        prob_vector = []
+        total_attempt = float(sum(self.N[this_key]))
+        if total_attempt == 0:
+            print("Total attempt is zero! The state is ", state)
+        for attemp in self.N[this_key]:
+            prob_vector.append(attemp/total_attempt)
+
+        return prob_vector
 
     def _action_to_coords(self, action: int):
 
@@ -185,12 +187,10 @@ class MCTS:
 
         if s.ended:
             current_reward = 1
-            print("We actually win! The depth is ", depth)
             self.reward[hashed_s] = current_reward
             return 1
 
         if depth >= self.max_depth:
-            print("Max depth reached!")
             return -1
 
         if not (hashed_s in self.visited):
@@ -207,7 +207,6 @@ class MCTS:
 
         if all(v == 0 for v in self.Q[hashed_s]):
             best_action = random.randint(0,self.nn.choices-1)
-            logging.warning("Random choice triggered!")
         else:
             for action in range(0, self.nn.choices):
                 u = self.Q[hashed_s][action] + self.c_puct * self.P[hashed_s][action] * math.sqrt(sum(self.N[hashed_s])) / (
@@ -233,14 +232,17 @@ class MCTS:
         self.Q[hashed_s][this_action] = (self.N[hashed_s][this_action] * self.Q[hashed_s][this_action] + current_reward) / (
                     self.N[hashed_s][this_action] + 1)
 
+        assert not math.isnan(self.Q[hashed_s][this_action])
+
         self.N[hashed_s][this_action] += 1
         self.reward[hashed_s] = current_reward
         return current_reward
 
 class MCTSTrainer:
-    def __init__(self, dim = 3):
+    def __init__(self, dim = 3, agent = ChooseFirstAgent()):
         self.dim = dim
         self.net = HironakaNet(dim = dim)
+        self.agent = agent
 
     def _loss_function(self,x,y : List[torch.FloatTensor]):
         loss = torch.zeros(1)
@@ -264,42 +266,72 @@ class MCTSTrainer:
         old_host_record = test_validator.playoff(num_steps=steps, verbose=0)
         return (len(new_host_record) > len(old_host_record))
 
-    def train(self, ITERATIONS = 1000, c_puct = 0.5, lr = 1e-6, agent = ChooseFirstAgent(), use_arena = False):
+    def _policy_iter(self, state:TensorPoints, c_puct = 0.5, max_depth = 20):
+        #This method returns samples of a single complete game.
+        examples = ([],[])
+
+        mcts_instance = MCTS(state = state, env = self.agent, nn=self.net, max_depth = max_depth, c_puct= c_puct)
+
+        depth = 0
+
+        while True:
+            mcts_instance.run(iteration = 20, state = state)
+            if sum(mcts_instance.N[hashify(state)]) == 0:
+                print("No attempt made! Current state:", state)
+                print("Current depth:", depth)
+
+            current_sample = mcts_instance.get_sample(state)
+            examples[0].append(inverse_hash(hashify(state), dim = self.dim))
+            examples[1].append(current_sample)
+            best_prob , best_action = 0,-1
+            for i,prob in enumerate(current_sample):
+                if prob > best_prob:
+                    best_prob = prob
+                    best_action = i
+
+            coords = mcts_instance._action_to_coords(best_action) #todo: This is ugly. Write a global action decoder.
+
+            self.agent.move(state,[coords])
+
+            state.get_newton_polytope()
+            state.rescale()
+            state = TensorPoints(state.get_features())
+
+            depth += 1
+
+            if state.ended:
+                for sample in examples[1]:
+                    sample.append(1)
+                break
+            elif depth >= max_depth:
+                for sample in examples[1]:
+                    sample.append(-1)
+                break
+
+        return examples
+
+    def train(self, ITERATIONS = 1000, c_puct = 0.5, lr = 1e-6,  use_arena = False):
         for i in range(ITERATIONS):
-            examples = ([], [])
-            for _ in range(10):
-                while True:
-                    test_points = TensorPoints(snip.generate_batch_points(n=10, dimension=self.dim, max_value=50),
-                                               max_num_points=10)
-                    test_points.get_newton_polytope()
-                    test_points.rescale()
-                    test_points = TensorPoints(test_points.get_features())
-                    if not test_points.ended:
-                        break
+            while True:
+                test_points = TensorPoints(snip.generate_batch_points(n=10, dimension=self.dim, max_value=50),max_num_points=10)
+                test_points.get_newton_polytope()
+                test_points.rescale()
+                test_points = TensorPoints(test_points.get_features())
+                if not test_points.ended:
+                    break
 
-                mcts_instance = MCTS(state=test_points, env=agent, nn=self.net, max_depth=50, c_puct = c_puct)
-                mcts_instance.run(iteration=20)
-                new_examples = mcts_instance.get_examples()
-                examples[0].extend(new_examples[0])
-                examples[1].extend(new_examples[1])
-            data, y = examples
-            new_data = []
-            for points in data:
-                temp = []
-                for point in points:
-                    temp += point
-                new_data.append(temp)
+            examples = self._policy_iter(state = test_points, c_puct = 0.5, max_depth = 20)
 
-            data = [torch.FloatTensor(_) for _ in new_data]
-            y = [torch.FloatTensor(_) for _ in y]
+            data = [torch.FloatTensor(_) for _ in examples[0]]
+
+            y = [torch.FloatTensor(_) for _ in examples[1]]
             pred = []
-            old_model = copy.deepcopy(self.net)
             optimizer = torch.optim.SGD(self.net.parameters(), lr = lr, momentum= 0.9)
 
             for batch, x in enumerate(data):
                 this_pred = self.net(x)
                 pred.append(this_pred)
-            #todo: Try the alpha_zero training process.
+
             if pred:
                 loss = self._loss_function(pred, y)
                 optimizer.zero_grad()
@@ -307,9 +339,6 @@ class MCTSTrainer:
                 optimizer.step()
                 if i % 10 == 0:
                     print("The current loss is: ", loss.item())
-
-            if use_arena and not self._arena(trained_host(self.net), trained_host(old_model), steps = 1000, agent = agent):
-                self.net = copy.deepcopy(old_model)
 
             print("We are in iteration ", i)
 
@@ -320,8 +349,8 @@ class MCTSTrainer:
 
 if __name__ == '__main__':
 
-    trainer = MCTSTrainer(dim=3)
-    trainer.train(ITERATIONS=100, agent=ChooseFirstAgent(), c_puct=0.5, lr=1e-2)
+    trainer = MCTSTrainer(dim=4, agent = RandomAgent())
+    trainer.train(ITERATIONS=100, c_puct=0.5, lr=1e-4)
 
     path = 'test_model.pth'
     trainer.save_model(path = path)
