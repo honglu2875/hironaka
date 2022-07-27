@@ -45,6 +45,12 @@ class RandomHost(Host):
         return [np.random.choice(list(range(dim)), size=2, replace=False).tolist() for _ in range(points.batch_size)]
 
 
+class AllCoordHost(Host):
+    def _select_coord(self, points: ListPoints):
+        dim = points.dimension
+        return [list(range(dim)) for _ in range(points.batch_size)]
+
+
 class Zeillinger(Host):
     # noinspection PyPep8Naming
     @staticmethod

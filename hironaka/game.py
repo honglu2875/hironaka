@@ -16,7 +16,7 @@ class Game(abc.ABC):
 
     @abc.abstractmethod
     def __init__(self,
-                 state: Union[ListPoints, Points],
+                 state: Union[ListPoints, Points, None],
                  host: Host,
                  agent: Agent,
                  scale_observation: Optional[bool] = True,
@@ -41,11 +41,15 @@ class Game(abc.ABC):
         self.coord_history = []
         self.move_history = []
 
-        self.state.get_newton_polytope()  # Clear up extra points
-        self.stopped = self.state.ended
         self.scale_observation = scale_observation
-        if self.scale_observation:
-            self.state.rescale()
+
+        if self.state is not None:
+            self.state.get_newton_polytope()  # Clear up extra points
+            self.stopped = self.state.ended
+            if self.scale_observation:
+                self.state.rescale()
+        else:
+            self.stopped = True
 
     @abc.abstractmethod
     def step(self, verbose: int = 0) -> bool:
@@ -78,7 +82,7 @@ class Game(abc.ABC):
 
 class GameHironaka(Game):
     def __init__(self,
-                 state: Union[ListPoints, Points],
+                 state: Union[ListPoints, Points, None],
                  host: Host,
                  agent: Agent,
                  **kwargs):
@@ -128,7 +132,7 @@ class GameMorin(Game):
     after the shift"""
 
     def __init__(self,
-                 state: Union[ListPoints, Points],
+                 state: Union[ListPoints, Points, None],
                  host: Host,
                  agent: Agent,
                  **kwargs):
