@@ -138,14 +138,7 @@ class MCTS:
         self.visited = col.defaultdict()
         self.c_puct = c_puct
 
-        #A pre-calculated table to convert action to coordinates
-
-        self.action_translate = []
-        for i in range(1,2**self.dim):
-            if not ((i & (i-1) == 0)): # Check if i is NOT a power of 2
-                self.action_translate.append(i)
-
-        #self.action_translate gives a table, whose value at index i is the 10-digits convertion of the i-th valid action.
+        self.coder = snip.HostActionCoder(dim = self.dim)
 
     def run(self, iteration = 100, state = None):
         for _ in range(iteration):
@@ -166,18 +159,6 @@ class MCTS:
             prob_vector.append(attemp/total_attempt)
 
         return prob_vector
-
-    def _action_to_coords(self, action: int):
-
-        current_coord = 0
-        coords = []
-        action = self.action_translate[action]
-        while action != 0:
-            if action % 2:
-                coords.append(current_coord)
-            current_coord += 1
-            action = action // 2
-        return coords
 
     def _search(self,s:TensorPoints,depth = 0):
         if torch.isnan(s.points[0][0][0]):
@@ -220,7 +201,7 @@ class MCTS:
 
         this_action = best_action
 
-        coords = [self._action_to_coords(this_action)]
+        coords = [self.coder.decode(this_action)]
 
         next_s = s.copy()
         self.env.move(next_s, coords)
@@ -243,6 +224,7 @@ class MCTSTrainer:
         self.dim = dim
         self.net = HironakaNet(dim = dim)
         self.agent = agent
+        self.coder = snip.HostActionCoder(dim = self.dim)
 
     def _loss_function(self,x,y : List[torch.FloatTensor]):
         loss = torch.zeros(1)
@@ -265,6 +247,9 @@ class MCTSTrainer:
         test_validator = HironakaValidator(old_host, agent, dimension = self.dim)
         old_host_record = test_validator.playoff(num_steps=steps, verbose=0)
         return (len(new_host_record) > len(old_host_record))
+
+    def _symmertic_sample_generator(self, examples):
+        pass
 
     def _policy_iter(self, state:TensorPoints, c_puct = 0.5, max_depth = 20):
         #This method returns samples of a single complete game.
@@ -289,7 +274,7 @@ class MCTSTrainer:
                     best_prob = prob
                     best_action = i
 
-            coords = mcts_instance._action_to_coords(best_action) #todo: This is ugly. Write a global action decoder.
+            coords = self.coder.decode(best_action)
 
             self.agent.move(state,[coords])
 
@@ -308,6 +293,12 @@ class MCTSTrainer:
                     sample.append(-1)
                 break
 
+        print("Training game finished. Data:")
+        print("Depth: ", depth)
+        print("Points: ")
+        print(examples[0])
+        print("Probablity vectors and win/loss:" )
+        print(examples[1])
         return examples
 
     def train(self, ITERATIONS = 1000, c_puct = 0.5, lr = 1e-6,  use_arena = False):
@@ -349,8 +340,8 @@ class MCTSTrainer:
 
 if __name__ == '__main__':
 
-    trainer = MCTSTrainer(dim=4, agent = RandomAgent())
-    trainer.train(ITERATIONS=100, c_puct=0.5, lr=1e-4)
+    trainer = MCTSTrainer(dim=3, agent = ChooseFirstAgent())
+    trainer.train(ITERATIONS=1000, c_puct=0.7, lr=1e-4)
 
     path = 'test_model.pth'
     trainer.save_model(path = path)

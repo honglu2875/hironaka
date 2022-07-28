@@ -115,27 +115,27 @@ if __name__ == '__main__':
     net = torch.load(path)
     this_host = trained_host(net)
 
-    agent = RandomAgent()
+    agent = ChooseFirstAgent()
 
-    test_validator = HironakaValidator(this_host,agent, dimension = net.dim, step_threshold = 20)
+    test_validator = HironakaValidator(this_host,agent, dimension = net.dim, step_threshold = 50)
     #Type check failed. Need some minor change on my host class.
 
-    history = test_validator.playoff(num_steps=1000,verbose= 1)
+    history = test_validator.playoff(num_steps=2000,verbose= 1)
 
     print(len(history))
 
     random_host = host.RandomHost()
 
-    test_validator = HironakaValidator(random_host, agent, dimension = net.dim, step_threshold = 20)
+    test_validator = HironakaValidator(random_host, agent, dimension = net.dim, step_threshold = 50)
 
-    history = test_validator.playoff(num_steps=1000,verbose=1)
+    history = test_validator.playoff(num_steps=2000,verbose=1)
 
     print(len(history))
 
     Zeillinger = host.Zeillinger()
 
-    test_validator = HironakaValidator(Zeillinger, agent, dimension = net.dim, step_threshold = 20)
+    test_validator = HironakaValidator(Zeillinger, agent, dimension = net.dim, step_threshold = 50)
 
-    history = test_validator.playoff(num_steps=1000,verbose=1)
+    history = test_validator.playoff(num_steps=2000,verbose=1)
 
     print(len(history))
