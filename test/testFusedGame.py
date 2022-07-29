@@ -27,7 +27,7 @@ config = {
     "max_value": 20,
     "masked": True,
     "max_num_points": 20,
-    "use_cuda": True,
+    "device_key": 'cuda',
     "normalized": False,
     "value_threshold": 1e8,
     "step_threshold": 200,
