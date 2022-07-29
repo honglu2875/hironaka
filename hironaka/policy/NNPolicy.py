@@ -16,7 +16,7 @@ class NNPolicy(Policy):
 
     def __init__(self,
                  model,
-                 use_cuda: Optional[bool] = False,
+                 device_key: Optional[str] = 'cpu',
                  masked: Optional[bool] = True,
                  eval_mode: Optional[bool] = False,
                  use_discrete_actions_for_host: Optional[bool] = False,
@@ -29,10 +29,7 @@ class NNPolicy(Policy):
         super().__init__(**config)
 
         self._model = model
-        if use_cuda or config.get('use_cuda'):
-            self._device = torch.device('cuda')
-        else:
-            self._device = torch.device('cpu')
+        self._device = torch.device(device_key)
 
         self.masked = config.get('masked', masked)
         self.use_discrete_actions_for_host = config.get('use_discrete_actions_for_host', use_discrete_actions_for_host)

@@ -128,7 +128,10 @@ def reposition_torch(points: torch.Tensor,
 
 def rescale_torch(points: torch.Tensor, inplace: Optional[bool] = True, padding_value: Optional[float] = -1.):
     available_points = points.ge(0)
-    r = points * available_points / torch.reshape(torch.amax(points, (1, 2)), (-1, 1, 1)) + \
+    max_val = torch.amax(points, (1, 2))
+    max_val = max_val + max_val.eq(0) * 1
+    max_val = torch.reshape(max_val, (-1, 1, 1))
+    r = points * available_points / max_val + \
         padding_value * ~available_points
     if inplace:
         points[:, :, :] = r
