@@ -28,8 +28,10 @@ class NNPolicy(Policy):
         config = kwargs if config_kwargs is None else {**kwargs, **config_kwargs}
         super().__init__(**config)
 
-        self._model = model
         self._device = torch.device(device_key)
+        if self._device != model.device:
+            self.logger.warning(f"The specified device is {device_key} but the model is on {model.device}.")
+        self._model = model.to(self._device)
 
         self.masked = config.get('masked', masked)
         self.use_discrete_actions_for_host = config.get('use_discrete_actions_for_host', use_discrete_actions_for_host)
@@ -59,8 +61,6 @@ class NNPolicy(Policy):
         if debug:
             self.logger.debug("Input tensor:")
             self.logger.debug(input_tensor)
-
-        self._model.to(self._device)
 
         if self.eval_mode:
             self._model.eval()
