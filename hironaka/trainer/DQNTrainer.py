@@ -25,7 +25,7 @@ class DQNTrainer(Trainer):
         for role in ['host', 'agent']:
             head_cls, net_arch, input_dim, output_dim = self.get_net_args(role)
             head = head_cls(self.dimension, self.max_num_points)
-            setattr(self, f'{role}_net_target', self._make_network(head, net_arch, input_dim, output_dim))
+            setattr(self, f'{role}_net_target', self._make_network(head, net_arch, input_dim, output_dim).to(self.device))
 
             # Setting tau=1 is the same as copying weights
             q_net, q_net_target = self.get_net(role), self.get_net_target(role)
@@ -71,7 +71,9 @@ class DQNTrainer(Trainer):
         optimizer.step()
 
         # Logging
-        if self.use_tensorboard and self.layerwise_logging:
+        # We hard-coded the 20-step interval for now. Profiling analysis shows it is about 1/10 on time cost
+        #   comparing to autograd happening above.
+        if self.use_tensorboard and self.layerwise_logging and (self.total_num_steps + current_step) % 20 == 0:
             for j, layer in enumerate(q_net.parameters()):
                 self.tb_writer.add_scalar(f'{log_prefix}/model/layer-{j}/avg_wt', layer.mean().item(),
                                           self.total_num_steps + current_step)
@@ -90,7 +92,9 @@ class DQNTrainer(Trainer):
                  'agent': self.get_all_role_specific_param('agent')}
 
         for i in range(steps):
+            self.set_learning_rate()
             for role in ['host', 'agent']:
+
                 losses.append(self._fit_network(
                     self.get_net(role), self.get_net_target(role), self.get_optim(role), self.get_replay_buffer(role),
                     **param[role],
@@ -98,7 +102,7 @@ class DQNTrainer(Trainer):
                     current_step=i
                 ))
 
-                if self.total_num_steps + i % param[role]['steps_before_rollout'] == 0:
+                if (self.total_num_steps + i) % param[role]['steps_before_rollout'] == 0:
                     self._generate_rollout(role, param[role]['rollout_size'])
 
         self.total_num_steps += steps
@@ -111,8 +115,3 @@ class DQNTrainer(Trainer):
     def get_net_target(self, role):
         return getattr(self, f'{role}_net_target')
 
-    def get_gamma(self, role):
-        return getattr(self, f'{role}_gamma')
-
-    def get_tau(self, role):
-        return getattr(self, f'{role}_tau')

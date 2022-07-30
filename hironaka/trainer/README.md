@@ -1,11 +1,15 @@
 # hironaka.trainer
 This module provides an alternative method to facilitate training and is further used for large-scale distributed training and fine-tuning.
 
-Using the gym environment through RL implementations like `stable-baseline3` is a great way to train. Codes are not published along with the repo (very dirty and messy, but may be available upon requests). But there are a few points which make it not a horrible idea to recreate a custom training facility:
-- Our `gym` environment (`gym_env`) uses `ListPoints` and runs one game at a time. But the states can be recorded as a `Tensor` and operations can be vectorized, which allows us to run multiple games in GPU. This might be doable in `gym` too but may require multiple messy wrappers to reformat data.
-- `stable-baseline3` is a very professionally written project. But everything comes with a trade-off. For example, when tracking and customizing a training process, one has to go through multiple subclasses in the inheritance chain scattered across the folders. Modularity is certainly a great engineering concept, but a fused and streamlined structure may have roles to play when horizontal scaling is unnecessary.
-- We are running our codes on a massive GPU cluster consisting of thousands of nodes each of which has 8 Nvidia A100. Distributed training would have a lot of meanings in this context (distributed hyperparameter searching, distributed training of one single network, distributed model selection like genetic algorithm, etc.), which will eventually require a lot of customized modules.
+Using the gym environment through RL implementations like `stable-baseline3` is a great way to train RL models. Attempts are made but codes are not published along with the repo (very dirty and messy, but may be available upon requests). But there are a few points which make it not a horrible idea to recreate a custom training facility:
+- Our `gym` environment (`gym_env`) uses `ListPoints` and runs one game at a time. But the states can be recorded as a `Tensor` and operations can be vectorized, which allows us to run multiple games in GPU. This might also be doable in `gym`, but I foresee many potentially messy wrappers to reformat data.
+- `stable-baseline3` is a very professionally written project with an amazing execution of OOP principles. But everything comes with a trade-off. For example, when tracking and customizing a small segment of the procedure, one has to go through multiple subclasses from different base classes scattered across the folders. Modularity is certainly a great engineering concept, but a fused and streamlined structure may have roles to play when horizontal scaling is relatively unimportant.
+- We are running our codes on a massive GPU cluster consisting of thousands of nodes each of which has 8 Nvidia A100. Distributed training would have a lot of meanings in this context (distributed hyperparameter searching, distributed training of one single network, distributed model selection like genetic algorithm, etc.), which will eventually require a lot of highly customized codes.
 
+Hence, I made this submodule.
+
+Note that it is not my goal to make a general purpose RL trainer. I separate host- and agent-related attributes instead of calling them by index (e.g. like `self.player_net[0], self.player_net[1]`) due to the asymmetric nature of the game. We may want to do different things for host and agent specifically.
+But it should be really easy to adapt this code base to different symmetric games. 
 # Content
 The classes center around `Trainer`. Every trainer must be initialized with an exhaustive configuration dict **without** having hidden parameters defaulting to certain values. This way, users are always reminded about everything that goes into training. 
 
@@ -15,6 +19,8 @@ An example config file in the format of YAML is given for each `Trainer` subclas
 - create a class that inherits `Trainer`,
 - read the docstring on what must be implemented and what can be overridden.
 - implement the training logic in `_train()` based on what the class provides.
+
+We hope that a subclass implementation is a highly concentrated piece of codes that only concerns with the training logic of the specific RL algorithm. This way, reading and tweaking all happens in one single place without getting the head buried under piles of folders and trees of inheritance.
 
 What the class provides include but are not limited to:
 - Key objects:

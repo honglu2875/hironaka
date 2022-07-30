@@ -77,13 +77,13 @@ class ReplayBuffer:
             for target, source in zip(each_storage, each_data):
                 if self.pos + length < self.buffer_size:
                     target[self.pos:self.pos+length] = source.clone().to(self.device)
-                    self.pos += length
                 else:  # If full, roll back.
                     target[self.pos:self.buffer_size] = source[:self.buffer_size-self.pos].clone().to(self.device)
-                    new_pointer = length + self.pos - self.buffer_size
-                    target[:new_pointer] = source[self.buffer_size-self.pos:].clone().to(self.device)
-                    self.pos = new_pointer
-                    self.full = True
+                    target[:length+self.pos-self.buffer_size] = source[self.buffer_size-self.pos:].clone().to(
+                        self.device)
+
+        self.full = (length + self.pos) >= self.buffer_size
+        self.pos = (length + self.pos) % self.buffer_size
 
     def sample(self, batch_size: int) -> Tuple:
         sample_index = self.pos if not self.full else self.buffer_size

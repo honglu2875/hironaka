@@ -80,7 +80,11 @@ class TestTrainer(unittest.TestCase):
 
         replay_buffer = ReplayBuffer((20, 3), 8, 1000, torch.device('cpu'))
         exp = game.step(p, 'host', scale_observation=False)
+        length = exp[0].shape[0]
+
+        old_pos = replay_buffer.pos
         replay_buffer.add(*exp)  # If adding buffer is successful -> the shapes are right.
+        assert replay_buffer.pos - old_pos == length  # make sure add in the same amount of rows
 
         replay_buffer = ReplayBuffer({'points': (20, 3), 'coords': (3,)}, 3, 1000, torch.device('cpu'))
         exp = game.step(p, 'agent', scale_observation=False)

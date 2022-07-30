@@ -1,19 +1,20 @@
 # Hironaka
 
-A utility package for reinforcement learning study of Hironaka's game of local resolution of singularities and its
+A utility package for a reinforcement learning study of Hironaka's game of local resolution of singularities and its
 variation problems.
 
 # Quick start
 
-[This notebook](https://cocalc.com/share/public_paths/5db3252a0bcb8d068aad2ee53bf5a1ce85753ebf) provides a brief
+[This quick tutorial](https://cocalc.com/share/public_paths/5db3252a0bcb8d068aad2ee53bf5a1ce85753ebf) provides a brief
 demonstration of key classes in this repo. It is highly recommended to take a look first if you are an example-oriented
 learner.
 
 # Contents
 
-For ML and RL specialists, the following two sections should give you an overview:
+For ML and RL specialists, the following are what you need for a quick start.
 
 - [Rule of the game](#rule-of-the-game)
+- [The quick tutorial](https://cocalc.com/share/public_paths/5db3252a0bcb8d068aad2ee53bf5a1ce85753ebf)
 - [The structure of the repo](#the-structure-of-the-repo)
 
 For math-oriented viewers or ML experts who are intrigued about the background story, please feel free to continue with:
@@ -51,8 +52,10 @@ a result, the host wants to reduce the number of $S$ as quickly as possible, but
 $S$ for as long as possible.
 
 # The structure of the repo
+For the detailed structure of the repo, please check out the README starting from the [hironaka](hironaka) package. But we would like to draw ML and RL researcher's attention to this submodule first:
+ - [hironaka.trainer](hironaka/trainer)
 
-......
+This is directly related to the current progress of the model training. I hope the codes and comments are self-explanatory.
 
 ---
 Now the big question is, how is this game related to some fundamental questions in pure math, or specifically, algebraic

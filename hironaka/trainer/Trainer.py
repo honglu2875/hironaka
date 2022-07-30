@@ -23,19 +23,21 @@ class Trainer(abc.ABC):
 
         A Trainer (and its subclasses) is responsible for training a pair of host/agent networks.
         A few important points before using/inheriting:
-          - All parameters come from a nested dict `config`.
-            A sample config is given in YAML format for every implementation.
+          - All parameters come from one single nested dict `config` as the positional argument in the constructor.
+            A sample config should be given in YAML format for every implementation.
           - NONE of the keys in config may have default values in the class. Not having a lazy mode means the user
-            is educated/reminded about everything that goes into the RL training. Also avoids messy config situations
-            like crazy chains of configs from subclasses with clashing keys.
+            is educated/reminded about every parameter that goes into the RL training. Also avoids messy parameter
+            passing when there are crazy chains of configs from subclasses with clashing keys.
             It is okay to have optional config keys though (default: None).
+          - Please include role-specific hyperparameters in `role_specific_hyperparameters`. The rest is taken care of.
+            You can find the parameters in the dict returned by `get_all_role_specific_param()`
 
         Please implement:
             _train()
         Feel free to override:
             _make_network()
             _update_learning_rate()
-            _initial_rollout()
+            _generate_rollout()
 
     """
     optim_dict = {'adam': torch.optim.Adam,
@@ -48,7 +50,7 @@ class Trainer(abc.ABC):
 
     # Please include role-specific hyperparameters that only require simple assignments to object attributes.
     #   (except exploration_rate due to more complex nature).
-    # If useful, also feel free to add role-specific getter method (unfortunately in a one-by-one fashion).
+    # Note that all the parameters defined here can be obtained by calling `get_all_role_specific_param()`.
     role_specific_hyperparameters = ['batch_size', 'initial_rollout_size', 'max_rollout_step']
 
     # Clarify and suppress IDE warnings.
@@ -71,6 +73,11 @@ class Trainer(abc.ABC):
             self.config = config
         else:
             raise TypeError(f"config must be either a str or dict. Got{type(config)}.")
+
+        # Initialize persistent variables
+        self.total_num_steps = 0  # Record the total number of training steps
+
+        # -------- Handle Configurations -------- #
 
         # Highest-level mandatory configs:
         self.use_tensorboard = self.config['use_tensorboard']
@@ -114,7 +121,7 @@ class Trainer(abc.ABC):
             # Construct networks
             head = head_cls(self.dimension, self.max_num_points)
             input_dim = head.feature_dim
-            setattr(self, f'{role}_net', self._make_network(head, net_arch, input_dim, output_dim))
+            setattr(self, f'{role}_net', self._make_network(head, net_arch, input_dim, output_dim).to(self.device))
             setattr(self, f'{role}_net_args', (head_cls, net_arch, input_dim, output_dim))
 
             # Construct optimizers
@@ -146,6 +153,9 @@ class Trainer(abc.ABC):
             elif role == 'agent':
                 input_shape = {'points': (self.max_num_points, self.dimension),
                                'coords': (self.dimension,)}
+            else:
+                raise Exception('Impossible code path.')
+
             replay_buffer = self.replay_buffer_dict[cfg['type']](
                 input_shape=input_shape,
                 output_dim=output_dim,
@@ -153,14 +163,13 @@ class Trainer(abc.ABC):
                 **cfg)
             setattr(self, f'{role}_replay_buffer', replay_buffer)
 
+        # -------- Initialize states -------- #
+
         # Construct FusedGame
         self._make_fused_game()
         # Generate initial collections of replays
         self._generate_rollout('host', getattr(self, 'host_initial_rollout_size'))
         self._generate_rollout('agent', getattr(self, 'agent_initial_rollout_size'))
-
-        # Initialize persistent variables
-        self.total_num_steps = 0  # Record the total number of training steps
 
     def replace_nets(self, host_net: nn.Module = None, agent_net: nn.Module = None) -> None:
         """
@@ -186,7 +195,12 @@ class Trainer(abc.ABC):
         # We choose to always reset training mode to False outside training.
         self.set_training(False)
 
-    # ------- Role specific getters -------
+    @abc.abstractmethod
+    def _train(self, steps: int):
+        pass
+
+    # -------- Role specific getters -------- #
+
     def get_all_role_specific_param(self, role):
         if not hasattr(self, f'{role}_all_param'):
             result = {}
@@ -210,13 +224,17 @@ class Trainer(abc.ABC):
     def get_er_scheduler(self, role):
         return getattr(self, f'{role}_er_scheduler')
 
+    def get_er(self, role):
+        return self.get_er_scheduler(role)(self.total_num_steps)
+
     def get_replay_buffer(self, role):
         return getattr(self, f'{role}_replay_buffer')
 
     def get_batch_size(self, role):
         return getattr(self, f'{role}_batch_size')
 
-    # ------- Setting internal parameters -------
+    # -------- Set internal parameters -------- #
+
     def set_learning_rate(self):
         for role in ['host', 'agent']:
             optimizer = self.get_optim(role)
@@ -229,14 +247,12 @@ class Trainer(abc.ABC):
         for role in ['host', 'agent']:
             self.get_net(role).train(training_mode)
 
+    # -------- Local utility methods -------- #
+
     @staticmethod
     def _update_learning_rate(optimizer, new_lr):
         for param_group in optimizer.param_groups:
             param_group["lr"] = new_lr
-
-    @abc.abstractmethod
-    def _train(self, steps: int):
-        pass
 
     def _generate_rollout(self, role, steps):
         param = self.get_all_role_specific_param(role)
@@ -248,7 +264,7 @@ class Trainer(abc.ABC):
             points.rescale()
 
         replay_buffer = self.get_replay_buffer(role)
-        replay_buffer.add(*self._roll_out(points, role, 0., param['max_rollout_step']))
+        replay_buffer.add(*self._roll_out(points, role, self.get_er(role), param['max_rollout_step']))
 
     def _roll_out(self, points: TensorPoints, role: str, er: float, steps: int):
         """
@@ -259,9 +275,10 @@ class Trainer(abc.ABC):
                 er: int. Exploration rate.
                 steps: int. Number of steps to play.
         """
-        roll_outs = [
-            self.fused_game.step(points, role, scale_observation=self.scale_observation, exploration_rate=er)
-            for _ in range(steps)]
+        with torch.inference_mode():
+            roll_outs = [
+                self.fused_game.step(points, role, scale_observation=self.scale_observation, exploration_rate=er)
+                for _ in range(steps)]
         return merge_experiences(roll_outs)
 
     def _make_fused_game(self):
