@@ -5,22 +5,21 @@ variation problems.
 
 # Quick start
 [This quick tutorial](https://cocalc.com/share/public_paths/5db3252a0bcb8d068aad2ee53bf5a1ce85753ebf) provides a brief
-demonstration of key classes in this repo. It is highly recommended to take a look first if you are an example-oriented
-learner.
+demonstration of some key classes in this repo.
 
-There are 2 ways to start a proper Reinforcement learning training:
+There are 2 ways to start a proper Reinforcement Learning training:
 - (TL;DR, clone this [Google Colab file](https://colab.research.google.com/drive/1nVnVA6cyg0GT5qTadJTJH7aU6smgopLm?usp=sharing), forget what I say below and start your adventure)
 
-    If you trust that I am not a Python idiot, feel free to subclass my own interface `Trainer` and write a double-player training routine. `DQNTrainer` is a quick implementation combining `Trainer` with `stable-baseline3`'s DQN codes. It runs in 3 lines:
+    If you trust that my coding, feel free to subclass my own interface `Trainer` and write a double-player training routine. `DQNTrainer` is a quick implementation combining `Trainer` with `stable-baseline3`'s DQN codes. It runs in 3 lines:
     ```
     from hironaka.trainer.DQNTrainer import DQNTrainer
     trainer = DQNTrainer('dqn_config_test.yml')
     trainer.train(100)
     ```
   Of course, for this to work you need to 
-  - set up the system path, so that Python can import those stuff;
+  - set up the system path so that Python can import those stuff;
   - copy the config file `dqn_config_test.yml` from `.test/` to your running folder.
-- Assuming you are here in the project folder, and `requirements.txt` are satisfied (or create a venv and run `pip install -r requirements.txt`), run the following:
+- Assuming you are here in the project folder, and `requirements.txt` are met (or create a venv and run `pip install -r requirements.txt`), run the following:
     ```
     python train/train_sb3.py
     ```
@@ -66,6 +65,28 @@ keep the vertices.
 A `state` is terminal if it consists of one single point. In this case, the game will not continue and the host wins. As
 a result, the host wants to reduce the number of $S$ as quickly as possible, but the agent wants to keep the number of
 $S$ for as long as possible.
+
+## Rewards and metrics
+
+Defining the reward function is an open-ended question. But our goal is:
+- The host needs to minimize the game length (to stop in finite steps is already a challenge).
+- The agent needs to maximize the game length.
+
+Therefore, the most straightforward reward function for a host is `1 if game.ended else 0`. For agent, we switch around to `1 if not game.ended else 0`.
+
+Fix a pair of host and agent. Given an integer $n$, we can run a random game for $n$ steps (restart another random game if ended). Let $g(n)$ be the number of games that happen during the $n$ steps. An important metric that measures the pair of host and agent is the ratio
+
+$$\rho(n) = \dfrac{g(n)}{n}.$$
+
+This ratio directly relates to the cumulative rewards for host and agent ($n\rho(n)$ for host and $n(1-\rho(n))$ for agent). If a limit
+
+$$\DeclareMathOperator*{\lim}{\text{lim}}\rho = \displaystyle\lim_\limits{n\rightarrow\infty}\rho(n)$$
+
+exists, it would be an important measure for the pair of host and agent: 
+- if $\rho$ is high, the host is strong; 
+- if $\rho$ is low, the agent is strong. 
+
+The existence of the limit is not proven, but empirically $\rho(n)$ seems to converge to some values when $n$ grows larger.
 
 # The structure of the repo
 For the detailed structure of the repo, please check out the README starting from the [hironaka](hironaka) package. But we would like to draw ML and RL researcher's attention to this submodule first:
