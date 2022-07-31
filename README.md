@@ -10,7 +10,7 @@ demonstration of some key classes in this repo.
 There are 2 ways to start a proper Reinforcement Learning training:
 - (TL;DR, clone this [Google Colab file](https://colab.research.google.com/drive/1nVnVA6cyg0GT5qTadJTJH7aU6smgopLm?usp=sharing), forget what I say below and start your adventure)
 
-    If you trust that my coding, feel free to subclass my own interface `Trainer` and write a double-player training routine. `DQNTrainer` is a quick implementation combining `Trainer` with `stable-baseline3`'s DQN codes. It runs in 3 lines:
+    `DQNTrainer` is a quick implementation combining my interface `Trainer` with `stable-baseline3`'s DQN codes. It runs in 3 lines:
     ```
     from hironaka.trainer.DQNTrainer import DQNTrainer
     trainer = DQNTrainer('dqn_config_test.yml')
@@ -19,7 +19,7 @@ There are 2 ways to start a proper Reinforcement Learning training:
   Of course, for this to work you need to 
   - set up the system path so that Python can import those stuff;
   - copy the config file `dqn_config_test.yml` from `.test/` to your running folder.
-- Assuming you are here in the project folder, and `requirements.txt` are met (or create a venv and run `pip install -r requirements.txt`), run the following:
+- When you are here in the project folder and `requirements.txt` are met (or create a venv and run `pip install -r requirements.txt`), try the following:
     ```
     python train/train_sb3.py
     ```
@@ -72,8 +72,9 @@ Defining the reward function is an open-ended question. But our goal is:
 - The host needs to minimize the game length (to stop in finite steps is already a challenge).
 - The agent needs to maximize the game length.
 
-Therefore, the most straightforward reward function for a host is `1 if game.ended else 0`. For agent, we switch around to `1 if not game.ended else 0`.
+Therefore, the most straightforward reward function for a host is `1 if game.ended else 0`. For agent, we switch around to `1 if not game.ended else 0`. There are more (e.g., step reward:=number of points killed for host). But experiments have been telling us to focus on the original one.
 
+### An interesting metric: $\rho$
 Fix a pair of host and agent. Given an integer $n$, we can run a random game for $n$ steps (restart another random game if ended). Let $g(n)$ be the number of games that happen during the $n$ steps. An important metric that measures the pair of host and agent is the ratio
 
 $$\rho(n) = \dfrac{g(n)}{n}.$$
