@@ -1,0 +1,56 @@
+use_tensorboard: true
+layerwise_logging: true
+use_cuda: false
+scale_observation: true
+version_string: 'vanilla_v0'
+
+dimension: 3
+max_num_points: 20
+max_value: 20  # Not sure if this impacts the game at all
+max_grad_norm: 10
+
+host:
+  batch_size: 256
+  initial_rollout_size: 100
+  max_rollout_step: 10
+  optim:
+    name: 'adam'
+    args:  # Pass optimizer parameters here
+      lr: 0.00000001
+    lr_schedule: # (OPTIONAL) Use a scheduler on the learning rate
+      mode: 'exponential'
+      initial_lr: 0.001
+      rate: 0.996
+  er: 0.2  # Exploration rate
+  er_schedule: # (OPTIONAL) Use a scheduler on the exploration rate
+    mode: 'exponential'
+    initial_er: 0.5
+    rate: 0.996
+  net_arch: [128, 'b', {repeat: 20, net_arch: [256, 'b']}, 128, 'b']
+
+agent:
+  batch_size: 256
+  initial_rollout_size: 100
+  max_rollout_step: 10
+  optim:
+    name: 'adam'
+    args:
+      lr: 0.00000001
+    lr_schedule:
+      mode: 'exponential'
+      initial_lr: 0.001
+      rate: 0.996
+  er: 0.2
+  er_schedule:
+    mode: 'exponential'
+    initial_er: 0.5
+    rate: 0.996
+  net_arch: [128, 'b', {repeat: 20, net_arch: [256, 'b']}, 128, 'b']
+
+replay_buffer:
+  type: 'base'
+  buffer_size: 10000000
+  use_cuda: false
+
+
+

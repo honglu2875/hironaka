@@ -47,6 +47,7 @@ class FusedGame:
         observations = points.get_features()
         done = points.ended_batch_in_tensor
 
+        # Set the exploration rate. The counter-party should not explore.
         e_r = exploration_rate if sample_for == "host" else 0.0
         host_move, chosen_actions = self._host_move(points, masked=masked, exploration_rate=e_r)
         e_r = exploration_rate if sample_for == "agent" else 0.0
@@ -56,6 +57,7 @@ class FusedGame:
         next_done = points.ended_batch_in_tensor
         next_observations = points.get_features()
 
+        # Filter out already-finished states and obtain experiences
         if sample_for == "host":
             output_obs = observations[~done].clone()
             output_actions = chosen_actions[~done].clone()
@@ -70,9 +72,9 @@ class FusedGame:
         next_done = next_done[~done].clone()
 
         return output_obs, \
-               output_actions, \
-               self._rewards(sample_for, output_obs, next_observations, next_done), \
-               next_done, \
+               output_actions.reshape(-1, 1), \
+               self._rewards(sample_for, output_obs, next_observations, next_done).reshape(-1, 1), \
+               next_done.reshape(-1, 1), \
                next_observations
 
     def _host_move(self, points: TensorPoints, masked=True, exploration_rate=0.0) -> Tuple[torch.Tensor, torch.Tensor]:

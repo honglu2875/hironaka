@@ -1,9 +1,10 @@
 import numbers
 import sys
-from typing import List, Union, Optional
+from typing import List, Union, Optional, Tuple, Dict, Any
 
 import numpy as np
 import torch
+from torch import nn
 
 
 def get_shape(o):
@@ -209,3 +210,28 @@ def remove_repeated(points: torch.Tensor, padding_value: Optional[float] = -1.):
     points[:, :, :] = r
 
     return None
+
+
+Experience = Tuple[Union[torch.Tensor, Dict[Any, torch.Tensor]]]
+
+
+def merge_experiences(exp_lst: List[Experience]) -> Experience:
+    """
+        A snippet that merges a list of experiences.
+        An experience is the following tuple of torch tensors:
+            observations, actions, rewards, dones, next_observations
+    """
+    assert len(exp_lst) != 0
+    merged = []
+    for i in range(5):
+        if isinstance(exp_lst[0][i], dict):
+            data = {}
+            for key in exp_lst[0][i]:
+                data[key] = torch.concat([d[i][key] for d in exp_lst], dim=0)
+            merged.append(data)
+        elif isinstance(exp_lst[0][i], torch.Tensor):
+            merged.append(torch.concat([d[i] for d in exp_lst], dim=0))
+        else:
+            raise TypeError(f"tuple must contain either dict or tensor. Got {type(exp_lst[0][i])}")
+
+    return tuple(merged)
