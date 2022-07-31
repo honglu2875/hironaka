@@ -31,8 +31,8 @@ register(
 )
 
 sb3_policy_config = {
-    "net_arch": [256] * 32,
-    "normalize_images": True}
+    "net_arch": [32] * 4,
+    "normalize_images": False}
 
 
 def main(config_file: str):
