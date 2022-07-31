@@ -29,8 +29,6 @@ class NNPolicy(Policy):
         super().__init__(**config)
 
         self._device = torch.device(device_key)
-        if self._device != model.device:
-            self.logger.warning(f"The specified device is {device_key} but the model is on {model.device}.")
         self._model = model.to(self._device)
 
         self.masked = config.get('masked', masked)
