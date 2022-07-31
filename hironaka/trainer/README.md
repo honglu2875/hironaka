@@ -1,6 +1,8 @@
 # hironaka.trainer
 This module provides an alternative method to facilitate training and is further used for large-scale distributed training and fine-tuning.
 
+(TL;DR in case you skipped [Quick Start](../README.md#quick-start), you can clone this [Google Colab file](https://colab.research.google.com/drive/1nVnVA6cyg0GT5qTadJTJH7aU6smgopLm?usp=sharing) to start using this `trainer` module)
+
 Using the gym environment through RL implementations like `stable-baseline3` is a great way to train RL models. Attempts are made but codes are not published along with the repo (very dirty and messy, but may be available upon requests). But there are a few points which make it not a horrible idea to recreate a custom training facility:
 - Our `gym` environment (`gym_env`) uses `ListPoints` and runs one game at a time. But the states can be recorded as a `Tensor` and operations can be vectorized, which allows us to run multiple games in GPU. This might also be doable in `gym`, but I foresee many potentially messy wrappers to reformat data.
 - `stable-baseline3` is a very professionally written project with an amazing execution of OOP principles. But everything comes with a trade-off. For example, when tracking and customizing a small segment of the procedure, one has to go through multiple subclasses from different base classes scattered across the folders. Modularity is certainly a great engineering concept, but a fused and streamlined structure may have roles to play when horizontal scaling is relatively unimportant.

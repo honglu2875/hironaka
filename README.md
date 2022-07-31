@@ -4,17 +4,33 @@ A utility package for a reinforcement learning study of Hironaka's game of local
 variation problems.
 
 # Quick start
-
 [This quick tutorial](https://cocalc.com/share/public_paths/5db3252a0bcb8d068aad2ee53bf5a1ce85753ebf) provides a brief
 demonstration of key classes in this repo. It is highly recommended to take a look first if you are an example-oriented
 learner.
 
+There are 2 ways to start a proper Reinforcement learning training:
+- (TL;DR, clone this [Google Colab file](https://colab.research.google.com/drive/1nVnVA6cyg0GT5qTadJTJH7aU6smgopLm?usp=sharing), forget what I say below and start your adventure)
+
+    If you trust that I am not a Python idiot, feel free to subclass my own interface `Trainer` and write a double-player training routine. `DQNTrainer` is a quick implementation combining `Trainer` with `stable-baseline3`'s DQN codes. It runs in 3 lines:
+    ```
+    from hironaka.trainer.DQNTrainer import DQNTrainer
+    trainer = DQNTrainer('dqn_config_test.yml')
+    trainer.train(100)
+    ```
+  Of course, for this to work you need to 
+  - set up the system path, so that Python can import those stuff;
+  - copy the config file `dqn_config_test.yml` from `.test/` to your running folder.
+- Assuming you are here in the project folder, and `requirements.txt` are satisfied (or create a venv and run `pip install -r requirements.txt`), run the following:
+    ```
+    python train/train_sb3.py
+    ```
+  It starts from our base classes `Host, Agent`, goes through the gym wrappers `.gym_env.HironakaHostEnv, .gym_env.HironakaAgentEnv`, and ends up using `stable_baseline3`'s implementations. In this particular script, it uses their `DQN` class. But you can totally try other stuff like `PPO` with corresponding adjustments.
+
 # Contents
 
-For ML and RL specialists, the following are what you need for a quick start.
+For ML and RL specialists, hopefully the [Quick Start](#quick-start) already gives you a good idea about where to start. In addition, check out
 
 - [Rule of the game](#rule-of-the-game)
-- [The quick tutorial](https://cocalc.com/share/public_paths/5db3252a0bcb8d068aad2ee53bf5a1ce85753ebf)
 - [The structure of the repo](#the-structure-of-the-repo)
 
 For math-oriented viewers or ML experts who are intrigued about the background story, please feel free to continue with:
