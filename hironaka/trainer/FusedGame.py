@@ -105,8 +105,8 @@ class FusedGame:
 
         actions = torch.argmax(action_prob, dim=1)
 
-        noise = torch.randint(0, action_prob.shape[1], actions.shape).type(actions.dtype).to(actions.device)
-        random_mask = torch.rand(actions.shape[0]).le(exploration_rate).to(actions.device)
+        noise = torch.randint(0, action_prob.shape[1], actions.shape, device=actions.device).type(actions.dtype)
+        random_mask = torch.rand(actions.shape[0], device=actions.device).le(exploration_rate)
         actions = actions * ~random_mask + noise * random_mask
 
         _TYPE = points.points.dtype
