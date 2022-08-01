@@ -244,7 +244,7 @@ class MCTSTrainer:
         self.net = HironakaNet(dim = dim)
         self.agent = agent
 
-    def _loss_function(self,x,y : List[torch.FloatTensor]):
+    def _loss_function(self,x,y : List[torch.Tensor]):
         loss = torch.zeros(1)
         for i, pred in enumerate(x):
             choice_x = torch.narrow(pred, 0, 0, self.net.choices)
@@ -322,9 +322,9 @@ class MCTSTrainer:
 
             examples = self._policy_iter(state = test_points, c_puct = 0.5, max_depth = 20)
 
-            data = [torch.FloatTensor(_) for _ in examples[0]]
+            data = [torch.tensor(_) for _ in examples[0]]
 
-            y = [torch.FloatTensor(_) for _ in examples[1]]
+            y = [torch.tensor(_) for _ in examples[1]]
             pred = []
             optimizer = torch.optim.SGD(self.net.parameters(), lr = lr, momentum= 0.9)
 

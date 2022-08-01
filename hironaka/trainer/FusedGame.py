@@ -4,7 +4,7 @@ import numpy as np
 import torch
 
 from hironaka.core import PointsBase, TensorPoints
-from hironaka.src import mask_encoded_action
+from hironaka.src import mask_encoded_action, mask_encoded_action_torch
 
 
 class FusedGame:
@@ -31,6 +31,10 @@ class FusedGame:
         self.device = torch.device(device_key)
         self.host_net = host_net.to(self.device)
         self.agent_net = agent_net.to(self.device)
+
+        # The following are used as cache inside host action decoding. Sometimes improves performances.
+        self.binary_table = None
+        self.mask = None
 
     def step(self,
              points: TensorPoints,
@@ -78,12 +82,13 @@ class FusedGame:
                next_observations
 
     def _host_move(self, points: TensorPoints, masked=True, exploration_rate=0.0) -> Tuple[torch.Tensor, torch.Tensor]:
+        with torch.inference_mode():
+            output = self.host_net(points.get_features())
 
-        output = self.host_net(points.get_features().to(self.device))
         _TYPE = output.dtype
 
-        noise = torch.rand(output.shape).type(_TYPE).to(self.device)
-        random_mask = torch.rand(output.shape[0], 1).le(exploration_rate).to(self.device)
+        noise = torch.rand(output.shape, device=self.device, dtype=_TYPE)
+        random_mask = torch.rand(output.shape[0], 1, device=self.device).le(exploration_rate)
         output = output * ~random_mask + noise * random_mask
         # The random noises still have to go through decode_tensor, therefore are still never illegal moves.
         host_move_binary, chosen_actions = self.decode_tensor(output, masked=masked)
@@ -96,17 +101,19 @@ class FusedGame:
                     scale_observation: Optional[bool] = True,
                     inplace: Optional[bool] = True,
                     exploration_rate: Optional[float] = 0.0) -> torch.Tensor:
-        action_prob = self.agent_net(
-            {"points": points.get_features().to(self.device), "coords": host_moves.to(self.device)})
+        with torch.inference_mode():
+            action_prob = self.agent_net(
+                {"points": points.get_features(), "coords": host_moves})
+
         if masked:
             minimum = torch.finfo(action_prob.dtype).min
-            masked_value = (1 - host_moves.to(self.device)) * minimum
-            action_prob = action_prob * host_moves.to(self.device) + masked_value
+            masked_value = (1 - host_moves) * minimum
+            action_prob = action_prob * host_moves + masked_value
 
         actions = torch.argmax(action_prob, dim=1)
 
-        noise = torch.randint(0, action_prob.shape[1], actions.shape).type(actions.dtype).to(actions.device)
-        random_mask = torch.rand(actions.shape[0]).le(exploration_rate).to(actions.device)
+        noise = torch.randint(0, action_prob.shape[1], actions.shape, device=actions.device).type(actions.dtype)
+        random_mask = torch.rand(actions.shape[0], device=actions.device).le(exploration_rate)
         actions = actions * ~random_mask + noise * random_mask
 
         _TYPE = points.points.dtype
@@ -123,12 +130,11 @@ class FusedGame:
                  next_obs: Union[torch.Tensor, dict],
                  next_done: torch.Tensor) -> torch.Tensor:
         if sample_for == "host":
-            return next_done.clone().type(torch.float)
+            return next_done.clone().type(torch.float32)
         elif sample_for == "agent":
-            return (~next_done).clone().type(torch.float)
+            return (~next_done).clone().type(torch.float32)
 
-    @staticmethod
-    def decode_tensor(t, masked=True) -> Tuple[torch.Tensor, torch.Tensor]:
+    def decode_tensor(self, t, masked=True) -> Tuple[torch.Tensor, torch.Tensor]:
         """
             Decode a batch of encoded host actions into a batch of multi-binary (0 or 1) arrays.
             Parameters:
@@ -136,23 +142,29 @@ class FusedGame:
                 masked: filter out choices with less than 2 coordinates (excluding 0, 1, 2, 4, 8, ...).
         """
         device = t.device
+        minimum = torch.finfo(t.dtype).min
+
         dim = int(np.log2(t.shape[1]))
         assert 2 ** dim == t.shape[1], f"The length of the 2nd axis must be length a power of 2. Got {t.shape} instead."
 
-        binary = torch.zeros(2 ** dim, dim)
-        minimum = torch.finfo(t.dtype).min
-
         if masked:
-            mask = torch.FloatTensor(mask_encoded_action(dim)).unsqueeze(0).to(device)
+            if self.mask is None:
+                self.mask = mask_encoded_action_torch(dim, device=device).unsqueeze(0)
+            mask = self.mask
         else:
-            mask = torch.ones(1, 2 ** dim).type(torch.float).to(device)
+            mask = torch.ones((1, 2 ** dim), device=device, dtype=torch.float32)
 
         masked_values = ((1 - mask) * minimum).repeat(t.shape[0], 1)
 
-        for i in range(2 ** dim):
-            b = bin(i)[2:]
-            for j in range(len(b) - 1, -1, -1):
-                if b[j] == '1':
-                    binary[i][len(b) - 1 - j] = 1
+        if self.binary_table is None:
+            self.binary_table = torch.zeros((2 ** dim, dim), device=device)
+            # They involve a lot of small CPU ops which may cause undesirable effects if repeated too many times,
+            #   so we make sure it only runs once per object life-span.
+            # But there might be a smarter vectorized way to generate these.
+            for i in range(2 ** dim):
+                b = bin(i)[2:]
+                for j in range(len(b) - 1, -1, -1):
+                    if b[j] == '1':
+                        self.binary_table[i][len(b) - 1 - j] = 1
         chosen_actions = torch.argmax(t * mask + masked_values, dim=1)
-        return torch.index_select(binary.to(device), 0, chosen_actions.to(device)), chosen_actions
+        return self.binary_table[chosen_actions], chosen_actions

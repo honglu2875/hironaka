@@ -182,6 +182,17 @@ def mask_encoded_action(dimension: int):
     return result
 
 
+def mask_encoded_action_torch(dimension: int, device=torch.device('cpu'), dtype=torch.float32):
+    assert isinstance(dimension, int), f"Got {type(dimension)}."
+
+    result = torch.ones(2 ** dimension, dtype=dtype, device=device)
+    index = torch.arange(dimension, dtype=torch.int64, device=device)
+    result[0] = 0
+    result[2**index] = 0
+
+    return result
+
+
 def generate_points(n: int, dimension=3, max_value=50):
     return [[np.random.randint(max_value) for _ in range(dimension)] for _ in range(n)]
 
@@ -202,11 +213,11 @@ def remove_repeated(points: torch.Tensor, padding_value: Optional[float] = -1.):
     difference = points.unsqueeze(2).repeat(1, 1, max_num_points, 1) - \
                  points.unsqueeze(1).repeat(1, max_num_points, 1, 1)
 
-    upper_tri = ~torch.triu(torch.ones(max_num_points, max_num_points).type(torch.bool), diagonal=0) \
-        .unsqueeze(0).repeat(batch_size, 1, 1).to(device)
+    upper_tri = ~torch.triu(torch.ones((max_num_points, max_num_points), device=device).type(torch.bool), diagonal=0) \
+        .unsqueeze(0).repeat(batch_size, 1, 1)
     repeated_points = ((difference.eq(0).all(3) & upper_tri).any(2)).unsqueeze(2).repeat(1, 1, dimension)
     # Always modify inplace
-    r = points * ~repeated_points + torch.full(points.shape, padding_value).to(device) * repeated_points
+    r = points * ~repeated_points + torch.full(points.shape, padding_value, device=device) * repeated_points
     points[:, :, :] = r
 
     return None

@@ -33,7 +33,7 @@ class NNPolicy(Policy):
 
         self.masked = config.get('masked', masked)
         self.use_discrete_actions_for_host = config.get('use_discrete_actions_for_host', use_discrete_actions_for_host)
-        self.discrete_host_mask = torch.FloatTensor(mask_encoded_action(self.dimension)).to(self._device) \
+        self.discrete_host_mask = torch.tensor(mask_encoded_action(self.dimension), device=self._device) \
             if self.masked and self.use_discrete_actions_for_host else None
         self.eval_mode = config.get('eval_mode', eval_mode)
 
@@ -75,7 +75,7 @@ class NNPolicy(Policy):
         if self.mode == 'agent':
             output_tensor = torch.softmax(output_tensor, dim=1)
             if self.masked:
-                mask = torch.FloatTensor(batched_coord_list_to_binary(features[1], self.dimension)).to(self._device)
+                mask = torch.tensor(batched_coord_list_to_binary(features[1], self.dimension), device=self._device)
                 output_tensor = output_tensor * mask
             return torch.argmax(output_tensor, dim=1).detach().cpu().numpy()
         elif self.mode == 'host':
