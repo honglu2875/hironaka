@@ -257,14 +257,17 @@ class Trainer(abc.ABC):
     def _generate_rollout(self, role, steps):
         param = self.get_all_role_specific_param(role)
 
-        pts = torch.randint(self.max_value+1, (steps, self.max_num_points, self.dimension), dtype=torch.float)
+        pts = torch.randint(self.max_value+1, (steps, self.max_num_points, self.dimension), dtype=torch.float,
+                            device=self.device)
         points = TensorPoints(pts, device_key=self.device_key)
         points.get_newton_polytope()
         if self.scale_observation:
             points.rescale()
 
         replay_buffer = self.get_replay_buffer(role)
-        replay_buffer.add(*self._roll_out(points, role, self.get_er(role), param['max_rollout_step']))
+        roll_outs = self._roll_out(points, role, self.get_er(role), param['max_rollout_step'])
+        for roll_out in roll_outs:
+            replay_buffer.add(*roll_out, clone=False)
 
     def _roll_out(self, points: TensorPoints, role: str, er: float, steps: int):
         """
@@ -279,7 +282,7 @@ class Trainer(abc.ABC):
             roll_outs = [
                 self.fused_game.step(points, role, scale_observation=self.scale_observation, exploration_rate=er)
                 for _ in range(steps)]
-        return merge_experiences(roll_outs)
+        return roll_outs
 
     def _make_fused_game(self):
         device_key = self.device_key

@@ -182,6 +182,17 @@ def mask_encoded_action(dimension: int):
     return result
 
 
+def mask_encoded_action_torch(dimension: int, device=torch.device('cpu'), dtype=torch.float32):
+    assert isinstance(dimension, int), f"Got {type(dimension)}."
+
+    result = torch.ones(2 ** dimension, dtype=dtype, device=device)
+    index = torch.arange(dimension, dtype=torch.int64, device=device)
+    result[0] = 0
+    result[2**index] = 0
+
+    return result
+
+
 def generate_points(n: int, dimension=3, max_value=50):
     return [[np.random.randint(max_value) for _ in range(dimension)] for _ in range(n)]
 
