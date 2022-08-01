@@ -34,19 +34,19 @@ class ReplayBuffer:
             self.observations = {}
             self.next_observations = {}
             for key in self.input_shape:
-                self.observations[key] = torch.zeros((self.buffer_size, *self.input_shape[key])).type(torch.float).to(
-                    self.device)
-                self.next_observations[key] = torch.zeros((self.buffer_size, *self.input_shape[key])).type(
-                    torch.float).to(self.device)
+                self.observations[key] = torch.zeros((self.buffer_size, *self.input_shape[key]),
+                                                     device=self.device).type(torch.float32)
+                self.next_observations[key] = torch.zeros((self.buffer_size, *self.input_shape[key]),
+                                                          device=self.device).type(torch.float32)
         else:
-            self.observations = torch.zeros((self.buffer_size, *self.input_shape)).type(torch.float).to(
-                self.device)
-            self.next_observations = torch.zeros((self.buffer_size, *self.input_shape)).type(torch.float).to(
-                self.device)
+            self.observations = torch.zeros((self.buffer_size, *self.input_shape),
+                                            device=self.device).type(torch.float32)
+            self.next_observations = torch.zeros((self.buffer_size, *self.input_shape),
+                                                 device=self.device).type(torch.float)
 
-        self.actions = torch.zeros((self.buffer_size, 1)).type(torch.int32).to(self.device)
-        self.rewards = torch.zeros((self.buffer_size, 1)).type(torch.float).to(self.device)
-        self.dones = torch.zeros((self.buffer_size, 1)).type(torch.bool).to(self.device)
+        self.actions = torch.zeros((self.buffer_size, 1), device=self.device).type(torch.int32)
+        self.rewards = torch.zeros((self.buffer_size, 1), device=self.device).type(torch.float32)
+        self.dones = torch.zeros((self.buffer_size, 1), device=self.device).type(torch.bool)
 
         self.pos = 0
         self.full = False

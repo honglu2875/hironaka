@@ -56,7 +56,7 @@ class Policy(abc.ABC):
             :return: a 2d Tensor with padded points flattened. Possibly normalized depending on config.
         """
         feature_tensor = torch.flatten(
-            torch.FloatTensor(
+            torch.tensor(
                 get_batched_padded_array(features, self.max_num_points, constant_value=self.padding_value)
             ), start_dim=1)  # TODO: maybe add a GPU option for the process?
         if self.normalized:
@@ -72,11 +72,11 @@ class Policy(abc.ABC):
         assert isinstance(features, Tuple)
 
         feature_tensor = torch.flatten(
-            torch.FloatTensor(
+            torch.tensor(
                 get_batched_padded_array(features[0], self.max_num_points, constant_value=self.padding_value)
             ), start_dim=1)
         if self.normalized:
             feature_tensor = torch.nn.functional.normalize(feature_tensor, p=1.0)
-        coord_tensor = torch.FloatTensor(batched_coord_list_to_binary(features[1], self.dimension))
+        coord_tensor = torch.tensor(batched_coord_list_to_binary(features[1], self.dimension))
 
         return torch.cat([feature_tensor, coord_tensor], dim=1)

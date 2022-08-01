@@ -16,7 +16,7 @@ from train.MCTS import HironakaNet, MCTS, trained_host
 
 ITERATIONS = 2
 
-def loss_function(x,y : List[torch.FloatTensor])->torch.Tensor:
+def loss_function(x,y : List[torch.Tensor])->torch.Tensor:
     loss = torch.zeros(1)
     for i,pred in enumerate(x):
         choice_x = torch.narrow(pred,0,0,8)
@@ -52,7 +52,7 @@ def points_to_tensor(s:TensorPoints):
     while len(coords) < 30:
         coords.append(0)
 
-    converted = torch.FloatTensor(coords)
+    converted = torch.tensor(coords)
     return converted
 
 def train_network():
@@ -84,8 +84,8 @@ def train_network():
                 temp += point
             new_data.append(temp)
 
-        data = [torch.FloatTensor(_) for _ in new_data]
-        y = [torch.FloatTensor(_) for _ in y]
+        data = [torch.tensor(_) for _ in new_data]
+        y = [torch.tensor(_) for _ in y]
         pred = []
         for batch, x in enumerate(data):
             this_pred = net(x)

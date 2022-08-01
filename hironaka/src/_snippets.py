@@ -202,11 +202,11 @@ def remove_repeated(points: torch.Tensor, padding_value: Optional[float] = -1.):
     difference = points.unsqueeze(2).repeat(1, 1, max_num_points, 1) - \
                  points.unsqueeze(1).repeat(1, max_num_points, 1, 1)
 
-    upper_tri = ~torch.triu(torch.ones(max_num_points, max_num_points).type(torch.bool), diagonal=0) \
-        .unsqueeze(0).repeat(batch_size, 1, 1).to(device)
+    upper_tri = ~torch.triu(torch.ones((max_num_points, max_num_points), device=device).type(torch.bool), diagonal=0) \
+        .unsqueeze(0).repeat(batch_size, 1, 1)
     repeated_points = ((difference.eq(0).all(3) & upper_tri).any(2)).unsqueeze(2).repeat(1, 1, dimension)
     # Always modify inplace
-    r = points * ~repeated_points + torch.full(points.shape, padding_value).to(device) * repeated_points
+    r = points * ~repeated_points + torch.full(points.shape, padding_value, device=device) * repeated_points
     points[:, :, :] = r
 
     return None

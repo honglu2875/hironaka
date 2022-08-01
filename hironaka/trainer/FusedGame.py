@@ -143,9 +143,9 @@ class FusedGame:
         minimum = torch.finfo(t.dtype).min
 
         if masked:
-            mask = torch.FloatTensor(mask_encoded_action(dim)).unsqueeze(0).to(device)
+            mask = torch.tensor(mask_encoded_action(dim), device=device).unsqueeze(0)
         else:
-            mask = torch.ones(1, 2 ** dim).type(torch.float).to(device)
+            mask = torch.ones((1, 2 ** dim), device=device).type(torch.float32)
 
         masked_values = ((1 - mask) * minimum).repeat(t.shape[0], 1)
 
