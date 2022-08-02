@@ -211,7 +211,8 @@ def remove_repeated(points: torch.Tensor, padding_value: Optional[float] = -1.):
 
     return None
 
-class HostActionCoder:
+
+class HostActionEncoder:
     """
     This class translates host actions between a list of chosen coordinates (used in game environment) and an integer (used in neural networks)
     The rule of translation is as follows:
@@ -221,28 +222,28 @@ class HostActionCoder:
 
     """
 
-    def __init__(self, dim = 3):
+    def __init__(self, dim=3):
         self.dim = dim
         self.action_translate = []
-        for i in range(1,2**self.dim):
-            if not ((i & (i-1) == 0)): # Check if i is NOT a power of 2
+        for i in range(1, 2 ** self.dim):
+            if not ((i & (i - 1) == 0)):  # Check if i is NOT a power of 2
                 self.action_translate.append(i)
 
-    def encode(self, coords:List[int])-> int:
-        #Given coords, return the integer for action. Inverse function of decode
+    def encode(self, coords: List[int]) -> int:
+        # Given coords, return the integer for action. Inverse function of decode
         assert len(coords) > 1
 
         action = 0
         for choice in coords:
-            action += 2**choice
+            action += 2 ** choice
 
         action = action - int(math.floor(math.log2(action))) - 2
 
         return action
 
-    def decode(self, action:int)-> List[int]:
-        #Given integer as action, return coords. Inverse function of encode.
-        assert (action < 2**self.dim - self.dim - 1) and (action >= 0)
+    def decode(self, action: int) -> List[int]:
+        # Given integer as action, return coords. Inverse function of encode.
+        assert (action < 2 ** self.dim - self.dim - 1) and (action >= 0)
 
         action = self.action_translate[action]
         coords = []
