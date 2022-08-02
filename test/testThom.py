@@ -1,5 +1,6 @@
 import unittest
-
+import sys
+sys.setrecursionlimit(10000)
 from treelib import Tree
 import numpy as np
 
@@ -44,14 +45,14 @@ class TestThom(unittest.TestCase):
         print(game.move_history)
 
     def test_ThomTreeHom(self):
-        points = thom_points_homogeneous(4)
+        points = thom_points_homogeneous(6)
         print(f"Points: {points}")
         dimension = len(points[0])
         initial_points = ListPoints([points], distinguished_points=[len(points) - 1])
 
         tree = Tree()
         tree.create_node(0, 0, data=initial_points)
-        MAX_SIZE = 10000
+        MAX_SIZE = 100000
 
         host = WeakSpivakovsky()
         weights = [1]*dimension
@@ -67,7 +68,7 @@ class TestThom(unittest.TestCase):
 
         tree = Tree()
         tree.create_node(0, 0, data=initial_points)
-        MAX_SIZE = 10000
+        MAX_SIZE = 100000
 
         host = WeakSpivakovsky()
         weights = [1,1,2,3,2,3,3]

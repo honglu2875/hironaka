@@ -60,23 +60,59 @@ geometry.
 
 # What is a resolution of singularity
 
-[intro]
+An affine algebraic variety  
+\[X = \{(x_1,\ldots, x_n): f_1(x_1,\ldots, x_n)=\ldots =f_k(x_1,\ldots, x_n)=0\} \subset A^n\]
+is the common zero locus of polynomial equations. Affine varieties play central role in mathematics, physics and biology.  
 
-## Smoothness
+Affine varieties cut out by one polynomial exation are called affine hypersurfaces. E.g
+\[X=\{\}\]
 
-[definition] & [examples]
 
 ## Singularities
 
-[examples]
+[definition] & [examples]
+
+We can think of varieties as "shapes in affine spaces", and at a generic point 
+$x \in X$ the variety locally is $A^r$ for some $r$, which we call the dimension of $X$.
+However, there are special, ill-behaved points, where the local geometry of $X$ is less patent.
+
+The set $X$ is singular at a point $ a \in X$ if the Jacobian matrix
+\[Jac(X,a)=\left(\partial f_i \partial x_j\right)(a)
+at a is of rank smaller than $n-dim(X)$. The set of singular points of $X$ is called the singular locus of $X$.
+
+
+
 
 ## Blow-up: turning singularities into smooth points
 
+Resolution of singularities is a classical central problem in geometry. By resolution we mean that we substitute the original,
+possibly singular $X$ with a nonsingular $Y$ with a proper 
+birational map $f:Y \to X$ such that $f$ is an isomorphism over some open dense subset of X.
+
+The celebrated Hironaka theorem asserts that such resolution exists for all $X$, and it can be constructed from an 
+elementary type of operation called blowing up. Blowing up or blowup is a type of geometric transformation which 
+replaces a subspace of a given space  with all the directions pointing out of that subspace. 
+
+For example, the blowup of a point in a plane replaces the point 
+with the projectivized tangent space at that point...
 [examples]
 
 ## Hironaka's theorem
 
-[statement]
+The most famous and general result concerning resolution of singularities was given by Heisuke Hironaka in 1964 
+He proved that the resolution of singularities can be achieved by a sequence of blowups 
+\[Y=X_n \to X_{n-1} \to \ldots \to X_0=X\]
+if the characteristic of the base field is zero.
+
+This beautiful and fundamental work was recognized with a Fields medal in 1970. Recently, Villamayor and, independently, 
+Bierstone and Milman have clarified the process of resolution of singularities in characteristic zero, 
+explicitly describing the algorithmic nature of the resolution process. 
+
+Using de Jong's deep ideas, simple proofs of Hironaka's theorem have been discovered by de Jong and Abramovich and by 
+Bogomolov and Pantev.
+
+
+
 
 # What is Hironaka's polyhedral game
 
@@ -90,10 +126,27 @@ geometry.
 
 # Variations of Hironaka's game
 
+## Spivakovsky game
+
+## Hauser game 
+
+## Bloch-Levine game for moving cycles
+
 ## Thom game
 
-## Singularity theory and Thom polynomial
+# Applications and open questions
 
-# Further topics
+## Singularity theory and Thom polynomials
+
+Geometric invariant theory is the algebraic set-up to construct quotients of algebraic varieties by algebraic group 
+actions. A key technical conditions for GIT is called the semistability=stability condition. When this fails, there is 
+a blow-up algorithm to prepare our space for GIT. When the acting group is a non-reductive reparametrisation group, the 
+GIT blow-up procedure can be interpreted using the Hironaka game.
+
+## Comparing performance of different winnig strategies
+
+## Other problems
+
+From "FORTY QUESTIONS ON SINGULARITIES OF ALGEBRAIC VARIETIES" by Hauser and Schicho
 
 ...
