@@ -16,7 +16,7 @@ class NNPolicy(Policy):
 
     def __init__(self,
                  model,
-                 use_cuda: Optional[bool] = False,
+                 device_key: Optional[str] = 'cpu',
                  masked: Optional[bool] = True,
                  eval_mode: Optional[bool] = False,
                  use_discrete_actions_for_host: Optional[bool] = False,
@@ -28,15 +28,12 @@ class NNPolicy(Policy):
         config = kwargs if config_kwargs is None else {**kwargs, **config_kwargs}
         super().__init__(**config)
 
-        self._model = model
-        if use_cuda or config.get('use_cuda'):
-            self._device = torch.device('cuda')
-        else:
-            self._device = torch.device('cpu')
+        self._device = torch.device(device_key)
+        self._model = model.to(self._device)
 
         self.masked = config.get('masked', masked)
         self.use_discrete_actions_for_host = config.get('use_discrete_actions_for_host', use_discrete_actions_for_host)
-        self.discrete_host_mask = torch.FloatTensor(mask_encoded_action(self.dimension)).to(self._device) \
+        self.discrete_host_mask = torch.tensor(mask_encoded_action(self.dimension), device=self._device) \
             if self.masked and self.use_discrete_actions_for_host else None
         self.eval_mode = config.get('eval_mode', eval_mode)
 
@@ -63,8 +60,6 @@ class NNPolicy(Policy):
             self.logger.debug("Input tensor:")
             self.logger.debug(input_tensor)
 
-        self._model.to(self._device)
-
         if self.eval_mode:
             self._model.eval()
             with torch.inference_mode(mode=True):
@@ -80,7 +75,7 @@ class NNPolicy(Policy):
         if self.mode == 'agent':
             output_tensor = torch.softmax(output_tensor, dim=1)
             if self.masked:
-                mask = torch.FloatTensor(batched_coord_list_to_binary(features[1], self.dimension)).to(self._device)
+                mask = torch.tensor(batched_coord_list_to_binary(features[1], self.dimension), device=self._device)
                 output_tensor = output_tensor * mask
             return torch.argmax(output_tensor, dim=1).detach().cpu().numpy()
         elif self.mode == 'host':

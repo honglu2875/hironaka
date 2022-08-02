@@ -26,12 +26,12 @@ class TensorPoints(PointsBase):
         assert padding_value <= 0, f"'padding_value' must be a non-positive number. Got {padding_value} instead."
 
         if isinstance(points, list):
-            points = torch.FloatTensor(
+            points = torch.tensor(
                 get_batched_padded_array(points,
                                          new_length=config['max_num_points'],
                                          constant_value=padding_value))
         elif isinstance(points, np.ndarray):
-            points = torch.FloatTensor(points)
+            points = torch.tensor(points)
         elif isinstance(points, torch.Tensor):
             points = points.type(torch.float32)
         else:

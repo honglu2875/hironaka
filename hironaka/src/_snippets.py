@@ -1,6 +1,6 @@
 import numbers
-import math
 import sys
+import math
 from typing import List, Union, Optional
 
 import numpy as np
@@ -210,7 +210,6 @@ def remove_repeated(points: torch.Tensor, padding_value: Optional[float] = -1.):
     points[:, :, :] = r
 
     return None
-
 
 class HostActionEncoder:
     """

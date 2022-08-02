@@ -1,8 +1,12 @@
 import unittest
 
 import numpy as np
+import torch
+from torch import nn
 
-from hironaka.src import get_batched_padded_array, batched_coord_list_to_binary, get_newton_polytope_lst, get_shape
+from hironaka.src import get_batched_padded_array, batched_coord_list_to_binary, get_newton_polytope_lst, get_shape, \
+    merge_experiences
+from hironaka.trainer.nets import expand_net_list, create_mlp
 
 
 class TestUtil(unittest.TestCase):
@@ -74,3 +78,106 @@ class TestUtil(unittest.TestCase):
     def test_get_shape_extra_character(self):
         p = [[1, 2, 3, 'd'], [2, 3, 4]]
         assert get_shape(p) == (2, 3)
+
+    def test_create_mlp(self):
+        net_arch = [12, 13, 'b',
+                    {'repeat': 3,
+                     'net_arch':
+                         [14, 15,
+                          {'repeat': 5,
+                           'net_arch': ['b', 16]}
+                          ]}
+                    ]
+
+        expanded = [12, 13, 'b', 14, 15, 'b', 16, 'b', 16, 'b', 16, 'b', 16, 'b', 16, 14, 15, 'b', 16, 'b', 16, 'b', 16,
+                    'b', 16, 'b', 16, 14, 15, 'b', 16, 'b', 16, 'b', 16, 'b', 16, 'b', 16]
+
+        assert expand_net_list(net_arch) == expanded
+
+        net = create_mlp(nn.Flatten(),
+                         [16, 12, {'repeat': 5, 'net_arch': [3, 'b', 4, 'b', {'repeat': 2, 'net_arch': [5]}]}], 60, 8)
+
+        net.train(False)
+        print(net(torch.Tensor([[1] * 60])))  # Make sure all networks connect and the evaluation is successful.
+
+    def test_merge_exp(self):
+        exps = []
+        for i in range(5):
+            obs = {'a': torch.full((2, 10), 4 * i, dtype=torch.float), 'b': torch.full((2, 5), 4 * i + 1, dtype=torch.float)}
+            next_obs = {'a': torch.full((2, 10), 4 * i + 2, dtype=torch.float), 'b': torch.full((2, 5), 4 * i + 3, dtype=torch.float)}
+            actions = torch.ones((2, 1)).type(torch.int32)
+            rewards = torch.ones((2, 1)).type(torch.float)
+            dones = torch.ones((2, 1)).type(torch.bool)
+            exps.append((obs, actions, rewards, dones, next_obs))
+
+        r = ({'a': torch.FloatTensor([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                                      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                                      [4, 4, 4, 4, 4, 4, 4, 4, 4, 4],
+                                      [4, 4, 4, 4, 4, 4, 4, 4, 4, 4],
+                                      [8, 8, 8, 8, 8, 8, 8, 8, 8, 8],
+                                      [8, 8, 8, 8, 8, 8, 8, 8, 8, 8],
+                                      [12, 12, 12, 12, 12, 12, 12, 12, 12, 12],
+                                      [12, 12, 12, 12, 12, 12, 12, 12, 12, 12],
+                                      [16, 16, 16, 16, 16, 16, 16, 16, 16, 16],
+                                      [16, 16, 16, 16, 16, 16, 16, 16, 16, 16]]),
+              'b': torch.FloatTensor([[1, 1, 1, 1, 1],
+                                      [1, 1, 1, 1, 1],
+                                      [5, 5, 5, 5, 5],
+                                      [5, 5, 5, 5, 5],
+                                      [9, 9, 9, 9, 9],
+                                      [9, 9, 9, 9, 9],
+                                      [13, 13, 13, 13, 13],
+                                      [13, 13, 13, 13, 13],
+                                      [17, 17, 17, 17, 17],
+                                      [17, 17, 17, 17, 17]])},
+             torch.IntTensor([[1],
+                              [1],
+                              [1],
+                              [1],
+                              [1],
+                              [1],
+                              [1],
+                              [1],
+                              [1],
+                              [1]]), torch.FloatTensor([[1.],
+                                                        [1.],
+                                                        [1.],
+                                                        [1.],
+                                                        [1.],
+                                                        [1.],
+                                                        [1.],
+                                                        [1.],
+                                                        [1.],
+                                                        [1.]]), torch.BoolTensor([[True],
+                                                                              [True],
+                                                                              [True],
+                                                                              [True],
+                                                                              [True],
+                                                                              [True],
+                                                                              [True],
+                                                                              [True],
+                                                                              [True],
+                                                                              [True]]),
+             {'a': torch.FloatTensor([[2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
+                                      [2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
+                                      [6, 6, 6, 6, 6, 6, 6, 6, 6, 6],
+                                      [6, 6, 6, 6, 6, 6, 6, 6, 6, 6],
+                                      [10, 10, 10, 10, 10, 10, 10, 10, 10, 10],
+                                      [10, 10, 10, 10, 10, 10, 10, 10, 10, 10],
+                                      [14, 14, 14, 14, 14, 14, 14, 14, 14, 14],
+                                      [14, 14, 14, 14, 14, 14, 14, 14, 14, 14],
+                                      [18, 18, 18, 18, 18, 18, 18, 18, 18, 18],
+                                      [18, 18, 18, 18, 18, 18, 18, 18, 18, 18]]),
+              'b': torch.FloatTensor([[3, 3, 3, 3, 3],
+                                      [3, 3, 3, 3, 3],
+                                      [7, 7, 7, 7, 7],
+                                      [7, 7, 7, 7, 7],
+                                      [11, 11, 11, 11, 11],
+                                      [11, 11, 11, 11, 11],
+                                      [15, 15, 15, 15, 15],
+                                      [15, 15, 15, 15, 15],
+                                      [19, 19, 19, 19, 19],
+                                      [19, 19, 19, 19, 19]])})
+
+        assert str(merge_experiences(exps)) == str(r)
+

@@ -2,8 +2,7 @@ global:
   dimension: 3
   max_value: 20
   masked: true
-  max_number_points: 20
-  use_cuda: true
+  max_num_points: 20
   normalized: false
   value_threshold: 100000000
   step_threshold: 200 # HironakaAgentEnv, Validator only
