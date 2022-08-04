@@ -1,17 +1,19 @@
+![status](https://github.com/honglu2875/hironaka/actions/workflows/main.yml/badge.svg?branch=main)
 # Hironaka
 
 A utility package for a reinforcement learning study of Hironaka's game of local resolution of singularities and its
 variation problems.
 
 # Quick start
-[This quick tutorial](https://cocalc.com/share/public_paths/5db3252a0bcb8d068aad2ee53bf5a1ce85753ebf) provides a brief
+## Basic usage
+[This quick tutorial](https://cocalc.com/share/public_paths/5db3252a0bcb8d068aad2ee53bf5a1ce85753ebf) provides a short
 demonstration of some key classes in this repo.
-
+## Reinforcement Learning
 There are 2 ways to start a proper Reinforcement Learning training:
 - (TL;DR, clone this [Google Colab file](https://colab.research.google.com/drive/1nVnVA6cyg0GT5qTadJTJH7aU6smgopLm?usp=sharing), forget what I say below and start your adventure)
 
-    `DQNTrainer` is a quick implementation combining my interface `Trainer` with `stable-baselines3`'s DQN codes. It runs in 3 lines:
-    ```
+    `DQNTrainer` is a quick implementation combining my interface `Trainer` with `stable-baseline3`'s DQN codes. It runs in 3 lines:
+    ```python
     from hironaka.trainer.DQNTrainer import DQNTrainer
     trainer = DQNTrainer('dqn_config_test.yml')
     trainer.train(100)
@@ -20,14 +22,16 @@ There are 2 ways to start a proper Reinforcement Learning training:
   - set up the system path so that Python can import those stuff;
   - copy the config file `dqn_config_test.yml` from `.test/` to your running folder.
 - When you are here in the project folder and `requirements.txt` are met (or create a venv and run `pip install -r requirements.txt`), try the following:
-    ```
+    ```bash
     python train/train_sb3.py
     ```
-  It starts from our base classes `Host, Agent`, goes through the gym wrappers `.gym_env.HironakaHostEnv, .gym_env.HironakaAgentEnv`, and ends up using `stable_baselines3`'s implementations. In this particular script, it uses their `DQN` class. But you can totally try other stuff like `PPO` with corresponding adjustments.
+  It starts from our base classes `Host, Agent`, goes through the gym wrappers `.gym_env.HironakaHostEnv, .gym_env.HironakaAgentEnv`, and ends up using `stable_baseline3`'s implementations. In this particular script, it uses their `DQN` class. But you can totally try other stuff like `PPO` with corresponding adjustments.
+## Experiments
+Some of my experimental results are documented here: https://github.com/honglu2875/hironaka-experiments
 
 # Contents
 
-For ML and RL specialists, hopefully the [Quick Start](#quick-start) already gives you a good idea about where to start. In addition, check out
+For ML and RL specialists, hopefully the [Quick Start](#quick-start) already gives you a good idea about where to start. In addition, please check out
 
 - [Rule of the game](#rule-of-the-game)
 - [The structure of the repo](#the-structure-of-the-repo)
