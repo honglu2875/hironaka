@@ -97,5 +97,6 @@ class TestTrainer(unittest.TestCase):
 
     def test_dqn_trainer(self):
         dqn_trainer = DQNTrainer(str(pathlib.Path(__file__).parent.resolve())+'/dqn_config_test.yml')
-
         dqn_trainer.train(1)
+        print(dqn_trainer.time_log)
+        print(dqn_trainer.fused_game.time_log)

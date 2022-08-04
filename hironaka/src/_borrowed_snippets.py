@@ -10,7 +10,7 @@ import torch
 """
 
 """
-    The followings are short snippets directly borrowed from `stable-baseline3` 
+    The followings are short snippets directly borrowed from `stable-baselines3` 
 """
 
 

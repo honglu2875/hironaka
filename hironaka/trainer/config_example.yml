@@ -1,4 +1,5 @@
 use_tensorboard: true
+log_time: true
 layerwise_logging: true
 use_cuda: false
 scale_observation: true

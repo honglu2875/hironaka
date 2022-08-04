@@ -10,7 +10,7 @@ demonstration of some key classes in this repo.
 There are 2 ways to start a proper Reinforcement Learning training:
 - (TL;DR, clone this [Google Colab file](https://colab.research.google.com/drive/1nVnVA6cyg0GT5qTadJTJH7aU6smgopLm?usp=sharing), forget what I say below and start your adventure)
 
-    `DQNTrainer` is a quick implementation combining my interface `Trainer` with `stable-baseline3`'s DQN codes. It runs in 3 lines:
+    `DQNTrainer` is a quick implementation combining my interface `Trainer` with `stable-baselines3`'s DQN codes. It runs in 3 lines:
     ```
     from hironaka.trainer.DQNTrainer import DQNTrainer
     trainer = DQNTrainer('dqn_config_test.yml')
@@ -23,7 +23,7 @@ There are 2 ways to start a proper Reinforcement Learning training:
     ```
     python train/train_sb3.py
     ```
-  It starts from our base classes `Host, Agent`, goes through the gym wrappers `.gym_env.HironakaHostEnv, .gym_env.HironakaAgentEnv`, and ends up using `stable_baseline3`'s implementations. In this particular script, it uses their `DQN` class. But you can totally try other stuff like `PPO` with corresponding adjustments.
+  It starts from our base classes `Host, Agent`, goes through the gym wrappers `.gym_env.HironakaHostEnv, .gym_env.HironakaAgentEnv`, and ends up using `stable_baselines3`'s implementations. In this particular script, it uses their `DQN` class. But you can totally try other stuff like `PPO` with corresponding adjustments.
 
 # Contents
 

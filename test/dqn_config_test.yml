@@ -1,5 +1,6 @@
 use_tensorboard: true
 layerwise_logging: true
+log_time: true
 use_cuda: false
 scale_observation: true
 version_string: 'vanilla_v0'
@@ -13,6 +14,7 @@ host:
   batch_size: 256
   initial_rollout_size: 100
   steps_before_rollout: 10
+  steps_before_update_target: 100
   rollout_size: 20
   max_rollout_step: 10
   gradient_steps_per_loop: 10
@@ -37,6 +39,7 @@ agent:
   batch_size: 256
   initial_rollout_size: 100
   steps_before_rollout: 10
+  steps_before_update_target: 100
   rollout_size: 20
   max_rollout_step: 10
   gradient_steps_per_loop: 10

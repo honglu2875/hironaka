@@ -64,7 +64,7 @@ def create_mlp(head: nn.Module, net_arch: List[Any], input_dim: int, output_dim:
 
 class BaseFeaturesExtractor(nn.Module, abc.ABC):
     """
-        A feature extractor (inspired by stable-baseline3).
+        A feature extractor (inspired by stable-baselines3).
         Must assign
             self._feature_dim
         Must implement
