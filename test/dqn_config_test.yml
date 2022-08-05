@@ -1,5 +1,6 @@
 use_tensorboard: true
 layerwise_logging: true
+log_time: true
 use_cuda: false
 scale_observation: true
 version_string: 'vanilla_v0'
@@ -13,12 +14,13 @@ host:
   batch_size: 256
   initial_rollout_size: 100
   steps_before_rollout: 10
+  steps_before_update_target: 100
   rollout_size: 20
   max_rollout_step: 10
   gradient_steps_per_loop: 10
   optim:
     name: 'adam'
-    args:  # Pass optimizer parameters here
+    args: # Pass optimizer parameters here
       lr: 0.00000001
     lr_schedule: # (OPTIONAL) Use a scheduler on the learning rate
       mode: 'exponential'
@@ -29,7 +31,7 @@ host:
     mode: 'exponential'
     initial_er: 0.5
     rate: 0.996
-  net_arch: [16, 'b', {repeat: 2, net_arch: [32, 'b']}, 16, 'b']
+  net_arch: [ 16, 'b', { repeat: 2, net_arch: [ 32, 'b' ] }, 16, 'b' ]
   gamma: 0.99
   tau: 0.9
 
@@ -37,6 +39,7 @@ agent:
   batch_size: 256
   initial_rollout_size: 100
   steps_before_rollout: 10
+  steps_before_update_target: 100
   rollout_size: 20
   max_rollout_step: 10
   gradient_steps_per_loop: 10
@@ -53,7 +56,7 @@ agent:
     mode: 'exponential'
     initial_er: 0.5
     rate: 0.996
-  net_arch: [16, 'b', {repeat: 2, net_arch: [32, 'b']}, 16, 'b']
+  net_arch: [ 16, 'b', { repeat: 2, net_arch: [ 32, 'b' ] }, 16, 'b' ]
   gamma: 0.99
   tau: 0.9
 

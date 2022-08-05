@@ -1,4 +1,5 @@
 use_tensorboard: true
+log_time: true
 layerwise_logging: true
 use_cuda: false
 scale_observation: true
@@ -15,7 +16,7 @@ host:
   max_rollout_step: 10
   optim:
     name: 'adam'
-    args:  # Pass optimizer parameters here
+    args: # Pass optimizer parameters here
       lr: 0.00000001
     lr_schedule: # (OPTIONAL) Use a scheduler on the learning rate
       mode: 'exponential'
@@ -26,7 +27,7 @@ host:
     mode: 'exponential'
     initial_er: 0.5
     rate: 0.996
-  net_arch: [128, 'b', {repeat: 20, net_arch: [256, 'b']}, 128, 'b']
+  net_arch: [ 128, 'b', { repeat: 20, net_arch: [ 256, 'b' ] }, 128, 'b' ]
 
 agent:
   batch_size: 256
@@ -45,7 +46,7 @@ agent:
     mode: 'exponential'
     initial_er: 0.5
     rate: 0.996
-  net_arch: [128, 'b', {repeat: 20, net_arch: [256, 'b']}, 128, 'b']
+  net_arch: [ 128, 'b', { repeat: 20, net_arch: [ 256, 'b' ] }, 128, 'b' ]
 
 replay_buffer:
   type: 'base'

@@ -4,6 +4,7 @@ from typing import Union
 
 # Sorry about this block of codes. Blame google colab for not updating their python version...
 from hironaka.src import get_python_version_in_float
+
 if get_python_version_in_float() <= 3.7:
     Final = Union  # Basically we ignore Final in versions <= 3.7
 else:
