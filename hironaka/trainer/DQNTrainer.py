@@ -1,3 +1,5 @@
+from typing import List
+
 import torch
 from torch import nn
 import time
@@ -6,6 +8,7 @@ from hironaka.src import polyak_update
 from hironaka.trainer.ReplayBuffer import ReplayBuffer
 from hironaka.trainer.Timer import Timer
 from hironaka.trainer.Trainer import Trainer
+from hironaka.trainer.player_modules import DummyModule
 
 
 class DQNTrainer(Trainer):
@@ -99,11 +102,11 @@ class DQNTrainer(Trainer):
 
         return loss
 
-    def _train(self, steps: int, evaluation_interval: int = 1000):
+    def _train(self, steps: int, evaluation_interval: int = 1000, players: List[str] = ('host', 'agent')):
         losses = []
         param = {}
         net_param = {}
-        for role in ['host', 'agent']:
+        for role in players:
             net_param[role] = self.get_net(role), self.get_net_target(role), self.get_optim(
                 role), self.get_replay_buffer(role)
             param[role] = self.get_all_role_specific_param(role)
@@ -111,7 +114,11 @@ class DQNTrainer(Trainer):
 
         for i in range(steps):
             self.set_learning_rate()
-            for role in ['host', 'agent']:
+            for role in players:
+                # Ignore the update if the network is DummyModule
+                if isinstance(net_param[role][0], DummyModule):
+                    continue
+
                 # Updating target network with a delay helps the stability.
                 with Timer(f'update_{role}_target_net', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
                     if (self.total_num_steps + i) % param[role]['steps_before_update_target'] == 0:
@@ -157,11 +164,6 @@ class DQNTrainer(Trainer):
                     modules.append(getattr(module, key))
                     modules_target.append(getattr(module_target, key))
         polyak_update(modules, modules_target, tau)
-
-    def _update_time(self, previous_time_stamp: int, message: str):
-        self.logger(message)
-        self.logger(f"  - Timestamp:{time.time()}, time difference:{time.time()-previous_time_stamp}")
-        return time.time()
 
     # ------- Role specific getters -------
     def get_net_target(self, role):

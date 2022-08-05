@@ -84,9 +84,9 @@ def shift_torch(points: torch.Tensor,
     available_points = points.ge(0)
 
     # Turn each axis label into (0, 0, ... 1, ..., 0) where only the given location is 1.
-    src = torch.full((batch_size, 1), 1., device=device).type(_TENSOR_TYPE)
+    src = torch.full((batch_size, 1), 1., device=device, dtype=_TENSOR_TYPE)
     index = axis.unsqueeze(1).type(torch.int64)  # index must be int64
-    axis_binary = torch.scatter(torch.zeros((batch_size, dimension), device=device), 1, index, src).type(_TENSOR_TYPE)
+    axis_binary = torch.scatter(torch.zeros((batch_size, dimension), device=device, dtype=_TENSOR_TYPE), 1, index, src)
     # For each element in the batch, record a mask for valid actions.
     valid_actions_mask = torch.all((axis_binary - coord).le(0), dim=1)
     axis_binary *= valid_actions_mask.reshape(-1, 1)  # Apply the valid action mask.
@@ -114,11 +114,15 @@ def reposition_torch(points: torch.Tensor,
                      padding_value: Optional[float] = -1.):
     available_points = points.ge(0)
     maximum = torch.max(points)
+    _TENSOR_TYPE = torch.float32
+    device = points.device
 
-    preprocessed = points * available_points + torch.full(points.shape, maximum + 1) * ~available_points
+    preprocessed = points * available_points + \
+                   torch.full(points.shape, maximum + 1, device=device, dtype=_TENSOR_TYPE) * ~available_points
     coordinate_minimum = torch.amin(preprocessed, 1)
     unfiltered_result = points - coordinate_minimum.unsqueeze(1).repeat(1, points.shape[1], 1)
-    r = unfiltered_result * available_points + torch.full(points.shape, padding_value) * ~available_points
+    r = unfiltered_result * available_points + \
+        torch.full(points.shape, padding_value, device=device, dtype=_TENSOR_TYPE) * ~available_points
     if inplace:
         points[:, :, :] = r
         return None
@@ -135,5 +139,6 @@ def rescale_torch(points: torch.Tensor, inplace: Optional[bool] = True, padding_
         padding_value * ~available_points
     if inplace:
         points[:, :, :] = r
+        return None
     else:
         return r

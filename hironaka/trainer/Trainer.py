@@ -14,6 +14,7 @@ from .ReplayBuffer import ReplayBuffer
 from .Scheduler import ConstantScheduler, ExponentialLRScheduler, ExponentialERScheduler
 from hironaka.core import TensorPoints
 from hironaka.src import merge_experiences
+from .player_modules import DummyModule
 
 
 class Trainer(abc.ABC):
@@ -188,10 +189,11 @@ class Trainer(abc.ABC):
         for role, net in zip(['host', 'agent'], [host_net, agent_net]):
             if net is not None:
                 setattr(self, f'{role}_net', net.to(self.device))
-                self._set_optim(role)
+                if not isinstance(net, DummyModule):
+                    self._set_optim(role)
         self._make_fused_game()
 
-    def train(self, steps: int, evaluation_interval: int = 1000):
+    def train(self, steps: int, evaluation_interval: int = 1000, **kwargs):
         """
             Train the networks for a number of steps.
             The definition of 'step' is up to the subclasses. Ideally, each step is one unit that updates both host
@@ -201,7 +203,7 @@ class Trainer(abc.ABC):
         # The subclass will implement the training logic in _train()
         # Note: `self.total_num_steps` is left for _train() to control.
         with Timer('train_total', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
-            self._train(steps, evaluation_interval=evaluation_interval)
+            self._train(steps, evaluation_interval=evaluation_interval, **kwargs)
         # We always reset training mode to False outside training.
         self.set_training(False)
 

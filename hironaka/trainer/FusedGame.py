@@ -135,10 +135,13 @@ class FusedGame:
         with Timer(f'agent_move-point_operations', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
             _TYPE = points.points.dtype
             if inplace:
-                points.shift(host_moves.type(_TYPE), actions.type(_TYPE))
-                points.get_newton_polytope()
-                if scale_observation:
-                    points.rescale()
+                with Timer(f'agent_move-pt_ops_shift', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
+                    points.shift(host_moves.type(_TYPE), actions.type(_TYPE))
+                with Timer(f'agent_move-pt_ops_get_newton_polytope', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
+                    points.get_newton_polytope()
+                with Timer(f'agent_move-pt_ops_rescale', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
+                    if scale_observation:
+                        points.rescale()
         return actions
 
     @staticmethod
