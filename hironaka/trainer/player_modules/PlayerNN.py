@@ -33,6 +33,6 @@ class AllCoordHostModule(nn.Module, DummyModule):
         self.device = device
 
     def forward(self, x):
-        r = torch.zeros((x.shape[0], 2**self.dimension), device=self.device, dtype=torch.float32)
-        r[:, 2**self.dimension - 1] = 1.
+        r = torch.zeros((x.shape[0], 2 ** self.dimension), device=self.device, dtype=torch.float32)
+        r[:, 2 ** self.dimension - 1] = 1.
         return r

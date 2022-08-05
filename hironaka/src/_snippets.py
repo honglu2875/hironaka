@@ -4,7 +4,6 @@ from typing import List, Union, Optional, Tuple, Dict, Any
 
 import numpy as np
 import torch
-from torch import nn
 
 
 def get_shape(o):
@@ -188,7 +187,7 @@ def mask_encoded_action_torch(dimension: int, device=torch.device('cpu'), dtype=
     result = torch.ones(2 ** dimension, dtype=dtype, device=device)
     index = torch.arange(dimension, dtype=torch.int64, device=device)
     result[0] = 0
-    result[2**index] = 0
+    result[2 ** index] = 0
 
     return result
 

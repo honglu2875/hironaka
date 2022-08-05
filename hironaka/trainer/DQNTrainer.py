@@ -1,8 +1,7 @@
-from typing import List
+from typing import Iterable
 
 import torch
 from torch import nn
-import time
 
 from hironaka.src import polyak_update
 from hironaka.trainer.ReplayBuffer import ReplayBuffer
@@ -30,7 +29,8 @@ class DQNTrainer(Trainer):
         for role in ['host', 'agent']:
             head_cls, net_arch, input_dim, output_dim = self.get_net_args(role)
             head = head_cls(self.dimension, self.max_num_points)
-            setattr(self, f'{role}_net_target', self._make_network(head, net_arch, input_dim, output_dim).to(self.device))
+            setattr(self, f'{role}_net_target',
+                    self._make_network(head, net_arch, input_dim, output_dim).to(self.device))
 
             # Setting tau=1 is the same as copying weights
             q_net, q_net_target = self.get_net(role), self.get_net_target(role)
@@ -46,11 +46,13 @@ class DQNTrainer(Trainer):
                 loss: int (only for logging purpose)
         """
         # Sample replay buffer
-        with Timer(log_prefix+'-sample_replay_buffer_total', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
+        with Timer(log_prefix + '-sample_replay_buffer_total', self.time_log, active=self.log_time,
+                   use_cuda=self.use_cuda):
             replay_data = replay_buffer.sample(batch_size)
             observations, actions, rewards, dones, next_observations = replay_data
 
-        with Timer(log_prefix+'-get_target_q_value_total', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
+        with Timer(log_prefix + '-get_target_q_value_total', self.time_log, active=self.log_time,
+                   use_cuda=self.use_cuda):
             with torch.no_grad():
                 # Compute the next Q-values using the target network
                 next_q_values = q_net_target(next_observations)
@@ -61,29 +63,29 @@ class DQNTrainer(Trainer):
                 # 1-step TD target
                 target_q_values = rewards + (~dones) * gamma * next_q_values
 
-        with Timer(log_prefix+'-q_net_fwd_total', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
+        with Timer(log_prefix + '-q_net_fwd_total', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
             # Get current Q-values estimates
             current_q_values = q_net(observations)
 
-        with Timer(log_prefix+'-gather_total', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
+        with Timer(log_prefix + '-gather_total', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
             # Retrieve the q-values for the actions from the replay buffer
             current_q_values = torch.gather(current_q_values, dim=1, index=actions.long())
 
-        with Timer(log_prefix+'-loss_total', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
+        with Timer(log_prefix + '-loss_total', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
             # Compute Huber loss (less sensitive to outliers)
             loss = nn.functional.smooth_l1_loss(current_q_values, target_q_values)
 
-        with Timer(log_prefix+'-bwd_total', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
+        with Timer(log_prefix + '-bwd_total', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
             # Optimize the policy
             optimizer.zero_grad()
             loss.backward()
 
-        with Timer(log_prefix+'-grad_step_total', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
+        with Timer(log_prefix + '-grad_step_total', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
             # Clip gradient norm
             nn.utils.clip_grad_norm_(q_net.parameters(), self.max_grad_norm)
             optimizer.step()
 
-        with Timer(log_prefix+'-logging_total', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
+        with Timer(log_prefix + '-logging_total', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
             # Logging
             # We hard-coded the 20-step interval for now. Profiling analysis shows it is about 1/10 on time cost
             #   comparing to autograd happening above.
@@ -102,7 +104,7 @@ class DQNTrainer(Trainer):
 
         return loss
 
-    def _train(self, steps: int, evaluation_interval: int = 1000, players: List[str] = ('host', 'agent')):
+    def _train(self, steps: int, evaluation_interval: int = 1000, players: Iterable[str] = ('host', 'agent')):
         losses = []
         param = {}
         net_param = {}
@@ -132,7 +134,8 @@ class DQNTrainer(Trainer):
                         current_step=i
                     ))
 
-                with Timer(f'collect_{role}_rollouts_total', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
+                with Timer(f'collect_{role}_rollouts_total', self.time_log, active=self.log_time,
+                           use_cuda=self.use_cuda):
                     if (self.total_num_steps + i) % param[role]['steps_before_rollout'] == 0:
                         self.collect_rollout(role, param[role]['rollout_size'])
 
@@ -168,4 +171,3 @@ class DQNTrainer(Trainer):
     # ------- Role specific getters -------
     def get_net_target(self, role):
         return getattr(self, f'{role}_net_target')
-

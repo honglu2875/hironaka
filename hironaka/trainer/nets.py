@@ -115,7 +115,3 @@ class HostFeatureExtractor(BaseFeaturesExtractor):
 
     def _get_feature_dim(self) -> int:
         return self.dimension * self.max_num_points
-
-
-
-

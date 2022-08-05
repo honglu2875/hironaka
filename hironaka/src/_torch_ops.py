@@ -100,7 +100,8 @@ def shift_torch(points: torch.Tensor,
     trans_matrix = trans_matrix.unsqueeze(1).repeat(1, max_num_points, 1, 1)
 
     transformed_points = torch.matmul(trans_matrix, points.unsqueeze(3)).squeeze(3)
-    r = (transformed_points * available_points) + torch.full(points.shape, padding_value, device=device) * ~available_points
+    r = (transformed_points * available_points) + torch.full(points.shape, padding_value,
+                                                             device=device) * ~available_points
 
     if inplace:
         points[:, :, :] = r

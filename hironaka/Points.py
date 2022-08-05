@@ -31,4 +31,3 @@ class Points:
     @property
     def ended(self):
         return self.points.ended
-

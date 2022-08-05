@@ -1,19 +1,18 @@
 import abc
 import logging
-from collections import defaultdict
-from typing import List, Any, Dict, Union, Tuple
+from typing import List, Any, Dict, Union
+
 import torch
 import yaml
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 
-from .Timer import Timer
-from .nets import create_mlp, AgentFeatureExtractor, HostFeatureExtractor
+from hironaka.core import TensorPoints
 from .FusedGame import FusedGame
 from .ReplayBuffer import ReplayBuffer
 from .Scheduler import ConstantScheduler, ExponentialLRScheduler, ExponentialERScheduler
-from hironaka.core import TensorPoints
-from hironaka.src import merge_experiences
+from .Timer import Timer
+from .nets import create_mlp, AgentFeatureExtractor, HostFeatureExtractor
 from .player_modules import DummyModule
 
 
@@ -114,7 +113,7 @@ class Trainer(abc.ABC):
         # Initialize host and agent parameters
         roles = ['host', 'agent']
         heads = [HostFeatureExtractor, AgentFeatureExtractor]
-        output_dims = [2**self.dimension, self.dimension]
+        output_dims = [2 ** self.dimension, self.dimension]
 
         for role, head_cls, output_dim in zip(roles, heads, output_dims):
             # Initialize hyperparameters
@@ -248,10 +247,10 @@ class Trainer(abc.ABC):
                                                inplace=True,
                                                exploration_rate=agent_er)
                     new_ended = sum(points.ended_batch_in_tensor) - previous
-                    total_steps += new_ended * (i+1)
+                    total_steps += new_ended * (i + 1)
                     previous = sum(points.ended_batch_in_tensor)
                 total_steps += sum(~points.ended_batch_in_tensor) * max_steps
-                result.append((num_samples - initial)/total_steps)
+                result.append((num_samples - initial) / total_steps)
         return result
 
     def copy(self):
@@ -395,5 +394,3 @@ class Trainer(abc.ABC):
     @property
     def device_key(self):
         return f'cuda:{self.device_num}' if self.use_cuda else 'cpu'
-
-

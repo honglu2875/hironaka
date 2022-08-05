@@ -1,6 +1,5 @@
 import pathlib
 import unittest
-import os
 
 import gym
 import torch
@@ -12,8 +11,8 @@ from hironaka.core import TensorPoints
 from hironaka.host import Zeillinger
 from hironaka.src import merge_experiences
 from hironaka.trainer.DQNTrainer import DQNTrainer
-from hironaka.trainer.ReplayBuffer import ReplayBuffer
 from hironaka.trainer.FusedGame import FusedGame
+from hironaka.trainer.ReplayBuffer import ReplayBuffer
 
 register(
     id='hironaka/HironakaHost-v0',
@@ -96,7 +95,7 @@ class TestTrainer(unittest.TestCase):
         replay_buffer.add(*merge_experiences(roll_outs))
 
     def test_dqn_trainer(self):
-        dqn_trainer = DQNTrainer(str(pathlib.Path(__file__).parent.resolve())+'/dqn_config_test.yml')
+        dqn_trainer = DQNTrainer(str(pathlib.Path(__file__).parent.resolve()) + '/dqn_config_test.yml')
         dqn_trainer.train(1)
         print(dqn_trainer.time_log)
         print(dqn_trainer.fused_game.time_log)

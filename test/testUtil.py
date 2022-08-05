@@ -103,8 +103,10 @@ class TestUtil(unittest.TestCase):
     def test_merge_exp(self):
         exps = []
         for i in range(5):
-            obs = {'a': torch.full((2, 10), 4 * i, dtype=torch.float), 'b': torch.full((2, 5), 4 * i + 1, dtype=torch.float)}
-            next_obs = {'a': torch.full((2, 10), 4 * i + 2, dtype=torch.float), 'b': torch.full((2, 5), 4 * i + 3, dtype=torch.float)}
+            obs = {'a': torch.full((2, 10), 4 * i, dtype=torch.float),
+                   'b': torch.full((2, 5), 4 * i + 1, dtype=torch.float)}
+            next_obs = {'a': torch.full((2, 10), 4 * i + 2, dtype=torch.float),
+                        'b': torch.full((2, 5), 4 * i + 3, dtype=torch.float)}
             actions = torch.ones((2, 1)).type(torch.int32)
             rewards = torch.ones((2, 1)).type(torch.float)
             dones = torch.ones((2, 1)).type(torch.bool)
@@ -149,15 +151,15 @@ class TestUtil(unittest.TestCase):
                                                         [1.],
                                                         [1.],
                                                         [1.]]), torch.BoolTensor([[True],
-                                                                              [True],
-                                                                              [True],
-                                                                              [True],
-                                                                              [True],
-                                                                              [True],
-                                                                              [True],
-                                                                              [True],
-                                                                              [True],
-                                                                              [True]]),
+                                                                                  [True],
+                                                                                  [True],
+                                                                                  [True],
+                                                                                  [True],
+                                                                                  [True],
+                                                                                  [True],
+                                                                                  [True],
+                                                                                  [True],
+                                                                                  [True]]),
              {'a': torch.FloatTensor([[2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
                                       [2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
                                       [6, 6, 6, 6, 6, 6, 6, 6, 6, 6],
@@ -180,4 +182,3 @@ class TestUtil(unittest.TestCase):
                                       [19, 19, 19, 19, 19]])})
 
         assert str(merge_experiences(exps)) == str(r)
-

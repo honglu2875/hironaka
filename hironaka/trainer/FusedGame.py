@@ -4,7 +4,7 @@ import numpy as np
 import torch
 
 from hironaka.core import PointsBase, TensorPoints
-from hironaka.src import mask_encoded_action, mask_encoded_action_torch
+from hironaka.src import mask_encoded_action_torch
 from hironaka.trainer.Timer import Timer
 
 
@@ -137,7 +137,8 @@ class FusedGame:
             if inplace:
                 with Timer(f'agent_move-pt_ops_shift', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
                     points.shift(host_moves.type(_TYPE), actions.type(_TYPE))
-                with Timer(f'agent_move-pt_ops_get_newton_polytope', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
+                with Timer(f'agent_move-pt_ops_get_newton_polytope', self.time_log, active=self.log_time,
+                           use_cuda=self.use_cuda):
                     points.get_newton_polytope()
                 with Timer(f'agent_move-pt_ops_rescale', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
                     if scale_observation:

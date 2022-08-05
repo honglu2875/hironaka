@@ -1,6 +1,7 @@
 import time
-import torch
 from collections import defaultdict
+
+import torch
 
 
 class Timer:
@@ -8,6 +9,7 @@ class Timer:
         (Special thank to Panpan Huang who wrote the initial codes.)
         A simple timer class that logs into an external dict.
     """
+
     def __init__(self, name: str, log_dict: dict, active=True, use_cuda=False):
         self.name = name
         self._active = active
@@ -28,4 +30,3 @@ class Timer:
                 torch.cuda.current_stream().synchronize()
             if self.name in self._log_dict or isinstance(self._log_dict, defaultdict):
                 self._log_dict[self.name] += (time.perf_counter() - self.start) * 1000  # ms
-

@@ -1,4 +1,3 @@
-import abc
 from typing import Tuple, Dict, Union
 
 import torch
@@ -13,6 +12,7 @@ class ReplayBuffer:
         An experience is the following tuple (order matters!!):
         observations, actions, rewards, dones, next_observations
     """
+
     def __init__(self, input_shape: Union[Dict, Tuple],
                  output_dim: int,
                  buffer_size: int,
@@ -84,10 +84,11 @@ class ReplayBuffer:
             # Update each Tensor
             for target, source in zip(each_storage, each_data):
                 if self.pos + length < self.buffer_size:
-                    set_value(target[self.pos:self.pos+length], source, clone=clone)
+                    set_value(target[self.pos:self.pos + length], source, clone=clone)
                 else:  # If full, roll back.
-                    set_value(target[self.pos:self.buffer_size], source[:self.buffer_size-self.pos], clone=clone)
-                    set_value(target[:length+self.pos-self.buffer_size], source[self.buffer_size-self.pos:], clone=clone)
+                    set_value(target[self.pos:self.buffer_size], source[:self.buffer_size - self.pos], clone=clone)
+                    set_value(target[:length + self.pos - self.buffer_size], source[self.buffer_size - self.pos:],
+                              clone=clone)
 
         self.full = self.full or (length + self.pos) >= self.buffer_size
         self.pos = (length + self.pos) % self.buffer_size
@@ -117,5 +118,3 @@ class ReplayBuffer:
     def reset(self):
         self.pos = 0
         self.full = False
-
-
