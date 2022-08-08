@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union, Callable
 
 import numpy as np
 import torch
@@ -19,7 +19,8 @@ class FusedGame:
                  host_net: torch.nn.Module,
                  agent_net: torch.nn.Module,
                  device_key: Optional[str] = 'cpu',
-                 log_time: Optional[bool] = True):
+                 log_time: Optional[bool] = True,
+                 reward_func: Optional[Callable] = None):
         """
             host_net: a nn.Module where
                 input: a 3-dim tensor representing a batch of points.
@@ -35,6 +36,12 @@ class FusedGame:
         self.host_net = host_net.to(self.device)
         self.agent_net = agent_net.to(self.device)
         self.log_time = log_time
+        if reward_func is None:
+            self._rewards = self._default_reward
+        else:
+            assert isinstance(reward_func, Callable), \
+                f"reward_function must be callable. Got {type(reward_func)}."
+            self._rewards = reward_func
 
         # The following are used as cache inside host action decoding. Sometimes improves performances.
         self.binary_table = None
@@ -146,14 +153,14 @@ class FusedGame:
         return actions
 
     @staticmethod
-    def _rewards(sample_for: str,
+    def _default_reward(sample_for: str,
                  obs: Union[torch.Tensor, dict],
                  next_obs: Union[torch.Tensor, dict],
                  next_done: torch.Tensor) -> torch.Tensor:
         if sample_for == "host":
-            return next_done.clone().type(torch.float32)
+            return next_done.type(torch.float32).clone()
         elif sample_for == "agent":
-            return (~next_done).clone().type(torch.float32)
+            return (-next_done.type(torch.float32)).clone()
 
     def decode_tensor(self, t, masked=True) -> Tuple[torch.Tensor, torch.Tensor]:
         """

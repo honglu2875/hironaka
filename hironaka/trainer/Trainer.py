@@ -1,6 +1,8 @@
 import abc
+import contextlib
 import logging
-from typing import List, Any, Dict, Union
+from copy import deepcopy
+from typing import List, Any, Dict, Union, Callable, Optional, Tuple
 
 import torch
 import yaml
@@ -13,7 +15,7 @@ from .ReplayBuffer import ReplayBuffer
 from .Scheduler import ConstantScheduler, ExponentialLRScheduler, ExponentialERScheduler
 from .Timer import Timer
 from .nets import create_mlp, AgentFeatureExtractor, HostFeatureExtractor
-from .player_modules import DummyModule
+from .player_modules import DummyModule, RandomHostModule, AllCoordHostModule, RandomAgentModule, ChooseFirstAgentModule
 
 
 class Trainer(abc.ABC):
@@ -37,11 +39,11 @@ class Trainer(abc.ABC):
         Please implement:
             _train()
         Feel free to override:
-            _make_network()
+            _make_network()  # override if one wants to involve more complicated network structures (CNN, GNN, ...).
             _update_learning_rate()
             _generate_rollout()
-            copy()  # if a subclass needs to copy other models/variables, please override.
-            save()  # if a subclass needs to save other models/variables, please override.
+            copy()  # override if a subclass needs to copy other models/variables.
+            save()  # override if a subclass needs to save other models/variables.
             load()
 
     """
@@ -53,7 +55,7 @@ class Trainer(abc.ABC):
                          'exponential': ExponentialERScheduler}
     replay_buffer_dict = {'base': ReplayBuffer}
 
-    # Please include role-specific hyperparameters that only require simple assignments to object attributes.
+    # Please include role-specific hyperparameters that only require simple assignments to attributes.
     #   (except exploration_rate due to more complex nature).
     # Note that all the parameters defined here can be obtained by calling `get_all_role_specific_param()`.
     role_specific_hyperparameters = ['batch_size', 'initial_rollout_size', 'max_rollout_step']
@@ -65,7 +67,10 @@ class Trainer(abc.ABC):
     def __init__(self,
                  config: Union[Dict[str, Any], str],  # Either the config dict or the path to the YAML file
                  node: int = 0,  # For distributed training: the number of node
-                 device_num: int = 0  # For distributed training: the number of cuda device
+                 device_num: int = 0,  # For distributed training: the number of cuda device
+                 host_net: Optional[nn.Module] = None,  # Pre-assigned host_net. Will ignore host config if set.
+                 agent_net: Optional[nn.Module] = None,  # Pre-assigned agent_net. Will ignore agent config if set.
+                 reward_func: Optional[Callable] = None
                  ):
         self.logger = logging.getLogger(__class__.__name__)
 
@@ -114,8 +119,12 @@ class Trainer(abc.ABC):
         roles = ['host', 'agent']
         heads = [HostFeatureExtractor, AgentFeatureExtractor]
         output_dims = [2 ** self.dimension, self.dimension]
+        pretrained_nets = [host_net, agent_net]
 
-        for role, head_cls, output_dim in zip(roles, heads, output_dims):
+        # Set the reward function
+        self.reward_func = reward_func
+
+        for role, head_cls, output_dim, pretrained_net in zip(roles, heads, output_dims, pretrained_nets):
             # Initialize hyperparameters
             for key in self.role_specific_hyperparameters:
                 setattr(self, f'{role}_{key}', self.config[role][key])
@@ -128,10 +137,18 @@ class Trainer(abc.ABC):
             assert optim in permissible_optims, f"'optim' must be one of {permissible_optims}. Got {optim}."
 
             # Construct networks
-            head = head_cls(self.dimension, self.max_num_points)
-            input_dim = head.feature_dim
-            setattr(self, f'{role}_net', self._make_network(head, net_arch, input_dim, output_dim).to(self.device))
-            setattr(self, f'{role}_net_args', (head_cls, net_arch, input_dim, output_dim))
+            if pretrained_net is not None:
+                setattr(self, f'{role}_net', pretrained_net)
+            else:
+                head = head_cls(self.dimension, self.max_num_points)
+                input_dim = head.feature_dim
+                setattr(self, f'{role}_net', self._make_network(head, net_arch, input_dim, output_dim).to(self.device))
+
+            # Ignore the rest of the loop if we are given a dummy net (without trainable parameters)
+            if isinstance(pretrained_net, DummyModule):
+                setattr(self, f'{role}_is_dummy', True)
+                continue
+            setattr(self, f'{role}_is_dummy', False)
 
             # Construct optimizers
             cfg = self.config[role]['optim'].copy()
@@ -192,6 +209,13 @@ class Trainer(abc.ABC):
                     self._set_optim(role)
         self._make_fused_game()
 
+    def replace_reward_func(self, reward_func: Callable):
+        """
+            Replace the reward function by a new one, and reconstruct the self.fused_game object
+        """
+        self.reward_func = reward_func
+        self._make_fused_game()
+
     def train(self, steps: int, evaluation_interval: int = 1000, **kwargs):
         """
             Train the networks for a number of steps.
@@ -206,59 +230,96 @@ class Trainer(abc.ABC):
         # We always reset training mode to False outside training.
         self.set_training(False)
 
-    def collect_rollout(self, role: str, steps: int):
+    def collect_rollout(self, role: str, num_of_games: int):
         """
-            Play random games `step` number of times, and add all the outputs into the replay buffer.
+            Play random games `num_of_games` number of times, and add all the outputs into the replay buffer.
             Parameters:
                 role: str. Either 'host' or 'agent'.
-                steps: int. Number of steps to play.
+                num_of_games: int. Number of steps to play.
         """
-        param = self.get_all_role_specific_param(role)
+        if self.is_dummy(role):
+            return
 
-        points = self._generate_random_points(steps)
+        param = self.get_all_role_specific_param(role)
         replay_buffer = self.get_replay_buffer(role)
 
-        for i in range(param['max_rollout_step']):
+        exps = self.get_rollout(role, num_of_games, param['max_rollout_step'])
+        for exp in exps:
+            replay_buffer.add(*exp, clone=True)
+
+    def get_rollout(self, role: str, num_of_games: int, steps: int, er: float = None) -> List[Any]:
+        """
+            Generate roll-out `step` number of times, and return the experiences as a tuple
+                (obs, act, rew, done, next_obs).
+            Parameters:
+                role: str. Either 'host' or 'agent'.
+                num_of_games: int. Number of games to play.
+                steps: int. Number of maximal steps to play.
+                er: int. Learning rate.
+        """
+        er = self.get_er(role) if er is None else er
+        points = self._generate_random_points(num_of_games)
+        exps = []
+
+        for i in range(steps):
             if not points.ended:
-                replay_buffer.add(*self.fused_game.step(points, role,
-                                                        scale_observation=self.scale_observation,
-                                                        exploration_rate=self.get_er(role)),
-                                  clone=True)
+                exps.append(self.fused_game.step(points, role,
+                                                 scale_observation=self.scale_observation,
+                                                 exploration_rate=er))
+        return exps
 
     def evaluate_rho(self, num_samples: int = 1000, max_steps: int = 100) -> List[torch.Tensor]:
         """
-            Estimate the rho value for the following pairs of host and agent:
-            (host_net, agent_net)
-            (host_net, RandomAgent)
-            (RandomHost, agent_net)
-            (RandomHost, RandomAgent)
+            Estimate the rho value for pairs:
+                host_net vs (agent_net, RandomAgent, ChooseFirstAgent)
+                (RandomHost, AllCoordHost) vs agent_net
         """
         result = []
-        for host_er in [0., 1.]:
-            for agent_er in [0., 1.]:
-                points = self._generate_random_points(num_samples)
-                initial = sum(points.ended_batch_in_tensor)
-                previous = initial
-                total_steps = 0
-                for i in range(max_steps):
-                    host_move, _ = self.fused_game.host_move(points, exploration_rate=host_er)
-                    self.fused_game.agent_move(points, host_move,
-                                               scale_observation=self.scale_observation,
-                                               inplace=True,
-                                               exploration_rate=agent_er)
-                    new_ended = sum(points.ended_batch_in_tensor) - previous
-                    total_steps += new_ended * (i + 1)
-                    previous = sum(points.ended_batch_in_tensor)
-                total_steps += sum(~points.ended_batch_in_tensor) * max_steps
-                result.append((num_samples - initial) / total_steps)
+        dummy_param = (self.dimension, self.max_num_points, self.device)
+        hosts = [self.host_net]*3 + [RandomHostModule(*dummy_param), AllCoordHostModule(*dummy_param)]
+        agents = [self.agent_net, RandomAgentModule(*dummy_param), ChooseFirstAgentModule(*dummy_param)] + \
+                 [self.agent_net]*2
+
+        for host, agent in zip(hosts, agents):
+            points = self._generate_random_points(num_samples)
+            fused_game = FusedGame(host, agent, device_key=self.device_key, reward_func=self.reward_func)
+            initial = sum(points.ended_batch_in_tensor)
+            previous = initial
+            total_steps = 0
+            for i in range(max_steps):
+                host_move, _ = fused_game.host_move(points, exploration_rate=0.)
+                fused_game.agent_move(points, host_move,
+                                      scale_observation=self.scale_observation,
+                                      inplace=True,
+                                      exploration_rate=0.)
+                new_ended = sum(points.ended_batch_in_tensor) - previous
+                total_steps += new_ended * (i + 1)
+                previous = sum(points.ended_batch_in_tensor)
+            total_steps += sum(~points.ended_batch_in_tensor) * max_steps
+            result.append((num_samples - initial) / total_steps)
         return result
+
+    def count_actions(self, role: str, games: int, max_steps: int = 100, er: float = None) -> torch.Tensor:
+        rollouts = self.get_rollout(role, games, max_steps, er=er)
+        if role == 'host':
+            max_num = 2**self.dimension
+        elif role == 'agent':
+            max_num = self.dimension
+        else:
+            raise Exception(f'role must be either host or agent. Got {role}.')
+
+        count = torch.bincount(rollouts[0][1].flatten(), minlength=max_num)
+        for i in range(1, len(rollouts)):
+            count += torch.bincount(rollouts[i][1].flatten(), minlength=max_num)
+        return count
 
     def copy(self):
         """
             Copy the models and the config to create a new object. (Caution: ReplayBuffer is NOT copied).
             If a subclass would like to copy other models or variables, it MUST be overridden.
         """
-        return self.__class__(self.config, node=self.node, device_num=self.device_num)
+        return self.__class__(self.config, node=self.node, device_num=self.device_num,
+                              host_net=deepcopy(self.host_net), agent_net=deepcopy(self.agent_net))
 
     def save(self, path: str):
         """
@@ -272,8 +333,8 @@ class Trainer(abc.ABC):
         """
             Save replay buffers as a dict.
         """
-        saved = {'host_replay_buffer': getattr(self, 'host_replay_buffer'),
-                 'agent_replay_buffer': getattr(self, 'agent_replay_buffer')}
+        saved = {'host_replay_buffer': self.get_replay_buffer('host'),
+                 'agent_replay_buffer': self.get_replay_buffer('agent')}
         torch.save(saved, path)
 
     def load_replay_buffer(self, path: str):
@@ -282,7 +343,9 @@ class Trainer(abc.ABC):
         """
         saved = torch.load(path)
         for key in ['host_replay_buffer', 'agent_replay_buffer']:
-            assert key in saved, "Wrong file format."
+            if key not in saved or saved[key] is None:
+                continue
+
             if saved[key].actions.shape != getattr(self, key).actions.shape:
                 self.logger.warning(
                     f"The shape of the replay buffers might be different! Got {saved[key].actions.shape} \
@@ -300,7 +363,7 @@ class Trainer(abc.ABC):
         return new_trainer
 
     @abc.abstractmethod
-    def _train(self, steps: int, evaluation_interval: int = 1000):
+    def _train(self, steps: int, evaluation_interval: int = 1000, **kwargs):
         pass
 
     # -------- Role specific getters -------- #
@@ -316,26 +379,26 @@ class Trainer(abc.ABC):
     def get_net(self, role):
         return getattr(self, f'{role}_net')
 
-    def get_net_args(self, role):
-        return getattr(self, f'{role}_net_args')
-
     def get_optim(self, role):
-        return getattr(self, f'{role}_optimizer')
+        return getattr(self, f'{role}_optimizer', None)
 
     def get_lr_scheduler(self, role):
-        return getattr(self, f'{role}_lr_scheduler')
+        return getattr(self, f'{role}_lr_scheduler', None)
 
     def get_er_scheduler(self, role):
-        return getattr(self, f'{role}_er_scheduler')
+        return getattr(self, f'{role}_er_scheduler', None)
 
     def get_er(self, role):
         return self.get_er_scheduler(role)(self.total_num_steps)
 
     def get_replay_buffer(self, role):
-        return getattr(self, f'{role}_replay_buffer')
+        return getattr(self, f'{role}_replay_buffer', None)
 
     def get_batch_size(self, role):
         return getattr(self, f'{role}_batch_size')
+
+    def is_dummy(self, role):
+        return getattr(self, f'{role}_is_dummy')
 
     # -------- Set internal parameters (used outside initialization) -------- #
 
@@ -351,6 +414,14 @@ class Trainer(abc.ABC):
         for role in ['host', 'agent']:
             self.get_net(role).train(training_mode)
 
+    @contextlib.contextmanager
+    def inference_mode(self):
+        self.set_training(False)
+        try:
+            yield
+        finally:
+            self.set_training(True)
+
     # -------- Private utility methods -------- #
 
     @staticmethod
@@ -360,7 +431,7 @@ class Trainer(abc.ABC):
 
     def _make_fused_game(self):
         device_key = self.device_key
-        self.fused_game = FusedGame(self.host_net, self.agent_net, device_key=device_key)
+        self.fused_game = FusedGame(self.host_net, self.agent_net, device_key=device_key, reward_func=self.reward_func)
 
     def _set_optim(self, role: str):
         """
@@ -375,7 +446,7 @@ class Trainer(abc.ABC):
         return create_mlp(head, net_arch, input_dim, output_dim)
 
     def _generate_random_points(self, samples: int) -> TensorPoints:
-        pts = torch.randint(self.max_value + 1, (samples, self.max_num_points, self.dimension), dtype=torch.float,
+        pts = torch.randint(self.max_value + 1, (samples, self.max_num_points, self.dimension), dtype=torch.float32,
                             device=self.device)
         points = TensorPoints(pts, device_key=self.device_key)
         points.get_newton_polytope()

@@ -1,4 +1,5 @@
 from typing import Iterable
+from copy import deepcopy
 
 import torch
 from torch import nn
@@ -27,10 +28,11 @@ class DQNTrainer(Trainer):
 
         # Set up target Q-networks for both host and agent
         for role in ['host', 'agent']:
-            head_cls, net_arch, input_dim, output_dim = self.get_net_args(role)
-            head = head_cls(self.dimension, self.max_num_points)
-            setattr(self, f'{role}_net_target',
-                    self._make_network(head, net_arch, input_dim, output_dim).to(self.device))
+            if self.is_dummy(role):
+                continue
+
+            net = self.get_net(role)
+            setattr(self, f'{role}_net_target', deepcopy(net).to(self.device))
 
             # Setting tau=1 is the same as copying weights
             q_net, q_net_target = self.get_net(role), self.get_net_target(role)
@@ -137,20 +139,28 @@ class DQNTrainer(Trainer):
                 with Timer(f'collect_{role}_rollouts_total', self.time_log, active=self.log_time,
                            use_cuda=self.use_cuda):
                     if (self.total_num_steps + i) % param[role]['steps_before_rollout'] == 0:
-                        self.collect_rollout(role, param[role]['rollout_size'])
+                        with self.inference_mode():
+                            self.collect_rollout(role, param[role]['rollout_size'])
 
-            with Timer(f'evaluate_{role}_total', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
+            with Timer(f'evaluate_total', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
                 if i % evaluation_interval == 0:
-                    rhos = self.evaluate_rho()
-                    self.logger.info(rhos)
-                    self.tb_writer.add_scalar(f'{model_prefix}/rhos/host-agent',
-                                              rhos[0].item(), self.total_num_steps + i)
-                    self.tb_writer.add_scalar(f'{model_prefix}/rhos/host-random',
-                                              rhos[1].item(), self.total_num_steps + i)
-                    self.tb_writer.add_scalar(f'{model_prefix}/rhos/random-agent',
-                                              rhos[2].item(), self.total_num_steps + i)
-                    self.tb_writer.add_scalar(f'{model_prefix}/rhos/random-random',
-                                              rhos[3].item(), self.total_num_steps + i)
+                    with self.inference_mode():
+                        rhos = self.evaluate_rho()
+                        for role in players:
+                            actions = self.count_actions(role, 100, er=0.0)
+                            self.logger.info(actions)
+                        self.logger.info(rhos)
+
+                        self.tb_writer.add_scalar(f'{model_prefix}/rhos/host-agent',
+                                                  rhos[0].item(), self.total_num_steps + i)
+                        self.tb_writer.add_scalar(f'{model_prefix}/rhos/host-random',
+                                                  rhos[1].item(), self.total_num_steps + i)
+                        self.tb_writer.add_scalar(f'{model_prefix}/rhos/host-choosefirst',
+                                                  rhos[2].item(), self.total_num_steps + i)
+                        self.tb_writer.add_scalar(f'{model_prefix}/rhos/random-agent',
+                                                  rhos[3].item(), self.total_num_steps + i)
+                        self.tb_writer.add_scalar(f'{model_prefix}/rhos/allcoord-agent',
+                                                  rhos[4].item(), self.total_num_steps + i)
 
         self.total_num_steps += steps
 
@@ -170,4 +180,4 @@ class DQNTrainer(Trainer):
 
     # ------- Role specific getters -------
     def get_net_target(self, role):
-        return getattr(self, f'{role}_net_target')
+        return getattr(self, f'{role}_net_target', None)
