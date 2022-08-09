@@ -1,6 +1,6 @@
-import unittest
 import logging
 import sys
+import unittest
 
 from hironaka.Points import Points
 from hironaka.agent import RandomAgent, ChooseFirstAgent

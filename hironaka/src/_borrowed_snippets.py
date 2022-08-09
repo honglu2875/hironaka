@@ -1,5 +1,5 @@
-from typing import Iterable
 from itertools import zip_longest
+from typing import Iterable
 
 import torch
 
@@ -10,7 +10,7 @@ import torch
 """
 
 """
-    The followings are short snippets directly borrowed from `stable-baseline3` 
+    The followings are short snippets directly borrowed from `stable-baselines3` 
 """
 
 
@@ -23,9 +23,9 @@ def zip_equal(*iterables):
 
 
 def polyak_update(
-    params: Iterable[torch.nn.Parameter],
-    target_params: Iterable[torch.nn.Parameter],
-    tau: float,
+        params: Iterable[torch.nn.Parameter],
+        target_params: Iterable[torch.nn.Parameter],
+        tau: float,
 ) -> None:
     """
     Perform a Polyak average update on ``target_params`` using ``params``:

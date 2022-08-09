@@ -1,4 +1,3 @@
-import abc
 from typing import Tuple, Dict, Union
 
 import torch
@@ -6,13 +5,14 @@ import torch
 
 class ReplayBuffer:
     """
-        Replay buffer. Most of the codes are inspired by stable-baseline3, but the central data type is Tensor instead
+        Replay buffer. Most of the codes are inspired by stable-baselines3, but the central data type is Tensor instead
             of np.ndarray.
         This is the base class that does things in basic fashions.
 
         An experience is the following tuple (order matters!!):
         observations, actions, rewards, dones, next_observations
     """
+
     def __init__(self, input_shape: Union[Dict, Tuple],
                  output_dim: int,
                  buffer_size: int,
@@ -56,9 +56,9 @@ class ReplayBuffer:
 
         def set_value(a: torch.Tensor, b: torch.Tensor, clone=True):
             if clone:
-                a = b.clone()
+                a[:] = b.clone()
             else:
-                a = b
+                a[:] = b
 
         # Shape checks
         assert action.shape[1:] == torch.Size([1])
@@ -84,12 +84,13 @@ class ReplayBuffer:
             # Update each Tensor
             for target, source in zip(each_storage, each_data):
                 if self.pos + length < self.buffer_size:
-                    set_value(target[self.pos:self.pos+length], source, clone=clone)
+                    set_value(target[self.pos:self.pos + length], source, clone=clone)
                 else:  # If full, roll back.
-                    set_value(target[self.pos:self.buffer_size], source[:self.buffer_size-self.pos], clone=clone)
-                    set_value(target[:length+self.pos-self.buffer_size], source[self.buffer_size-self.pos:], clone=clone)
+                    set_value(target[self.pos:self.buffer_size], source[:self.buffer_size - self.pos], clone=clone)
+                    set_value(target[:length + self.pos - self.buffer_size], source[self.buffer_size - self.pos:],
+                              clone=clone)
 
-        self.full = (length + self.pos) >= self.buffer_size
+        self.full = self.full or (length + self.pos) >= self.buffer_size
         self.pos = (length + self.pos) % self.buffer_size
 
     def sample(self, batch_size: int) -> Tuple:
@@ -117,5 +118,3 @@ class ReplayBuffer:
     def reset(self):
         self.pos = 0
         self.full = False
-
-
