@@ -245,3 +245,45 @@ def merge_experiences(exp_lst: List[Experience]) -> Experience:
             raise TypeError(f"tuple must contain either dict or tensor. Got {type(exp_lst[0][i])}")
 
     return tuple(merged)
+
+class HostActionEncoder:
+    """
+    This class translates host actions between a list of chosen coordinates (used in game environment) and an integer (used in neural networks)
+    The rule of translation is as follows:
+    We build a bijection between natural numbers ranging in 0 and 2^dim - dim - 2 and all choice of coordinates that contain more than 1 coordinate.
+    Given coords, a choice of coordinate, we take sum(2**coor for coor in coords), and subtract all invalid choices that comes before it.
+    example: dim = 3, coords = [0,1], the sum = 3, but there are 3 invalid choices come before it (empty, [0], and [1]), so [0,1] -> 0 as an integer.
+    """
+
+    def __init__(self, dim=3):
+        self.dim = dim
+        self.action_translate = []
+        for i in range(1, 2 ** self.dim):
+            if not ((i & (i - 1) == 0)):  # Check if i is NOT a power of 2
+                self.action_translate.append(i)
+
+    def encode(self, coords: List[int]) -> int:
+        # Given coords, return the integer for action. Inverse function of decode
+        assert len(coords) > 1
+
+        action = 0
+        for choice in coords:
+            action += 2 ** choice
+
+        action = action - int(math.floor(math.log2(action))) - 2
+
+        return action
+
+    def decode(self, action: int) -> List[int]:
+        # Given integer as action, return coords. Inverse function of encode.
+        assert (action < 2 ** self.dim - self.dim - 1) and (action >= 0)
+
+        action = self.action_translate[action]
+        coords = []
+        current_coord = 0
+        while action != 0:
+            if action % 2:
+                coords.append(current_coord)
+            current_coord += 1
+            action = action // 2
+        return coords

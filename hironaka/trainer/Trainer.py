@@ -190,12 +190,12 @@ class Trainer(abc.ABC):
             setattr(self, f'{role}_replay_buffer', replay_buffer)
 
         # -------- Initialize states -------- #
-
-        # Construct FusedGame
-        self._make_fused_game()
-        # Generate initial collections of replays
-        self.collect_rollout('host', getattr(self, 'host_initial_rollout_size'))
-        self.collect_rollout('agent', getattr(self, 'agent_initial_rollout_size'))
+        #
+        # # Construct FusedGame
+        # self._make_fused_game()
+        # # Generate initial collections of replays
+        # self.collect_rollout('host', getattr(self, 'host_initial_rollout_size'))
+        # self.collect_rollout('agent', getattr(self, 'agent_initial_rollout_size'))
 
     def replace_nets(self, host_net: nn.Module = None, agent_net: nn.Module = None) -> None:
         """

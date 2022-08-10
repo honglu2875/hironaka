@@ -1,7 +1,7 @@
 import logging
 import random
 import sys
-from typing import List
+from typing import List, Union, Dict, Any
 
 import torch
 import torch.nn as nn
@@ -12,6 +12,7 @@ from hironaka.agent import RandomAgent, ChooseFirstAgent
 from hironaka.src import _snippets as snip
 from hironaka import host
 from hironaka.validator import HironakaValidator
+from hironaka.trainer import Trainer
 
 import collections as col
 
@@ -55,7 +56,7 @@ class trained_host(host.Host):
 
         self.action_translate = []
         for i in range(1, 2 ** self.dim):
-            if not ((i & (i - 1) == 0)):  # Check if i is NOT a power of 2
+            if not (i & (i - 1) == 0):  # Check if i is NOT a power of 2
                 self.action_translate.append(i)
 
     def _action_to_coords(self, action: int):
@@ -192,6 +193,149 @@ class MCTS:
         return current_reward
 
 
+class MCTSTrainer2(Trainer.Trainer):
+
+    def __init__(self, config: Union[Dict[str, Any], str]):
+        role_specific_hyperparameters = ["iterations", "c_puct", "lr", "max_depth", "MSE_coefficient", "agent"]
+        options = {
+            "iterations": 200,
+            "c_puct": 0.5,
+            "lr": 1e-4,
+            "max_depth": 20,
+            "MSE_coefficient": 1.0,
+            "agent": ChooseFirstAgent()
+        }
+
+        if isinstance(config, str):
+            self.config = self.load_yaml(config)
+        else:
+            self.config = config
+
+        options.update(self.config)
+        super().__init__(options)
+
+        logger = logging.getLogger(__name__)
+        logger.setLevel(logging.INFO)
+        if not logger.hasHandlers():
+            logger.addHandler(logging.StreamHandler(sys.stdout))
+
+        self.log = logger
+
+        self.my_agent = ChooseFirstAgent() #todo: change this to cooperate with the Trainer.Trainer class.
+        self.c_puct = options['c_puct']
+        self.max_depth = options['max_depth']
+        self.lr = options['lr']
+        self.MSE_coefficient = options['MSE_coefficient']
+
+        self.coder = snip.HostActionEncoder(dim=self.dimension)
+
+    def _make_network(self, head: nn.Module, net_arch: list, input_dim: int, output_dim: int) -> nn.Module:
+        return HironakaNet(dim = self.dimension)
+
+
+    def _policy_iter(self, net, state: TensorPoints, c_puct=0.5, max_depth=20):
+        # This method returns samples of a single complete game.
+        examples = ([], [])
+
+        mcts_instance = MCTS(state=state, nn=net, env=self.my_agent, max_depth=max_depth, c_puct=c_puct)
+
+        depth = 0
+
+        while True:
+            mcts_instance.run(iteration=20, state=state)
+            current_sample = mcts_instance.get_sample(state)
+            examples[0].append(state.points[0])
+            examples[1].append(current_sample)
+            best_action = torch.argmax(current_sample,0).item()
+
+            coords = self.coder.decode(best_action)
+
+            self.my_agent.move(state, [coords])
+
+            state.get_newton_polytope()
+            state.rescale()
+            state = TensorPoints(state.get_features())
+
+            depth += 1
+
+            if state.ended:
+                for i, sample in enumerate(examples[1]):
+                    examples[1][i] = torch.cat((sample, torch.zeros(1) + 1),0)
+                break
+            elif depth >= max_depth:
+                for i, sample in enumerate(examples[1]):
+                    examples[1][i] = torch.cat((sample, torch.zeros(1) - 1), 0)
+                break
+
+        return examples
+
+    def _loss_function(self, pred, y: List[torch.FloatTensor]):
+        # loss function is a linear combination of MSE on winning/lossing prediction and cross entropy on probability
+        # vectors.
+
+        loss = torch.zeros(1)
+        for i, pred in enumerate(pred):
+            choice_pred = torch.narrow(pred, 0, 0, self.host_net.choices)
+            reward_pred = torch.narrow(pred, 0, self.host_net.choices, 1)
+            choice_y = torch.narrow(y[i], 0, 0, self.host_net.choices)
+            choice_y = F.softmax(choice_y, dim=0)
+            reward_y = torch.narrow(y[i], 0, self.host_net.choices, 1)
+            loss = loss + self.MSE_coefficient * torch.square((reward_pred - reward_y)) - torch.dot(choice_y, torch.log(
+                choice_pred))
+
+            # If it is changed to the build-in cross entropy, remove softmax both in the network and in the MCTS.get_sample().
+
+        return loss
+
+    def _train(self, steps = 100, **config):
+
+        evaluation_interval = config['evaluation_interval']
+
+        for i in range(steps):
+            while True:
+                test_points = TensorPoints(snip.generate_batch_points(n=10, dimension=self.dimension, max_value=50),
+                                           max_num_points=10)
+                test_points.get_newton_polytope()
+                test_points.rescale()
+                test_points = TensorPoints(test_points.get_features())
+                if not test_points.ended:
+                    break
+
+            losses = []
+
+            examples = self._policy_iter(state=test_points, net = self.host_net, c_puct=self.c_puct, max_depth=self.max_depth)
+
+            data = [torch.FloatTensor(_) for _ in examples[0]]
+
+            y = [torch.FloatTensor(_) for _ in examples[1]]
+            pred = []
+            optimizer = torch.optim.Adam(self.host_net.parameters(), lr=self.lr)
+
+            for batch, x in enumerate(data):
+                this_pred = self.host_net(x)
+                pred.append(this_pred)
+
+            loss = self._loss_function(pred, y)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            losses.append(loss.item())
+            if len(losses) > evaluation_interval:
+                losses.pop(0)
+            if i % evaluation_interval == 0:
+                self.log.info("The MA of last " + str(evaluation_interval) + " iterations is: " +  str(sum(losses) / len(losses)))
+                self.log.info("Current iteration: " + str(i) + '/' + str(steps))
+
+
+
+    def save(self, path='test_model.pth'):
+        torch.save(self.host_net, path)
+        self.log.info("Saved model as: " + path)
+
+
+
+
+
 class MCTSTrainer:
     # todo: cooperate with the abstract trainer class.
     def __init__(self, **config):
@@ -255,7 +399,7 @@ class MCTSTrainer:
         while True:
             mcts_instance.run(iteration=20, state=state)
             current_sample = mcts_instance.get_sample(state)
-            examples[0].append(torch.flatten(state.points[0],0))
+            examples[0].append(state.points[0])
             examples[1].append(current_sample)
             best_action = torch.argmax(current_sample,0).item()
 
@@ -302,6 +446,7 @@ class MCTSTrainer:
             "agent": ChooseFirstAgent()
         }
 
+
         options.update(config)
         self.ITERATIONS = options["ITERATIONS"]
         self.c_puct = options["c_puct"]
@@ -347,11 +492,17 @@ class MCTSTrainer:
 
     def save_model(self, path='test_model.pth'):
         torch.save(self.net, path)
-        self.log.info("Saved model as ", path)
+        self.log.info("Saved model as: " + path)
 
 
 if __name__ == '__main__':
 
-    test_trainer = MCTSTrainer(dim = 3)
-    test_trainer.train(ITERATIONS = 200, c_puct = 0.5, lr = 1e-4, max_depth = 15, MSE_coefficient = 0.35, agent = ChooseFirstAgent())
-    test_trainer.save_model("test_model.pth")
+    test = MCTSTrainer2("mcts_config.yml")
+
+    test.train(steps= 100, evaluation_interval= 10)
+
+    test.save("test_model.pth")
+
+    # test_trainer = MCTSTrainer(dim = 3)
+    # test_trainer.train(ITERATIONS = 5000, c_puct = 0.5, lr = 1e-7, max_depth = 20, MSE_coefficient = 0.35, agent = ChooseFirstAgent())
+    # test_trainer.save_model("test_model.pth")
