@@ -194,9 +194,9 @@ class MCTS:
 
 
 class MCTSTrainer2(Trainer.Trainer):
+    role_specific_hyperparameters = ["iterations", "c_puct", "lr", "max_depth", "MSE_coefficient", "agent"]
 
     def __init__(self, config: Union[Dict[str, Any], str]):
-        role_specific_hyperparameters = ["iterations", "c_puct", "lr", "max_depth", "MSE_coefficient", "agent"]
         options = {
             "iterations": 200,
             "c_puct": 0.5,
@@ -212,12 +212,7 @@ class MCTSTrainer2(Trainer.Trainer):
             self.config = config
 
         options.update(self.config)
-        super().__init__(options)
-
-        logger = logging.getLogger(__name__)
-        logger.setLevel(logging.INFO)
-        if not logger.hasHandlers():
-            logger.addHandler(logging.StreamHandler(sys.stdout))
+        super().__init__(options, agent_net = ChooseFirstAgentModule) #todo: get agent module from initialization.
 
         self.log = logger
 
@@ -497,7 +492,7 @@ class MCTSTrainer:
 
 if __name__ == '__main__':
 
-    test = MCTSTrainer2("mcts_config.yml")
+    test = MCTSTrainer2("mcts_config_example.yml")
 
     test.train(steps= 100, evaluation_interval= 10)
 
