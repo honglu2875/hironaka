@@ -492,7 +492,7 @@ class MCTSTrainer:
 
 if __name__ == '__main__':
 
-    test = MCTSTrainer2("mcts_config_example.yml")
+    test = MCTSTrainer2("mcts_host_config_example.yml")
 
     test.train(steps= 100, evaluation_interval= 10)
 

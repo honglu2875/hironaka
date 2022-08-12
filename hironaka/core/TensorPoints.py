@@ -106,3 +106,6 @@ class TensorPoints(PointsBase):
 
     def __repr__(self):
         return str(self.points)
+
+    def __hash__(self):
+        return hash(self.points.detach().cpu().numpy().round(8).tostring())

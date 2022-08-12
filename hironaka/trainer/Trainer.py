@@ -49,6 +49,7 @@ class Trainer(abc.ABC):
     """
     optim_dict = {'adam': torch.optim.Adam,
                   'sgd': torch.optim.SGD}
+
     lr_scheduler_dict = {'constant': ConstantScheduler,
                          'exponential': ExponentialLRScheduler}
     er_scheduler_dict = {'constant': ConstantScheduler,
@@ -59,10 +60,6 @@ class Trainer(abc.ABC):
     #   (except exploration_rate due to more complex nature).
     # Note that all the parameters defined here can be obtained by calling `get_all_role_specific_param()`.
     role_specific_hyperparameters = ['batch_size', 'initial_rollout_size', 'max_rollout_step']
-
-    # Clarify and suppress IDE warnings.
-    host_net = None
-    agent_net = None
 
     def __init__(self,
                  config: Union[Dict[str, Any], str],  # Either the config dict or the path to the YAML file
@@ -101,6 +98,26 @@ class Trainer(abc.ABC):
         self.max_num_points = self.config['max_num_points']
         self.max_value = self.config['max_value']
 
+        # Add networks. The designed behavior should be the following:
+        #   if 'host' is present in config:
+        #       if `host_net` is a DummyModule, ignore in `self.trained_roles` but `self.host_net` will be set.
+        #       otherwise, it will be included in `self.trained_roles` and initialized if `host_net` is None.
+        #   if 'host' is not present in config:
+        #       'host_net' MUST be passed during initialization.
+        #       But it will not be included in `self.trained_roles`.
+        # The same goes for 'agent'...
+        self.host_net = host_net
+        self.agent_net = agent_net
+        assert any([role in self.config for role in ['host', 'agent']]), \
+            f"Must have at least one role out of ['host', 'agent'] in the config."
+
+        self.trained_roles = []
+        for role, net in zip(['host', 'agent'], [host_net, agent_net]):
+            if role in self.config and (not isinstance(net, DummyModule)):
+                self.trained_roles.append(role)
+            elif role not in self.config:
+                assert net is not None, f"{role} is not present in config. A network must be given during init."
+
         # Create time log
         self.time_log = dict()
 
@@ -116,15 +133,18 @@ class Trainer(abc.ABC):
         self.device = torch.device(f'cuda:{device_num}') if self.use_cuda else torch.device('cpu')
 
         # Initialize host and agent parameters
-        roles = ['host', 'agent']
-        heads = [HostFeatureExtractor, AgentFeatureExtractor]
-        output_dims = [2 ** self.dimension, self.dimension]
-        pretrained_nets = [host_net, agent_net]
+        heads = {'host': HostFeatureExtractor, 'agent': AgentFeatureExtractor}
+        output_dims = {'host': 2 ** self.dimension, 'agent': self.dimension}
+        pretrained_nets = {'host': host_net, 'agent': agent_net}
 
         # Set the reward function
         self.reward_func = reward_func
 
-        for role, head_cls, output_dim, pretrained_net in zip(roles, heads, output_dims, pretrained_nets):
+        for role in ['host', 'agent']:
+            if role not in self.config:
+                continue
+
+            head_cls, output_dim, pretrained_net = heads[role], output_dims[role], pretrained_nets[role]
             # Initialize hyperparameters
             for key in self.role_specific_hyperparameters:
                 setattr(self, f'{role}_{key}', self.config[role][key])
@@ -132,36 +152,14 @@ class Trainer(abc.ABC):
             net_arch = self.config[role]['net_arch']
             assert isinstance(net_arch, list), f"'net_arch' must be a list. Got {type(net_arch)}."
 
-            optim = self.config[role]['optim']['name']
-            permissible_optims = ['adam', 'sgd']
-            assert optim in permissible_optims, f"'optim' must be one of {permissible_optims}. Got {optim}."
-
             # Construct networks
             if pretrained_net is not None:
-                setattr(self, f'{role}_net', pretrained_net)
+                # The pretrained network should have been set. Or there must be a broken update.
+                assert self.get_net(role) is not None
             else:
                 head = head_cls(self.dimension, self.max_num_points)
                 input_dim = head.feature_dim
                 setattr(self, f'{role}_net', self._make_network(head, net_arch, input_dim, output_dim).to(self.device))
-
-            # Ignore the rest of the loop if we are given a dummy net (without trainable parameters)
-            if isinstance(pretrained_net, DummyModule):
-                setattr(self, f'{role}_is_dummy', True)
-                continue
-            setattr(self, f'{role}_is_dummy', False)
-
-            # Construct optimizers
-            cfg = self.config[role]['optim'].copy()
-            setattr(self, f'{role}_optim_config', cfg)
-            self._set_optim(role)
-
-            # Construct learning rate scheduler
-            lr = cfg['args']['lr']
-            if 'lr_schedule' in cfg:
-                lr_scheduler = self.lr_scheduler_dict[cfg['lr_schedule']['mode']](lr, **cfg['lr_schedule'])
-            else:
-                lr_scheduler = None
-            setattr(self, f'{role}_lr_scheduler', lr_scheduler)
 
             # Construct exploration rate scheduler
             cfg = self.config[role]
@@ -172,30 +170,22 @@ class Trainer(abc.ABC):
                 er_scheduler = ConstantScheduler(er)
             setattr(self, f'{role}_er_scheduler', er_scheduler)
 
-            # Construct replay buffer (same setting for both host and agent)
-            cfg = self.config['replay_buffer']
-            if role == 'host':
-                input_shape = (self.max_num_points, self.dimension)
-            elif role == 'agent':
-                input_shape = {'points': (self.max_num_points, self.dimension),
-                               'coords': (self.dimension,)}
-            else:
-                raise Exception('Impossible code path.')
+            # Construct optimizer, lr scheduler and replay buffer
+            setattr(self, f'{role}_optim_config', self.config[role]['optim'])
+            if not isinstance(self.get_net(role), DummyModule):
+                self._make_optimizer_and_lr(role)
+                self._make_replay_buffer(role, output_dim)
 
-            replay_buffer = self.replay_buffer_dict[cfg['type']](
-                input_shape=input_shape,
-                output_dim=output_dim,
-                device=self.device,
-                **cfg)
-            setattr(self, f'{role}_replay_buffer', replay_buffer)
+        assert self.get_net('host') is not None and self.get_net('agent') is not None
 
         # -------- Initialize states -------- #
 
         # Construct FusedGame
         self._make_fused_game()
-        # Generate initial collections of replays
-        self.collect_rollout('host', getattr(self, 'host_initial_rollout_size'))
-        self.collect_rollout('agent', getattr(self, 'agent_initial_rollout_size'))
+        # Generate initial collections of replays if 'deactivate' is not set or not True.
+        if self.use_replay_buffer:
+            for role in self.trained_roles:
+                self.collect_rollout(role, getattr(self, f'{role}_initial_rollout_size'))
 
     def replace_nets(self, host_net: nn.Module = None, agent_net: nn.Module = None) -> None:
         """
@@ -205,9 +195,22 @@ class Trainer(abc.ABC):
         for role, net in zip(['host', 'agent'], [host_net, agent_net]):
             if net is not None:
                 setattr(self, f'{role}_net', net.to(self.device))
-                if not isinstance(net, DummyModule):
+                if isinstance(net, DummyModule):
+                    self.trained_roles.remove(role)
+                elif role in self.config:
                     self._set_optim(role)
+
         self._make_fused_game()
+
+    def set_trainable(self, players: List[str]):
+        for role in players:
+            if role not in ['host', 'agent']:
+                continue
+
+            assert not isinstance(self.get_net(role), DummyModule), f"{role} net cannot be DummyModule."
+
+            if role not in self.trained_roles:
+                self.trained_roles.append(role)
 
     def replace_reward_func(self, reward_func: Callable):
         """
@@ -237,7 +240,13 @@ class Trainer(abc.ABC):
                 role: str. Either 'host' or 'agent'.
                 num_of_games: int. Number of steps to play.
         """
-        if self.is_dummy(role):
+        net = self.get_net(role)
+
+        if net is None:  # Might have a broken update if this is triggered.
+            self.logger.error(f'{role} network is not set.')
+            return
+
+        if isinstance(net, DummyModule):  # Ignore DummyModule silently (as it does not have replay buffer).
             return
 
         param = self.get_all_role_specific_param(role)
@@ -268,7 +277,7 @@ class Trainer(abc.ABC):
                                                  exploration_rate=er))
         return exps
 
-    def evaluate_rho(self, num_samples: int = 1000, max_steps: int = 100) -> List[torch.Tensor]:
+    def evaluate_rho(self, num_samples: int = 100, max_steps: int = 100) -> List[torch.Tensor]:
         """
             Estimate the rho value for pairs:
                 host_net vs (agent_net, RandomAgent, ChooseFirstAgent)
@@ -319,14 +328,14 @@ class Trainer(abc.ABC):
             If a subclass would like to copy other models or variables, it MUST be overridden.
         """
         return self.__class__(self.config, node=self.node, device_num=self.device_num,
-                              host_net=deepcopy(self.host_net), agent_net=deepcopy(self.agent_net))
+                              host_net=deepcopy(self.get_net('host')), agent_net=deepcopy(self.get_net('agent')))
 
     def save(self, path: str):
         """
             Save only models and config as a dict (Caution: ReplayBuffer is NOT saved).
             If a subclass creates extra models (e.g., DQNTrainer.{role}_q_net_target), it MUST be overridden.
         """
-        saved = {'host_net': self.host_net, 'agent_net': self.agent_net, 'config': self.config}
+        saved = {'host_net': self.get_net('host'), 'agent_net': self.get_net('agent'), 'config': self.config}
         torch.save(saved, path)
 
     def save_replay_buffer(self, path: str):
@@ -440,6 +449,47 @@ class Trainer(abc.ABC):
         cfg = getattr(self, f'{role}_optim_config')
         net = getattr(self, f'{role}_net')
         setattr(self, f'{role}_optimizer', self.optim_dict[cfg['name']](net.parameters(), **cfg['args']))
+
+    def _make_replay_buffer(self, role: str, output_dim: int):
+        """
+            Create replay buffer and learning rate scheduler inside __init__. Should only be called during initialization.
+        """
+        cfg = self.config['replay_buffer']
+        self.use_replay_buffer = not cfg.get('deactivate', False)
+        if self.use_replay_buffer:  # Ignore if `deactivate` is True
+            if role == 'host':
+                input_shape = (self.max_num_points, self.dimension)
+            elif role == 'agent':
+                input_shape = {'points': (self.max_num_points, self.dimension),
+                               'coords': (self.dimension,)}
+            else:
+                raise Exception('Impossible code path.')
+
+            replay_buffer = self.replay_buffer_dict[cfg['type']](
+                input_shape=input_shape,
+                output_dim=output_dim,
+                device=self.device,
+                **cfg)
+            setattr(self, f'{role}_replay_buffer', replay_buffer)
+
+    def _make_optimizer_and_lr(self, role: str):
+        """
+            Create optimizer inside __init__. Should only be called during initialization.
+        """
+        optim = self.config[role]['optim']['name']
+        assert optim in self.optim_dict, f"'optim' must be one of {self.optim_dict.keys()}. Got {optim}."
+
+        cfg = self.config[role]['optim'].copy()
+
+        # Create learning rate scheduler
+        lr = cfg['args']['lr']
+        if 'lr_schedule' in cfg:
+            lr_scheduler = self.lr_scheduler_dict[cfg['lr_schedule']['mode']](lr, **cfg['lr_schedule'])
+        else:
+            lr_scheduler = None
+        setattr(self, f'{role}_lr_scheduler', lr_scheduler)
+
+        self._set_optim(role)
 
     @staticmethod
     def _make_network(head: nn.Module, net_arch: list, input_dim: int, output_dim: int) -> nn.Module:

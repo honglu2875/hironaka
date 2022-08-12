@@ -177,3 +177,8 @@ class testTorchPoints(unittest.TestCase):
         point = TensorPoints(p)
         point.rescale()
         assert point.points.isfinite().all()
+
+    def test_points_hash_is_value_based(self):
+        p = TensorPoints(torch.rand(100, 20, 3))
+        assert hash(p) == hash(p.copy())
+
