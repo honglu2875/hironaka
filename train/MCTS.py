@@ -13,6 +13,7 @@ from hironaka.src import _snippets as snip
 from hironaka import host
 from hironaka.validator import HironakaValidator
 from hironaka.trainer import Trainer
+from hironaka.trainer.player_modules import ChooseFirstAgentModule, RandomAgentModule, RandomHostModule
 
 import collections as col
 
@@ -83,10 +84,10 @@ class trained_host(host.Host):
             reward_vector = torch.narrow(result, 0, self.net.choices, 1)
             reward = reward_vector.item()
             current_prob, choice = -float("inf"), -1
-            for _, prob in enumerate(prob_vector):
+            for i, prob in enumerate(prob_vector):
                 if prob > current_prob:
                     current_prob = prob
-                    choice = _
+                    choice = i
 
             coords = self._action_to_coords(choice)
             answer.append(coords)
@@ -214,7 +215,6 @@ class MCTSTrainer2(Trainer.Trainer):
         options.update(self.config)
         super().__init__(options, agent_net = ChooseFirstAgentModule) #todo: get agent module from initialization.
 
-        self.log = logger
 
         self.my_agent = ChooseFirstAgent() #todo: change this to cooperate with the Trainer.Trainer class.
         self.c_puct = options['c_puct']
@@ -265,6 +265,7 @@ class MCTSTrainer2(Trainer.Trainer):
         return examples
 
     def _loss_function(self, pred, y: List[torch.FloatTensor]):
+        #change list of tensors into batches.
         # loss function is a linear combination of MSE on winning/lossing prediction and cross entropy on probability
         # vectors.
 
@@ -279,6 +280,7 @@ class MCTSTrainer2(Trainer.Trainer):
                 choice_pred))
 
             # If it is changed to the build-in cross entropy, remove softmax both in the network and in the MCTS.get_sample().
+        loss = loss / len(pred)
 
         return loss
 
