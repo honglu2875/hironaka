@@ -25,7 +25,8 @@ class Trainer(abc.ABC):
         To maximize performances and lay the foundation for distributed training, we skip gym environments and game
             wrappers (Host, Agent, Game, etc.).
 
-        A Trainer (and its subclasses) is responsible for training a pair of host/agent networks.
+        A Trainer (and its subclasses) is responsible for training either a single player (either host or agent), or
+            a pair of (host, agent) altogether.
         A few important points before using/inheriting:
           - All parameters come from one single nested dict `config` as the positional argument in the constructor.
             A sample config should be given in YAML format for every implementation.
@@ -35,6 +36,14 @@ class Trainer(abc.ABC):
             It is okay to have optional config keys though (default: None).
           - Please include role-specific hyperparameters in `role_specific_hyperparameters`. The rest is taken care of.
             You can find the parameters in the dict returned by `get_all_role_specific_param()`
+          - The `__init__` of this base class is supposed to handle EVERYTHING about the reading of config. You will be
+            given all the attributes after calling `super().__init__(config, **kwargs)` on which your `_train()`
+            implementation should be based. The most commonly used attributes in `_train()` are:
+                self.host_net, self.host_optim, self.host_replay_buffer,
+                self.agent_net, self.agent_optim, self.agent_replay_buffer,
+                self.fused_game
+            Also use `self.get_all_role_specific_param(role)` to get role-specific attributes defined in
+            `role_specific_hyperparameters`.
 
         Please implement:
             _train()
@@ -49,7 +58,6 @@ class Trainer(abc.ABC):
     """
     optim_dict = {'adam': torch.optim.Adam,
                   'sgd': torch.optim.SGD}
-
     lr_scheduler_dict = {'constant': ConstantScheduler,
                          'exponential': ExponentialLRScheduler}
     er_scheduler_dict = {'constant': ConstantScheduler,
@@ -106,6 +114,7 @@ class Trainer(abc.ABC):
         #       'host_net' MUST be passed during initialization.
         #       But it will not be included in `self.trained_roles`.
         # The same goes for 'agent'...
+
         self.host_net = host_net
         self.agent_net = agent_net
         assert any([role in self.config for role in ['host', 'agent']]), \
@@ -145,30 +154,25 @@ class Trainer(abc.ABC):
                 continue
 
             head_cls, output_dim, pretrained_net = heads[role], output_dims[role], pretrained_nets[role]
+
             # Initialize hyperparameters
             for key in self.role_specific_hyperparameters:
                 setattr(self, f'{role}_{key}', self.config[role][key])
-
-            net_arch = self.config[role]['net_arch']
-            assert isinstance(net_arch, list), f"'net_arch' must be a list. Got {type(net_arch)}."
 
             # Construct networks
             if pretrained_net is not None:
                 # The pretrained network should have been set. Or there must be a broken update.
                 assert self.get_net(role) is not None
             else:
+                net_arch = self.config[role]['net_arch']
+                assert isinstance(net_arch, list), f"'net_arch' must be a list. Got {type(net_arch)}."
+
                 head = head_cls(self.dimension, self.max_num_points)
                 input_dim = head.feature_dim
                 setattr(self, f'{role}_net', self._make_network(head, net_arch, input_dim, output_dim).to(self.device))
 
             # Construct exploration rate scheduler
-            cfg = self.config[role]
-            er = cfg['er']
-            if 'er_schedule' in cfg:
-                er_scheduler = self.er_scheduler_dict[cfg['er_schedule']['mode']](er, **cfg['er_schedule'])
-            else:
-                er_scheduler = ConstantScheduler(er)
-            setattr(self, f'{role}_er_scheduler', er_scheduler)
+            self._make_er_scheduler(role)
 
             # Construct optimizer, lr scheduler and replay buffer
             setattr(self, f'{role}_optim_config', self.config[role]['optim'])
@@ -176,11 +180,11 @@ class Trainer(abc.ABC):
                 self._make_optimizer_and_lr(role)
                 self._make_replay_buffer(role, output_dim)
 
-        assert self.get_net('host') is not None and self.get_net('agent') is not None
-
         # -------- Initialize states -------- #
 
-        # Construct FusedGame
+        # At the end of the loop, both host_net and agent_net should be set.
+        assert self.host_net is not None and self.agent_net is not None
+        # Construct FusedGame.
         self._make_fused_game()
         # Generate initial collections of replays if 'deactivate' is not set or not True.
         if self.use_replay_buffer:
@@ -490,6 +494,18 @@ class Trainer(abc.ABC):
         setattr(self, f'{role}_lr_scheduler', lr_scheduler)
 
         self._set_optim(role)
+
+    def _make_er_scheduler(self, role: str):
+        """
+            Create exploration rate scheduler inside __init__. Should only be called during initialization.
+        """
+        cfg = self.config[role]
+        er = cfg['er']
+        if 'er_schedule' in cfg:
+            er_scheduler = self.er_scheduler_dict[cfg['er_schedule']['mode']](er, **cfg['er_schedule'])
+        else:
+            er_scheduler = ConstantScheduler(er)
+        setattr(self, f'{role}_er_scheduler', er_scheduler)
 
     @staticmethod
     def _make_network(head: nn.Module, net_arch: list, input_dim: int, output_dim: int) -> nn.Module:
