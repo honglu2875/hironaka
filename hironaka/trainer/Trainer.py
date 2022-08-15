@@ -60,6 +60,7 @@ class Trainer(abc.ABC):
     #   (except exploration_rate due to more complex nature).
     # Note that all the parameters defined here can be obtained by calling `get_all_role_specific_param()`.
     role_specific_hyperparameters = ['batch_size', 'initial_rollout_size', 'max_rollout_step']
+    model_specific_hyperparameters = []
 
     def __init__(self,
                  config: Union[Dict[str, Any], str],  # Either the config dict or the path to the YAML file
@@ -140,6 +141,10 @@ class Trainer(abc.ABC):
         # Set the reward function
         self.reward_func = reward_func
 
+        for key in self.model_specific_hyperparameters:  # Mingcong: I add model specific hyperparameters in case we
+            # need it. By default it is empty.
+            setattr(self, f'{key}', self.config[key])
+
         for role in ['host', 'agent']:
             if role not in self.config:
                 continue
@@ -181,11 +186,11 @@ class Trainer(abc.ABC):
         # -------- Initialize states -------- #
 
         # Construct FusedGame
-        self._make_fused_game()
-        # Generate initial collections of replays if 'deactivate' is not set or not True.
-        if self.use_replay_buffer:
-            for role in self.trained_roles:
-                self.collect_rollout(role, getattr(self, f'{role}_initial_rollout_size'))
+        # self._make_fused_game()
+        # # Generate initial collections of replays if 'deactivate' is not set or not True.
+        # if self.use_replay_buffer:
+        #     for role in self.trained_roles:
+        #         self.collect_rollout(role, getattr(self, f'{role}_initial_rollout_size'))
 
     def replace_nets(self, host_net: nn.Module = None, agent_net: nn.Module = None) -> None:
         """

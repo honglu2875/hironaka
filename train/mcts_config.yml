@@ -10,7 +10,17 @@ max_num_points: 10
 max_value: 20  # Not sure if this impacts the game at all
 max_grad_norm: 10
 
+c_puct: 0.5
+lr: 0.00001
+max_depth: 20
+MSE_coefficient: 1.0
+
 host:
+  c_puct: 0.5
+  lr: 0.00001
+  max_depth: 20
+  MSE_coefficient: 1.0
+
   batch_size: 1
   initial_rollout_size: 100
   max_rollout_step: 10
@@ -33,6 +43,11 @@ agent:
   batch_size: 256
   initial_rollout_size: 100
   max_rollout_step: 10
+  c_puct: 0.5
+  lr: 0.00001
+  max_depth: 20
+  MSE_coefficient: 1.0
+
   optim:
     name: 'adam'
     args:
@@ -50,7 +65,7 @@ agent:
 
 replay_buffer:
   type: 'base'
-  buffer_size: 10000000
+  buffer_size: 0
   use_cuda: false
 
 
