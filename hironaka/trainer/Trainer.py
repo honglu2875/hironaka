@@ -16,6 +16,7 @@ from .Scheduler import ConstantScheduler, ExponentialLRScheduler, ExponentialERS
 from .Timer import Timer
 from .nets import create_mlp, AgentFeatureExtractor, HostFeatureExtractor
 from .player_modules import DummyModule, RandomHostModule, AllCoordHostModule, RandomAgentModule, ChooseFirstAgentModule
+from ..src import HostActionEncoder
 
 
 class Trainer(abc.ABC):
@@ -103,6 +104,7 @@ class Trainer(abc.ABC):
         self.version_string = self.config['version_string']
 
         self.dimension = self.config['dimension']
+        self.host_action_encoder = HostActionEncoder(self.dimension)
         self.max_num_points = self.config['max_num_points']
         self.max_value = self.config['max_value']
 
@@ -143,7 +145,7 @@ class Trainer(abc.ABC):
 
         # Initialize host and agent parameters
         heads = {'host': HostFeatureExtractor, 'agent': AgentFeatureExtractor}
-        output_dims = {'host': 2 ** self.dimension, 'agent': self.dimension}
+        output_dims = {'host': 2 ** self.dimension - self.dimension - 1, 'agent': self.dimension}
         pretrained_nets = {'host': host_net, 'agent': agent_net}
 
         # Set the reward function
@@ -260,7 +262,7 @@ class Trainer(abc.ABC):
         for exp in exps:
             replay_buffer.add(*exp, clone=True)
 
-    def get_rollout(self, role: str, num_of_games: int, steps: int, er: float = None) -> List[Any]:
+    def get_rollout(self, role: str, num_of_games: int, steps: int, er: float = None) -> List:
         """
             Generate roll-out `step` number of times, and return the experiences as a tuple
                 (obs, act, rew, done, next_obs).
@@ -287,6 +289,7 @@ class Trainer(abc.ABC):
                 host_net vs (agent_net, RandomAgent, ChooseFirstAgent)
                 (RandomHost, AllCoordHost) vs agent_net
         """
+        # TODO: add count_actions into this evaluation and rename
         result = []
         dummy_param = (self.dimension, self.max_num_points, self.device)
         hosts = [self.host_net]*3 + [RandomHostModule(*dummy_param), AllCoordHostModule(*dummy_param)]
@@ -295,7 +298,7 @@ class Trainer(abc.ABC):
 
         for host, agent in zip(hosts, agents):
             points = self._generate_random_points(num_samples)
-            fused_game = FusedGame(host, agent, device_key=self.device_key, reward_func=self.reward_func)
+            fused_game = FusedGame(host, agent, device=self.device, reward_func=self.reward_func)
             initial = sum(points.ended_batch_in_tensor)
             previous = initial
             total_steps = 0
@@ -443,8 +446,8 @@ class Trainer(abc.ABC):
             param_group["lr"] = new_lr
 
     def _make_fused_game(self):
-        device_key = self.device_key
-        self.fused_game = FusedGame(self.host_net, self.agent_net, device_key=device_key, reward_func=self.reward_func)
+        self.fused_game = FusedGame(self.host_net, self.agent_net, device=self.device, reward_func=self.reward_func,
+                                    log_time=self.log_time)
 
     def _set_optim(self, role: str):
         """
@@ -461,6 +464,11 @@ class Trainer(abc.ABC):
         cfg = self.config['replay_buffer']
         self.use_replay_buffer = not cfg.get('deactivate', False)
         if self.use_replay_buffer:  # Ignore if `deactivate` is True
+            if cfg['use_cuda']:
+                device = torch.device('cuda') if self.use_cuda else self.device
+            else:
+                device = torch.device('cpu')
+
             if role == 'host':
                 input_shape = (self.max_num_points, self.dimension)
             elif role == 'agent':
@@ -472,7 +480,7 @@ class Trainer(abc.ABC):
             replay_buffer = self.replay_buffer_dict[cfg['type']](
                 input_shape=input_shape,
                 output_dim=output_dim,
-                device=self.device,
+                device=device,
                 **cfg)
             setattr(self, f'{role}_replay_buffer', replay_buffer)
 

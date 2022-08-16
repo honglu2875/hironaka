@@ -1,6 +1,6 @@
 import numbers
 import sys
-from typing import List, Union, Optional, Tuple, Dict, Any
+from typing import List, Union, Optional, Tuple, Dict, Any, Iterable
 
 import math
 
@@ -183,23 +183,12 @@ def mask_encoded_action(dimension: int):
     return result
 
 
-def mask_encoded_action_torch(dimension: int, device=torch.device('cpu'), dtype=torch.float32):
-    assert isinstance(dimension, int), f"Got {type(dimension)}."
-
-    result = torch.ones(2 ** dimension, dtype=dtype, device=device)
-    index = torch.arange(dimension, dtype=torch.int64, device=device)
-    result[0] = 0
-    result[2 ** index] = 0
-
-    return result
-
-
 def generate_points(n: int, dimension=3, max_value=50):
-    return [[np.random.randint(max_value) for _ in range(dimension)] for _ in range(n)]
+    return np.random.randint(0, max_value, (n, dimension)).tolist()
 
 
 def generate_batch_points(n: int, batch_num=1, dimension=3, max_value=50):
-    return [[[np.random.randint(max_value) for _ in range(dimension)] for _ in range(n)] for _ in range(batch_num)]
+    return np.random.randint(0, max_value, (batch_num, n, dimension)).tolist()
 
 
 def remove_repeated(points: torch.Tensor, padding_value: Optional[float] = -1.):
@@ -212,7 +201,7 @@ def remove_repeated(points: torch.Tensor, padding_value: Optional[float] = -1.):
 
     # get the difference matrix for the second axis
     difference = points.unsqueeze(2).repeat(1, 1, max_num_points, 1) - \
-                 points.unsqueeze(1).repeat(1, max_num_points, 1, 1)
+        points.unsqueeze(1).repeat(1, max_num_points, 1, 1)
 
     upper_tri = ~torch.triu(torch.ones((max_num_points, max_num_points), device=device).type(torch.bool), diagonal=0) \
         .unsqueeze(0).repeat(batch_size, 1, 1)
@@ -248,6 +237,7 @@ def merge_experiences(exp_lst: List[Experience]) -> Experience:
 
     return tuple(merged)
 
+
 class HostActionEncoder:
     """
     This class translates host actions between a list of chosen coordinates (used in game environment) and an integer (used in neural networks)
@@ -264,8 +254,18 @@ class HostActionEncoder:
             if not ((i & (i - 1) == 0)):  # Check if i is NOT a power of 2
                 self.action_translate.append(i)
 
+        self.binary_table = np.zeros((2 ** dim, dim))
+        for i in range(2 ** dim):
+            b = bin(i)[2:]
+            for j in range(len(b) - 1, -1, -1):
+                if b[j] == '1':
+                    self.binary_table[i][len(b) - 1 - j] = 1
+        self.binary_table = self.binary_table[self.action_translate, :]
+
     def encode(self, coords: List[int]) -> int:
-        # Given coords, return the integer for action. Inverse function of decode
+        """
+            Given coords, return the integer for action. Inverse function of decode
+        """
         assert len(coords) > 1
 
         action = 0
@@ -276,8 +276,22 @@ class HostActionEncoder:
 
         return action
 
+    def encode_tensor(self, coords: torch.Tensor) -> torch.Tensor:
+        """
+            Input is (batch, dim). Entries are either 0 or 1.
+            Torch tensor has different convention than list in terms of host action: [0,1] <-> torch.Tensor([1, 1, 0])
+        """
+        assert len(coords.shape) == 2
+        device = coords.device
+
+        actions = torch.sum(2 ** torch.arange(self.dim, device=device) * coords.type(torch.int64), dim=1)
+        actions = actions - torch.log2(actions).type(torch.int64) - 2
+        return actions
+
     def decode(self, action: int) -> List[int]:
-        # Given integer as action, return coords. Inverse function of encode.
+        """
+            Given integer as action, return coords. Inverse function of encode.
+        """
         assert (action < 2 ** self.dim - self.dim - 1) and (action >= 0)
 
         action = self.action_translate[action]
@@ -289,3 +303,13 @@ class HostActionEncoder:
             current_coord += 1
             action = action // 2
         return coords
+
+    def decode_tensor(self, actions: torch.Tensor) -> torch.Tensor:
+        """
+            Inverse function of encode_tensor.
+            E.g., turning [0, 1] -> torch.Tensor([[1, 1, 0], [1, 0, 1]])
+        """
+        assert len(actions.shape) == 1
+        assert all(actions.le(2 ** self.dim - self.dim - 2)) and all(actions.ge(0)), str(actions)
+        device = actions.device
+        return torch.tensor(self.binary_table, device=device, dtype=torch.float32)[actions]

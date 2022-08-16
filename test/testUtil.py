@@ -5,7 +5,7 @@ import torch
 from torch import nn
 
 from hironaka.src import get_batched_padded_array, batched_coord_list_to_binary, get_newton_polytope_lst, get_shape, \
-    merge_experiences
+    merge_experiences, HostActionEncoder
 from hironaka.trainer.nets import expand_net_list, create_mlp
 
 
@@ -182,3 +182,16 @@ class TestUtil(unittest.TestCase):
                                       [19, 19, 19, 19, 19]])})
 
         assert str(merge_experiences(exps)) == str(r)
+
+    def test_HostActionEncoder(self):
+        encoder = HostActionEncoder(3)
+        assert encoder.encode([0, 1]) == 0
+        print(encoder.encode_tensor(torch.tensor([[1., 1., 0.]])))
+        assert encoder.encode_tensor(torch.tensor([[1., 1., 0.]])).eq(torch.tensor([0], dtype=torch.int64)).all()
+        assert encoder.encode([0, 1, 2]) == 3
+        assert encoder.encode_tensor(torch.tensor([[1., 1., 1.]])).eq(torch.tensor([3], dtype=torch.int64)).all()
+        encoder = HostActionEncoder(4)
+        for i in range(11):
+            assert encoder.encode(encoder.decode(i)) == i
+        assert encoder.encode_tensor(encoder.decode_tensor(torch.arange(11))).eq(torch.arange(11)).all()
+

@@ -53,13 +53,6 @@ class ReplayBuffer:
 
     def add(self, obs: Union[torch.Tensor, Dict], action: torch.Tensor, reward: torch.Tensor,
             done: torch.Tensor, next_obs: Union[torch.Tensor, Dict], clone=True):
-
-        def set_value(a: torch.Tensor, b: torch.Tensor, clone=True):
-            if clone:
-                a[:] = b.clone()
-            else:
-                a[:] = b
-
         # Shape checks
         assert action.shape[1:] == torch.Size([1])
         assert reward.shape[1:] == torch.Size([1])
@@ -84,16 +77,17 @@ class ReplayBuffer:
             # Update each Tensor
             for target, source in zip(each_storage, each_data):
                 if self.pos + length < self.buffer_size:
-                    set_value(target[self.pos:self.pos + length], source, clone=clone)
+                    target[self.pos:self.pos + length] = self.set_value(source, clone=clone, device=self.device)
                 else:  # If full, roll back.
-                    set_value(target[self.pos:self.buffer_size], source[:self.buffer_size - self.pos], clone=clone)
-                    set_value(target[:length + self.pos - self.buffer_size], source[self.buffer_size - self.pos:],
-                              clone=clone)
+                    target[self.pos:self.buffer_size] = self.set_value(source[:self.buffer_size - self.pos],
+                                                                       clone=clone, device=self.device)
+                    target[:length + self.pos - self.buffer_size] = self.set_value(source[self.buffer_size - self.pos:],
+                                                                                   clone=clone, device=self.device)
 
         self.full = self.full or (length + self.pos) >= self.buffer_size
         self.pos = (length + self.pos) % self.buffer_size
 
-    def sample(self, batch_size: int) -> Tuple:
+    def sample(self, batch_size: int, device: torch.device = None, clone: bool = True) -> Tuple:
         sample_index = self.pos if not self.full else self.buffer_size
         assert sample_index > 0
 
@@ -108,9 +102,9 @@ class ReplayBuffer:
             if isinstance(data, dict):
                 d = {}
                 for key in data:
-                    d[key] = data[key][rand_index].clone()
+                    d[key] = self.set_value(data[key][rand_index], clone=clone, device=device)
             else:
-                d = data[rand_index].clone()
+                d = self.set_value(data[rand_index], clone=clone, device=device)
             experience.append(d)
 
         return tuple(experience)
@@ -118,3 +112,7 @@ class ReplayBuffer:
     def reset(self):
         self.pos = 0
         self.full = False
+
+    @staticmethod
+    def set_value(t: torch.Tensor, clone: bool, device: torch.device) -> torch.Tensor:
+        return t.to(device).clone() if clone else t.to(device)

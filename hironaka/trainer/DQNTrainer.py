@@ -47,7 +47,7 @@ class DQNTrainer(Trainer):
         # Sample replay buffer
         with Timer(log_prefix + '-sample_replay_buffer_total', self.time_log, active=self.log_time,
                    use_cuda=self.use_cuda):
-            replay_data = replay_buffer.sample(batch_size)
+            replay_data = replay_buffer.sample(batch_size, device=self.device)
             observations, actions, rewards, dones, next_observations = replay_data
 
         with Timer(log_prefix + '-get_target_q_value_total', self.time_log, active=self.log_time,

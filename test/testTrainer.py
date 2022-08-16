@@ -62,12 +62,11 @@ class TestTrainer(unittest.TestCase):
         r = game.step(p, 'agent', scale_observation=False)
 
     def test_replay_buffer_shape(self):
-
         points_t = torch.randint(5, (2, 20, 3)).type(torch.float)
         p = TensorPoints(points_t, padding_value=-1e-8)
 
         game = self.dqn_trainer.fused_game
-        replay_buffer = ReplayBuffer((20, 3), 8, 100, torch.device('cpu'))
+        replay_buffer = ReplayBuffer((20, 3), 4, 100, torch.device('cpu'))
         exp = game.step(p, 'host', scale_observation=False)
         length = exp[0].shape[0]
 
