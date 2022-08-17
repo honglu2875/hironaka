@@ -61,11 +61,11 @@ geometry.
 # What is a resolution of singularity
 
 An affine algebraic variety  
-$$X = \{(x_1,\ldots, x_n): f_1(x_1,\ldots, x_n)=\ldots =f_k(x_1,\ldots, x_n)=0\} \subset A^n$$
+$$X =\{(x_1,\ldots, x_n): f_1(x_1,\ldots, x_n)=\ldots =f_k(x_1,\ldots, x_n)=0\} \subset A^n$$
 is the common zero locus of polynomial equations. Affine varieties play central role in mathematics, physics and biology.   
 
 Affine varieties cut out by one polynomial equation are called affine hypersurfaces. E.g
-$$X=\{\}$$
+$$X=\{(x_1,\ldots, x_n):f(x_1,\ldots, x_n)=0\}$$
 
 
 ## Singularities
@@ -77,7 +77,7 @@ $x \in X$ the variety locally is $A^r$ for some $r$, which we call the dimension
 However, there are special, ill-behaved points, where the local geometry of $X$ is less patent.
 
 The set $X$ is singular at a point $a \in X$ if the Jacobian matrix
-$$Jac(X,a)=\left(\partial f_i \partial x_j\right)(a)$$
+$$Jac(X,a)=\left(\frac{\partial f_i}{\partial x_j}\right)(a)$$
 at a is of rank smaller than $n-dim(X)$. The set of singular points of $X$ is called the singular locus of $X$.
 
 
@@ -94,8 +94,9 @@ elementary type of operation called blowing up. Blowing up or blowup is a type o
 replaces a subspace of a given space  with all the directions pointing out of that subspace. 
 
 For example, the blowup of a point in a plane replaces the point 
-with the projectivized tangent space at that point...
-[examples]
+with the projectivized tangent space at that point. The geometric picture looks as follows: 
+
+![alt text](https://github.com/honglu2875/hironaka/tree/gergely/Blow-up.png "Blow-up of the plane at a point")
 
 ## Hironaka's theorem
 
