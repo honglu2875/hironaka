@@ -137,7 +137,7 @@ Bogomolov and Pantev.
 
 # Applications and open questions
 
-##Hilbert scheme of points on manifolds
+## Hilbert scheme of points on manifolds
 
 
 ## Singularity theory and Thom polynomials
