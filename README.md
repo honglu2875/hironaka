@@ -61,11 +61,11 @@ geometry.
 # What is a resolution of singularity
 
 An affine algebraic variety  
-\[X = \{(x_1,\ldots, x_n): f_1(x_1,\ldots, x_n)=\ldots =f_k(x_1,\ldots, x_n)=0\} \subset A^n\]
-is the common zero locus of polynomial equations. Affine varieties play central role in mathematics, physics and biology.  
+$$X = \{(x_1,\ldots, x_n): f_1(x_1,\ldots, x_n)=\ldots =f_k(x_1,\ldots, x_n)=0\} \subset A^n$$
+is the common zero locus of polynomial equations. Affine varieties play central role in mathematics, physics and biology.   
 
-Affine varieties cut out by one polynomial exation are called affine hypersurfaces. E.g
-\[X=\{\}\]
+Affine varieties cut out by one polynomial equation are called affine hypersurfaces. E.g
+$$X=\{\}$$
 
 
 ## Singularities
@@ -76,8 +76,8 @@ We can think of varieties as "shapes in affine spaces", and at a generic point
 $x \in X$ the variety locally is $A^r$ for some $r$, which we call the dimension of $X$.
 However, there are special, ill-behaved points, where the local geometry of $X$ is less patent.
 
-The set $X$ is singular at a point $ a \in X$ if the Jacobian matrix
-\[Jac(X,a)=\left(\partial f_i \partial x_j\right)(a)
+The set $X$ is singular at a point $a \in X$ if the Jacobian matrix
+$$Jac(X,a)=\left(\partial f_i \partial x_j\right)(a)$$
 at a is of rank smaller than $n-dim(X)$. The set of singular points of $X$ is called the singular locus of $X$.
 
 
