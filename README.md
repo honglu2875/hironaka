@@ -102,7 +102,7 @@ with the projectivized tangent space at that point. The geometric picture looks 
 
 The most famous and general result concerning resolution of singularities was given by Heisuke Hironaka in 1964 
 He proved that the resolution of singularities can be achieved by a sequence of blowups 
-\[Y=X_n \to X_{n-1} \to \ldots \to X_0=X\]
+$$Y=X_n \to X_{n-1} \to \ldots \to X_0=X$$
 if the characteristic of the base field is zero.
 
 This beautiful and fundamental work was recognized with a Fields medal in 1970. Recently, Villamayor and, independently, 
@@ -137,6 +137,9 @@ Bogomolov and Pantev.
 
 # Applications and open questions
 
+##Hilbert scheme of points on manifolds
+
+
 ## Singularity theory and Thom polynomials
 
 Geometric invariant theory is the algebraic set-up to construct quotients of algebraic varieties by algebraic group 
@@ -144,7 +147,9 @@ actions. A key technical conditions for GIT is called the semistability=stabilit
 a blow-up algorithm to prepare our space for GIT. When the acting group is a non-reductive reparametrisation group, the 
 GIT blow-up procedure can be interpreted using the Hironaka game.
 
-## Comparing performance of different winnig strategies
+
+
+## Comparing performance of different winning strategies
 
 ## Other problems
 
