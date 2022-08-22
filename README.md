@@ -23,33 +23,6 @@ For math-oriented viewers or ML experts who are intrigued about the background s
 - [Variations of Hironaka's game](#variations-of-hironakas-game)
 - [Further topics](#further-topics)
 
-# Rule of the game
-
-## The definition of the game
-
-The original Hironaka game is a game consisting of 2 players. They operate in a non-symmetric fashion. To emphasize the
-difference, let us call player 1 the "host", player 2 the "agent". For every turn the game has a `state`, the host makes
-a move, and the agents makes a move. Their moves change the `state` and the game goes into the next turn.
-
-A `state` is represented by a set of points $S\in\mathbb Z^n$ who are the vertices of the Newton polytope $S$ itself.
-
-Every turn,
-
-- The host chooses a subset $I\subset \{1,2,\cdots, n\}$ such that $|I|\geq 2$.
-- The agent chooses a number $i\in I$.
-
-$i, I$ together changes the `state` $S$ to the next according to the following linear change of variables:
-
-$$x_j \mapsto \begin{cases}x_j, &\qquad\text{if } i\neq j \newline \sum\limits_{k\in I} x_k, &\qquad\text{if }i=j
-\end{cases},$$
-
-for points $(x_1,\cdots,x_n)\in \mathbb Z^n$. We subsequently apply Newton polytope to the transformed points and only
-keep the vertices.
-
-A `state` is terminal if it consists of one single point. In this case, the game will not continue and the host wins. As
-a result, the host wants to reduce the number of $S$ as quickly as possible, but the agent wants to keep the number of
-$S$ for as long as possible.
-
 # The structure of the repo
 
 ......
@@ -112,10 +85,23 @@ explicitly describing the algorithmic nature of the resolution process.
 Using de Jong's deep ideas, simple proofs of Hironaka's theorem have been discovered by de Jong and Abramovich and by 
 Bogomolov and Pantev.
 
+The latest big progress in approaching a simple resolution algorithm was achieved by 
+Abramovich-Tempkin-Vlodarczyk and independenty by McQuillen, who 
+came up with a simple stacky presentation using weighted blow-ups. 
+
+
 
 
 
 # What is Hironaka's polyhedral game
+
+In the literature, there appear at least 11 proofs for Hironaka's celebrated theorem on the resolution of singularities
+of varieties of arbitrary dimension defined over fields of characteristic zero. These proofs associate invariants to 
+singularities, and show that certain type of blow-ups improve the invariant. 
+
+We can interpret resolution as a game between two players. Player A attempts to improve the singularities. 
+Player B is some malevolent adversary who tries to keep the singularities alive as long as possible. 
+The first player chooses the centres of the blowups, the second provides new order functions after each blowup. 
 
 ## Monomial ideals
 
@@ -127,9 +113,67 @@ Bogomolov and Pantev.
 
 # Variations of Hironaka's game
 
-## Spivakovsky game
+## Short summary 
+
+The formulation of the resolution as a game goes back to Hironaka himself. He introduced the polyhedra game where 
+Player A has a winning strategy, which provide resolution of hypersurface singularities. He formulated a "hard" 
+polyhedra game, where a winning strategy for Player A would imply the resolution theorem in full generality, but such 
+winning strategy does not necessarily exist. 
+Later Hauser defined a game which provided a new proof of the Hironaka theorem. 
+
+Certain modified version of the game, due to Bloch and Levine provide solutions to the moving cylcles problem. 
+Finally, recent work of Berczi shows that a restricted weighted version of the Hironaka game provides closed integration
+formulas over Hilbert scheme of points on manifolds.  
+
+## The definition of the game
+
+All versions of the game consist of 2 players. They operate in a non-symmetric fashion. To emphasize the
+difference, let us call Player A the "host", player B the "agent". For every turn the game has a `state`, the host makes
+a move, and the agents makes a move. Their moves change the `state` and the game goes into the next turn.
+
+A `state` is represented by a set of points $S\in\mathbb Z^n$ satisfying certain rules depending of the different versions
+of the game. At each turn,
+
+- The host chooses a subset $I\subset \{1,2,\cdots, n\}$ such that $|I|\geq 2$.
+- The agent chooses a number $i\in I$.
+
+$(i, I)$ together defines a change of the `state` $S$ to the next according to a certain rule. Player A wins if 
+the 'state' becomes 'terminal', where 'terminal' is defined in each version 
+slightly different ways. 
+
+
+
+## Hironaka's polyhedra game 
+
+\textbf{The game:} The original Hironaka game 
+
+
+## Hard polyhedra game 
+
+\textbf{The game:} 
+
+
+\textbf{History:} The hard polyhedra game was proposed by Hironaka in 1978. 
+Hironaka has proved that an affirmative solution of this game would imply the local uniformization theorem for an
+algebraic variety over an algebraically closed field of any characteristic.
+Mark Spivakovsky showed that Player A does not always have a winning strategy
+
 
 ## Hauser game 
+
+\textbf{The game:} This version was suggested by Hauser. A simple winning strategy was given by Zeillinger. 
+
+Following linear change of variables:
+
+$$x_j \mapsto \begin{cases}x_j, &\qquad\text{if } i\neq j \newline \sum\limits_{k\in I} x_k, &\qquad\text{if }i=j
+\end{cases},$$
+
+for points $(x_1,\cdots,x_n)\in \mathbb Z^n$. We subsequently apply Newton polytope to the transformed points and only
+keep the vertices.
+
+A `state` is terminal if it consists of one single point. In this case, the game will not continue and the host wins. As
+a result, the host wants to reduce the number of $S$ as quickly as possible, but the agent wants to keep the number of
+$S$ for as long as possible.
 
 ## Bloch-Levine game for moving cycles
 
