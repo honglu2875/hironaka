@@ -2,7 +2,7 @@ import abc
 import contextlib
 import logging
 from copy import deepcopy
-from typing import List, Any, Dict, Union, Callable, Optional, Tuple
+from typing import List, Any, Dict, Union, Callable, Optional, Tuple, Type
 
 import torch
 import yaml
@@ -12,7 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 from hironaka.core import TensorPoints
 from .FusedGame import FusedGame
 from .ReplayBuffer import ReplayBuffer
-from .Scheduler import ConstantScheduler, ExponentialLRScheduler, ExponentialERScheduler
+from .Scheduler import ConstantScheduler, ExponentialLRScheduler, ExponentialERScheduler, InverseLRScheduler, Scheduler
 from .Timer import Timer
 from .nets import create_mlp, AgentFeatureExtractor, HostFeatureExtractor
 from .player_modules import DummyModule, RandomHostModule, AllCoordHostModule, RandomAgentModule, ChooseFirstAgentModule
@@ -60,7 +60,8 @@ class Trainer(abc.ABC):
     optim_dict = {'adam': torch.optim.Adam,
                   'sgd': torch.optim.SGD}
     lr_scheduler_dict = {'constant': ConstantScheduler,
-                         'exponential': ExponentialLRScheduler}
+                         'exponential': ExponentialLRScheduler,
+                         'inverse': InverseLRScheduler}
     er_scheduler_dict = {'constant': ConstantScheduler,
                          'exponential': ExponentialERScheduler}
     replay_buffer_dict = {'base': ReplayBuffer}
@@ -76,7 +77,8 @@ class Trainer(abc.ABC):
                  device_num: int = 0,  # For distributed training: the number of cuda device
                  host_net: Optional[nn.Module] = None,  # Pre-assigned host_net. Will ignore host config if set.
                  agent_net: Optional[nn.Module] = None,  # Pre-assigned agent_net. Will ignore agent config if set.
-                 reward_func: Optional[Callable] = None
+                 reward_func: Optional[Callable] = None,
+                 point_cls: Optional[Type[TensorPoints]] = TensorPoints  # the class to construct points
                  ):
         self.logger = logging.getLogger(__class__.__name__)
 
@@ -107,6 +109,11 @@ class Trainer(abc.ABC):
         self.host_action_encoder = HostActionEncoder(self.dimension)
         self.max_num_points = self.config['max_num_points']
         self.max_value = self.config['max_value']
+        self.point_cls = point_cls
+
+        # Get feature dimension by constructing a dummy tensor
+        pts = self.point_cls(torch.rand(1, self.max_num_points, self.dimension))
+        self.feature_dim = pts.get_features().reshape(-1).shape[0]
 
         # Add networks. The designed behavior should be the following:
         #   if 'host' is present in config:
@@ -145,6 +152,8 @@ class Trainer(abc.ABC):
 
         # Initialize host and agent parameters
         heads = {'host': HostFeatureExtractor, 'agent': AgentFeatureExtractor}
+        input_dims = {'host': self.feature_dim,
+                      'agent': self.feature_dim + self.dimension}
         output_dims = {'host': 2 ** self.dimension - self.dimension - 1, 'agent': self.dimension}
         pretrained_nets = {'host': host_net, 'agent': agent_net}
 
@@ -155,7 +164,8 @@ class Trainer(abc.ABC):
             if role not in self.config:
                 continue
 
-            head_cls, output_dim, pretrained_net = heads[role], output_dims[role], pretrained_nets[role]
+            head_cls, input_dim, output_dim, pretrained_net = \
+                heads[role], input_dims[role], output_dims[role], pretrained_nets[role]
 
             # Initialize hyperparameters
             for key in self.role_specific_hyperparameters:
@@ -169,7 +179,7 @@ class Trainer(abc.ABC):
                 net_arch = self.config[role]['net_arch']
                 assert isinstance(net_arch, list), f"'net_arch' must be a list. Got {type(net_arch)}."
 
-                head = head_cls(self.dimension, self.max_num_points)
+                head = head_cls(input_dim)
                 input_dim = head.feature_dim
                 setattr(self, f'{role}_net', self._make_network(head, net_arch, input_dim, output_dim).to(self.device))
 
@@ -283,6 +293,7 @@ class Trainer(abc.ABC):
                                                  exploration_rate=er))
         return exps
 
+    @torch.inference_mode()
     def evaluate_rho(self, num_samples: int = 100, max_steps: int = 100) -> List[torch.Tensor]:
         """
             Estimate the rho value for pairs:
@@ -290,6 +301,10 @@ class Trainer(abc.ABC):
                 (RandomHost, AllCoordHost) vs agent_net
         """
         # TODO: add count_actions into this evaluation and rename
+        if self.host_net.training or self.agent_net.training:
+            self.logger.error("Host net or agent net is still in training mode. Eval will not be executed")
+            return []
+
         result = []
         dummy_param = (self.dimension, self.max_num_points, self.device)
         hosts = [self.host_net]*3 + [RandomHostModule(*dummy_param), AllCoordHostModule(*dummy_param)]
@@ -315,7 +330,15 @@ class Trainer(abc.ABC):
             result.append((num_samples - initial) / total_steps)
         return result
 
+    @torch.inference_mode()
     def count_actions(self, role: str, games: int, max_steps: int = 100, er: float = None) -> torch.Tensor:
+        """
+            Get samples of rollout and count the action distributions.
+        """
+        if self.get_net(role).training:
+            self.logger.error("Host net or agent net is still in training mode. Eval will not be executed")
+            return None
+
         rollouts = self.get_rollout(role, games, max_steps, er=er)
         if role == 'host':
             max_num = 2**self.dimension
@@ -392,28 +415,28 @@ class Trainer(abc.ABC):
             setattr(self, f'{role}_all_param', result)
         return getattr(self, f'{role}_all_param')
 
-    def get_net(self, role):
+    def get_net(self, role) -> torch.nn.Module:
         return getattr(self, f'{role}_net')
 
     def get_optim(self, role):
         return getattr(self, f'{role}_optimizer', None)
 
-    def get_lr_scheduler(self, role):
+    def get_lr_scheduler(self, role) -> Scheduler:
         return getattr(self, f'{role}_lr_scheduler', None)
 
-    def get_er_scheduler(self, role):
+    def get_er_scheduler(self, role) -> Scheduler:
         return getattr(self, f'{role}_er_scheduler', None)
 
-    def get_er(self, role):
+    def get_er(self, role) -> float:
         return self.get_er_scheduler(role)(self.total_num_steps)
 
-    def get_replay_buffer(self, role):
+    def get_replay_buffer(self, role) -> ReplayBuffer:
         return getattr(self, f'{role}_replay_buffer', None)
 
-    def get_batch_size(self, role):
+    def get_batch_size(self, role) -> int:
         return getattr(self, f'{role}_batch_size')
 
-    def is_dummy(self, role):
+    def is_dummy(self, role) -> bool:
         return getattr(self, f'{role}_is_dummy')
 
     # -------- Set internal parameters (used outside initialization) -------- #
@@ -522,7 +545,7 @@ class Trainer(abc.ABC):
     def _generate_random_points(self, samples: int) -> TensorPoints:
         pts = torch.randint(self.max_value + 1, (samples, self.max_num_points, self.dimension), dtype=torch.float32,
                             device=self.device)
-        points = TensorPoints(pts, device_key=self.device_key)
+        points = self.point_cls(pts, device_key=self.device_key)
         points.get_newton_polytope()
         if self.scale_observation:
             points.rescale()

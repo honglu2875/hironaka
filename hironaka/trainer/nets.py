@@ -112,18 +112,13 @@ class BaseFeaturesExtractor(nn.Module, abc.ABC):
             forward()
     """
 
-    def __init__(self, dimension: int, max_num_points: int):
+    def __init__(self, input_dim: int):
         super().__init__()
-        self.dimension = dimension
-        self.max_num_points = max_num_points
+        self.input_dim = input_dim
 
     @property
     def feature_dim(self) -> int:
-        return self._get_feature_dim()
-
-    @abc.abstractmethod
-    def _get_feature_dim(self):
-        pass
+        return self.input_dim
 
     @abc.abstractmethod
     def forward(self, observations) -> torch.Tensor:
@@ -131,8 +126,8 @@ class BaseFeaturesExtractor(nn.Module, abc.ABC):
 
 
 class AgentFeatureExtractor(BaseFeaturesExtractor):
-    def __init__(self, dimension: int, max_num_points: int):
-        super().__init__(dimension, max_num_points)
+    def __init__(self, input_dim: int):
+        super().__init__(input_dim)
         self.extractors = {'points': nn.Flatten(),
                            'coords': nn.Flatten()}
 
@@ -142,17 +137,12 @@ class AgentFeatureExtractor(BaseFeaturesExtractor):
             tensor_list.append(extractor(observations[key]))
         return torch.cat(tensor_list, dim=1)
 
-    def _get_feature_dim(self) -> int:
-        return self.dimension * self.max_num_points + self.dimension
-
 
 class HostFeatureExtractor(BaseFeaturesExtractor):
-    def __init__(self, dimension: int, max_num_points: int):
-        super().__init__(dimension, max_num_points)
+    def __init__(self, input_dim: int):
+        super().__init__(input_dim)
         self.flatten = nn.Flatten()
 
     def forward(self, observations: torch.Tensor) -> torch.Tensor:
         return self.flatten(observations)
 
-    def _get_feature_dim(self) -> int:
-        return self.dimension * self.max_num_points

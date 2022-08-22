@@ -88,7 +88,7 @@ class DQNTrainer(Trainer):
             # Logging
             # We hard-coded the 20-step interval for now. Profiling analysis shows it is about 1/10 on time cost
             #   comparing to autograd happening above.
-            if self.use_tensorboard and self.layerwise_logging and (self.total_num_steps + current_step) % 20 == 0:
+            if self.use_tensorboard and self.layerwise_logging and (self.total_num_steps + current_step) % 100 == 0:
                 for j, layer in enumerate(q_net.parameters()):
                     self.tb_writer.add_scalar(f'{log_prefix}/model/layer-{j}/avg_wt', layer.mean().item(),
                                               self.total_num_steps + current_step)

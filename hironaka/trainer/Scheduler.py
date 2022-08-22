@@ -47,6 +47,16 @@ class ExponentialLRScheduler(Scheduler):
         return initial_lr * (rate ** steps) + self.value * (1 - rate ** steps)
 
 
+class InverseLRScheduler(Scheduler):
+    key_name = 'lr_schedule'
+    mandatory_keys = ['initial_lr', 'rate']
+
+    def get_value(self, steps: int) -> Union[float, int]:
+        initial_lr = self.kwargs['initial_lr']
+        rate = self.kwargs['rate']
+        return rate / (steps + rate / initial_lr)
+
+
 class ExponentialERScheduler(Scheduler):
     key_name = 'er_schedule'
     mandatory_keys = ['initial_er', 'rate']
