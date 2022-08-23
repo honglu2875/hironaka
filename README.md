@@ -168,7 +168,7 @@ was given by Mark Spivakovsky in 1980, which proved the resolution theorem for h
 
 \textbf{The rules:}
 \begin{itemize}
-\item `states`: A finite set of points $S \subset \mathbf{N}^n$, such that $\sum_{i=1}^n x_i>1$ for all 
+\item `states`: A finite set of rational points $S \subset \mathbf{Q}^n$, such that $\sum_{i=1}^n x_i>1$ for all 
 $(x_1,\ldots, x_n)\in S$, and $S$ is the set of vertices of the positive 
 convex hull $\Delta=\{S+\mathbf{R}^n_+\}$. 
 \item `move`: The host chooses a subset $I\subset \{1,2,\cdots, n\}$ such that $|I|\geq 2$ and 
@@ -191,11 +191,17 @@ Mark Spivakovsky showed that Player A does not always have a winning strategy
 
 \textbf{The rules:}
 \begin{itemize}
-\item `states`: A finite set of points $S \subset \mathbf{N}^n$, such that $\sum_{i=1}^n x_i>1$ for all 
-$(x_1,\ldots, x_n)\in S$, and $S$ is the set of vertices of the positive 
+\item `states`: A finite set of rational points $S \subset \mathbf{Q}^n$, such that $\sum_{i=1}^n x_i>1$ for all 
+$(x_1,\ldots, x_n)\in S$, the denominators are bounded by some fix $N$, and $S$ is the set of vertices of the positive 
 convex hull $\Delta=\{S+\mathbf{R}^n_+\}$. 
 \item `move`: The host chooses a subset $I\subset \{1,2,\cdots, n\}$ such that $|I|\geq 2$ and 
-\sum_{i\in I}x_i\ge 1$ for all $(x_1,\ldots, x_n)\in S$. The agent chooses a number $i\in I$.
+\sum_{i\in I}x_i\ge 1$ for all $(x_1,\ldots, x_n)\in S$. 
+The agent chooses some element $i\in S$ and modifies the Newton polygon $\Delta$ to a set $\Delta^*$ by
+the following procedure: first, the agent selects a finite number of points $y=(y_1,\ldots, y_n)$, all of whose 
+coordinates are rational numbers with denominators bounded by $N$ as above, and for each of which there exists
+an $x = (x_1, \ldots, x_n)\in \Delta$ which satisfy some basic relations. $\Delta^*$ is then taken to be the positive 
+convex hull of $\Delta \cup \{selected points\}$.
+
 \item `state change`: Given the pair (I,i) chosen by the host, for $x=(x_1,\cdots,x_n)\in \mathbb Z^n$ we define
 $T_{I,i}(x)=(x_1',\ldots, x_n')$ where 
 $$x_j' = \begin{cases}x_j, &\qquad\text{if } i\neq j \newline \sum\limits_{k\in I} x_k -1, &\qquad\text{if }i=j
@@ -205,12 +211,46 @@ The new `state` $S'$ is formed by the vertices of the Newton polyhedron of $\Del
 $\sum_{i=1}^n x_i \le 1$. 
 \end{enumerate}
 
+## The Stratify game 
 
-## Bloch-Levine game for moving cycles
+In 2012 Hauser and Schicho introduced a combinatorial game, called Stratify. It exhibits the axiomatic and logical 
+structure of the existing proofs for the resolution of singularities of algebraic varieties in characteristic zero. 
+The resolution is typically built on a sequence of blowups in smooth centres which are chosen as the smallest stratum 
+of a suitable stratification of the variety. The choice of the stratification and the proof of termination of the 
+resolution procedure are both established by induction on the ambient dimension. 
 
 ## Thom game
 
+In 2021 Berczi introduced the Thom game, which is a weighted version of the Hironaka game. It has a winning strategy, and
+every run of the game provides a blow-up tree, which encodes a formula for Thom polynomials of singularities, answering 
+long-standing question in enumerative geometry.
 
+\textbf{The rules:}
+\begin{itemize}
+\item `states`: A pair (S,w), where: S is a finite set of points $S \subset \mathbf{N}^n$, such that $S$ is the set of 
+vertices of the positive convex hull $\Delta=\{S+\mathbf{R}^n_+\}$; $w=(w_1,\ldots, w_n)\in \mathbf{N}^n$ is a weight 
+vector associating a nonnegative integer weight to all coordinates.
+\item `move`: The host chooses a subset $I\subset \{1,2,\cdots, n\}$ such that $|I|\geq 2$ and 
+\sum_{i\in I}x_i\ge 1$ for all $(x_1,\ldots, x_n)\in S$.
+The agent chooses an $i\in I$ such that $w_i$ is minimal in $\{w_j: j\in I\}$.
+\item `state change`: Given the pair (I,i) chosen by the host, for $x=(x_1,\cdots,x_n)\in \mathbb Z^n$ we define
+$T_{I,i}(x)=(x_1',\ldots, x_n')$ where 
+$$x_j' = \begin{cases}x_j, &\qquad\text{if } i\neq j \newline \sum\limits_{k\in I} x_k, &\qquad\text{if }i=j
+\end{cases},$$
+The new `state` $S'$ is formed by the vertices of the Newton polyhedron of $\Delta'=\{T_{I,i}(x):x\in S\}$, shifted by
+a positive integer multiple of $(-1,\ldots, -1)$ such that $S'$ still sits in the positive quadrant, but any
+further shift will move it out. 
+The new weight vector is 
+$$w'_j=\begin{cases}w_j, &\qquad\text{if } j=i or j\notin I \newline w_j-w_i &\qquad\text{if } j \in I\setminus \{i\}
+\end{cases},$$
+\item `terminal states`: a state $S$ is terminal if it consists of one single point, and  
+\end{enumerate}
+
+## The Abramovich-Tempkin-Vlodarczyk game
+
+In 2020 Abramovich-Tempkin-Vlodarczyk introduced a new resolution algorithm, based on weighted blow-ups. It significantly 
+simplifies the resolution process and uses intrinstic invariants of singularities which improve
+after each blow-up. 
 
 # Applications and open questions
 
@@ -220,8 +260,11 @@ $\sum_{i=1}^n x_i \le 1$.
 
 ## Comparing performance of different winning strategies
 
+
 ## Other problems
 
-From "FORTY QUESTIONS ON SINGULARITIES OF ALGEBRAIC VARIETIES" by Hauser and Schicho
 
-...
+
+## References
+
+[]
