@@ -137,61 +137,86 @@ of the game. At each turn,
 - The host chooses a subset $I\subset \{1,2,\cdots, n\}$ such that $|I|\geq 2$.
 - The agent chooses a number $i\in I$.
 
-$(i, I)$ together defines a change of the `state` $S$ to the next according to a certain rule. Player A wins if 
-the 'state' becomes 'terminal', where 'terminal' is defined in each version 
+$(i, I)$ together defines a `state change`, which is a simple geometric transformation of $S$ to $S'$ according to a 
+certain rule. Player A wins if 
+the `state` becomes `terminal state`, where the set of `terminal states` are defined in each version 
 slightly different ways. 
 
+## Hauser game 
 
+This version of the Hironaka game was suggested by Hauser. A simple winning strategy was given by Zeillinger. The existence of winning 
+strategy proves the resolution theorem for hypersurfaces.
+
+\textbf{The rules:}
+\begin{itemize}
+\item `states`: A finite set of points $S \subset \mathbf{N}^n$, such that $S$ is the set of vertices of the positive 
+convex hull $\Delta=\{S+\mathbf{R}^n_+\}$. 
+\item `state change`: Given the pair (I,i) chosen by the host, for $x=(x_1,\cdots,x_n)\in \mathbb Z^n$ we define
+$T_{I,i}(x)=(x_1',\ldots, x_n')$ where 
+$$x_j' = \begin{cases}x_j, &\qquad\text{if } i\neq j \newline \sum\limits_{k\in I} x_k, &\qquad\text{if }i=j
+\end{cases},$$
+The new `state` $S'$ is formed by the vertices of the Newton polyhedron of $\Delta'=\{T_{I,i}(x):x\in S\}$.
+\item `terminal states`: a state $S$ is terminal if it consists of one single point. 
+\end{enumerate}
+In short, the host wants to reduce the size of $S$ as quickly as possible, but the agent wants to keep the size of
+$S$ large.
 
 ## Hironaka's polyhedra game 
 
-\textbf{The game:} The original Hironaka game 
+This is the original Hironaka game from 1970. A winning strategy for the host
+was given by Mark Spivakovsky in 1980, which proved the resolution theorem for hypersurfaces.  
 
+\textbf{The rules:}
+\begin{itemize}
+\item `states`: A finite set of points $S \subset \mathbf{N}^n$, such that $\sum_{i=1}^n x_i>1$ for all 
+$(x_1,\ldots, x_n)\in S$, and $S$ is the set of vertices of the positive 
+convex hull $\Delta=\{S+\mathbf{R}^n_+\}$. 
+\item `move`: The host chooses a subset $I\subset \{1,2,\cdots, n\}$ such that $|I|\geq 2$ and 
+\sum_{i\in I}x_i\ge 1$ for all $(x_1,\ldots, x_n)\in S$. The agent chooses a number $i\in I$.
+\item `state change`: Given the pair (I,i) chosen by the host, for $x=(x_1,\cdots,x_n)\in \mathbb Z^n$ we define
+$T_{I,i}(x)=(x_1',\ldots, x_n')$ where 
+$$x_j' = \begin{cases}x_j, &\qquad\text{if } i\neq j \newline \sum\limits_{k\in I} x_k -1, &\qquad\text{if }i=j
+\end{cases},$$
+The new `state` $S'$ is formed by the vertices of the Newton polyhedron of $\Delta'=\{T_{I,j}(x):x\in S\}$.
+\item `terminal states`: a state $S$ is terminal if it consists a point $(x_1,\ldots, x_n)$ such that 
+$\sum_{i=1}^n x_i \le 1$. 
+\end{enumerate}
 
 ## Hard polyhedra game 
 
-\textbf{The game:} 
-
-
-\textbf{History:} The hard polyhedra game was proposed by Hironaka in 1978. 
+The hard polyhedra game was proposed by Hironaka in 1978. 
 Hironaka has proved that an affirmative solution of this game would imply the local uniformization theorem for an
 algebraic variety over an algebraically closed field of any characteristic.
 Mark Spivakovsky showed that Player A does not always have a winning strategy
 
-
-## Hauser game 
-
-\textbf{The game:} This version was suggested by Hauser. A simple winning strategy was given by Zeillinger. 
-
-Following linear change of variables:
-
-$$x_j \mapsto \begin{cases}x_j, &\qquad\text{if } i\neq j \newline \sum\limits_{k\in I} x_k, &\qquad\text{if }i=j
+\textbf{The rules:}
+\begin{itemize}
+\item `states`: A finite set of points $S \subset \mathbf{N}^n$, such that $\sum_{i=1}^n x_i>1$ for all 
+$(x_1,\ldots, x_n)\in S$, and $S$ is the set of vertices of the positive 
+convex hull $\Delta=\{S+\mathbf{R}^n_+\}$. 
+\item `move`: The host chooses a subset $I\subset \{1,2,\cdots, n\}$ such that $|I|\geq 2$ and 
+\sum_{i\in I}x_i\ge 1$ for all $(x_1,\ldots, x_n)\in S$. The agent chooses a number $i\in I$.
+\item `state change`: Given the pair (I,i) chosen by the host, for $x=(x_1,\cdots,x_n)\in \mathbb Z^n$ we define
+$T_{I,i}(x)=(x_1',\ldots, x_n')$ where 
+$$x_j' = \begin{cases}x_j, &\qquad\text{if } i\neq j \newline \sum\limits_{k\in I} x_k -1, &\qquad\text{if }i=j
 \end{cases},$$
+The new `state` $S'$ is formed by the vertices of the Newton polyhedron of $\Delta'=\{T_{I,j}(x):x\in S\}$.
+\item `terminal states`: a state $S$ is terminal if it consists a point $(x_1,\ldots, x_n)$ such that 
+$\sum_{i=1}^n x_i \le 1$. 
+\end{enumerate}
 
-for points $(x_1,\cdots,x_n)\in \mathbb Z^n$. We subsequently apply Newton polytope to the transformed points and only
-keep the vertices.
-
-A `state` is terminal if it consists of one single point. In this case, the game will not continue and the host wins. As
-a result, the host wants to reduce the number of $S$ as quickly as possible, but the agent wants to keep the number of
-$S$ for as long as possible.
 
 ## Bloch-Levine game for moving cycles
 
 ## Thom game
 
+
+
 # Applications and open questions
 
 ## Hilbert scheme of points on manifolds
 
-
 ## Singularity theory and Thom polynomials
-
-Geometric invariant theory is the algebraic set-up to construct quotients of algebraic varieties by algebraic group 
-actions. A key technical conditions for GIT is called the semistability=stability condition. When this fails, there is 
-a blow-up algorithm to prepare our space for GIT. When the acting group is a non-reductive reparametrisation group, the 
-GIT blow-up procedure can be interpreted using the Hironaka game.
-
-
 
 ## Comparing performance of different winning strategies
 
