@@ -1,17 +1,53 @@
+![status](https://github.com/honglu2875/hironaka/actions/workflows/main.yml/badge.svg?branch=main)
+
 # Hironaka
 
-A utility package for reinforcement learning study of Hironaka's game of local resolution of singularities and its
+A utility package for a reinforcement learning study of Hironaka's game of local resolution of singularities and its
 variation problems.
 
 # Quick start
 
-[This notebook](https://cocalc.com/share/public_paths/5db3252a0bcb8d068aad2ee53bf5a1ce85753ebf) provides a brief
-demonstration of key classes in this repo. It is highly recommended to take a look first if you are an example-oriented
-learner.
+## Basic usage
+
+[This quick tutorial](https://cocalc.com/share/public_paths/5db3252a0bcb8d068aad2ee53bf5a1ce85753ebf) provides a short
+demonstration of some key classes in this repo.
+
+## Reinforcement Learning
+
+There are 2 ways to start a proper Reinforcement Learning training:
+
+- (TL;DR, clone
+  this [Google Colab file](https://colab.research.google.com/drive/1nVnVA6cyg0GT5qTadJTJH7aU6smgopLm?usp=sharing),
+  forget what I say below and start your adventure)
+
+  `DQNTrainer` is a quick implementation combining my interface `Trainer` with `stable-baseline3`'s DQN codes. It runs
+  in 3 lines:
+    ```python
+    from hironaka.trainer.DQNTrainer import DQNTrainer
+    trainer = DQNTrainer('dqn_config_test.yml')
+    trainer.train(100)
+    ```
+  Of course, for this to work you need to
+    - set up the system path so that Python can import those stuff;
+    - copy the config file `dqn_config_test.yml` from `.test/` to your running folder.
+- When you are here in the project folder and `requirements.txt` are met (or create a venv and
+  run `pip install -r requirements.txt`), try the following:
+    ```bash
+    python train/train_sb3.py
+    ```
+  It starts from our base classes `Host, Agent`, goes through the gym
+  wrappers `.gym_env.HironakaHostEnv, .gym_env.HironakaAgentEnv`, and ends up using `stable_baseline3`'s
+  implementations. In this particular script, it uses their `DQN` class. But you can totally try other stuff like `PPO`
+  with corresponding adjustments.
+
+## Experiments
+
+Some of our experimental results are documented here: https://github.com/honglu2875/hironaka-experiments
 
 # Contents
 
-For ML and RL specialists, the following two sections should give you an overview:
+For ML and RL specialists, hopefully the [Quick Start](#quick-start) already gives you a good idea about where to start.
+In addition, please check out
 
 - [Rule of the game](#rule-of-the-game)
 - [The structure of the repo](#the-structure-of-the-repo)
@@ -23,9 +59,66 @@ For math-oriented viewers or ML experts who are intrigued about the background s
 - [Variations of Hironaka's game](#variations-of-hironakas-game)
 - [Further topics](#further-topics)
 
+# Rule of the game
+
+## The definition of the game
+
+All versions of the game consist of 2 players. They operate in a non-symmetric fashion. To emphasize the
+difference, let us call Player A the "host", player B the "agent". For every turn the game has a `state`, the host makes
+a move, and the agents makes a move. Their moves change the `state` and the game goes into the next turn.
+
+A `state` is represented by a set of points $S\in\mathbb Z^n$ satisfying certain rules depending of the different versions
+of the game. At each turn,
+
+- The host chooses a subset $I\subset \{1,2,\cdots, n\}$ such that $|I|\geq 2$.
+- The agent chooses a number $i\in I$.
+
+$(i, I)$ together defines a `state change`, which is a simple geometric transformation of $S$ to $S'$ according to a 
+certain rule. Player A wins if 
+the `state` becomes `terminal state`, where the set of `terminal states` are defined in each version 
+slightly different ways. 
+
+## Rewards and metrics
+
+Defining the reward function is an open-ended question. But our goal is:
+
+- The host needs to minimize the game length (to stop in finite steps is already a challenge).
+- The agent needs to maximize the game length.
+
+Therefore, the most straightforward reward function for a host is `1 if game.ended else 0`. For agent, we switch around
+to `1 if not game.ended else 0`. There are more (e.g., step reward:=number of points killed for host). But experiments
+have been telling us to focus on the original one.
+
+### An interesting metric: $\rho$
+
+Fix a pair of host and agent. Given an integer $n$, we can run a random game for $n$ steps (restart another random game
+if ended). Let $g(n)$ be the number of games that happen during the $n$ steps. An important metric that measures the
+pair of host and agent is the ratio
+
+$$\rho(n) = \dfrac{g(n)}{n}.$$
+
+This ratio directly relates to the cumulative rewards for host and agent ($n\rho(n)$ for host and $n(1-\rho(n))$ for
+agent). If a limit
+
+$$\DeclareMathOperator*{\lim}{\text{lim}}\rho = \displaystyle\lim_\limits{n\rightarrow\infty}\rho(n)$$
+
+exists, it would be an important measure for the pair of host and agent:
+
+- if $\rho$ is high, the host is strong;
+- if $\rho$ is low, the agent is strong.
+
+The existence of the limit is not proven, but empirically $\rho(n)$ seems to converge to some values when $n$ grows
+larger.
+
 # The structure of the repo
 
-......
+For the detailed structure of the repo, please check out the README starting from the [hironaka](hironaka) package. But
+we would like to draw ML and RL researcher's attention to this submodule first:
+
+- [hironaka.trainer](hironaka/trainer)
+
+This is directly related to the current progress of the model training. I hope the codes and comments are
+self-explanatory.
 
 ---
 Now the big question is, how is this game related to some fundamental questions in pure math, or specifically, algebraic
@@ -40,7 +133,6 @@ is the common zero locus of polynomial equations. Affine varieties play central 
 Affine varieties cut out by one polynomial equation are called affine hypersurfaces. E.g
 $$X=\{(x_1,\ldots, x_n):f(x_1,\ldots, x_n)=0\}$$
 
-
 ## Singularities
 
 [definition] & [examples]
@@ -52,9 +144,6 @@ However, there are special, ill-behaved points, where the local geometry of $X$ 
 The set $X$ is singular at a point $a \in X$ if the Jacobian matrix
 $$Jac(X,a)=\left(\frac{\partial f_i}{\partial x_j}\right)(a)$$
 at a is of rank smaller than $n-dim(X)$. The set of singular points of $X$ is called the singular locus of $X$.
-
-
-
 
 ## Blow-up: turning singularities into smooth points
 
@@ -89,10 +178,6 @@ The latest big progress in approaching a simple resolution algorithm was achieve
 Abramovich-Tempkin-Vlodarczyk and independenty by McQuillen, who 
 came up with a simple stacky presentation using weighted blow-ups. 
 
-
-
-
-
 # What is Hironaka's polyhedral game
 
 In the literature, there appear at least 11 proofs for Hironaka's celebrated theorem on the resolution of singularities
@@ -125,38 +210,25 @@ Certain modified version of the game, due to Bloch and Levine provide solutions 
 Finally, recent work of Berczi shows that a restricted weighted version of the Hironaka game provides closed integration
 formulas over Hilbert scheme of points on manifolds.  
 
-## The definition of the game
+## The basic version of the game
 
-All versions of the game consist of 2 players. They operate in a non-symmetric fashion. To emphasize the
-difference, let us call Player A the "host", player B the "agent". For every turn the game has a `state`, the host makes
-a move, and the agents makes a move. Their moves change the `state` and the game goes into the next turn.
-
-A `state` is represented by a set of points $S\in\mathbb Z^n$ satisfying certain rules depending of the different versions
-of the game. At each turn,
-
-- The host chooses a subset $I\subset \{1,2,\cdots, n\}$ such that $|I|\geq 2$.
-- The agent chooses a number $i\in I$.
-
-$(i, I)$ together defines a `state change`, which is a simple geometric transformation of $S$ to $S'$ according to a 
-certain rule. Player A wins if 
-the `state` becomes `terminal state`, where the set of `terminal states` are defined in each version 
-slightly different ways. 
+This project started out with (this basic version of the game)[##the-definition-of-the-game] (see the link for the rules). 
+It is a simplified version of (Hironaka's original polyhedra game)[##hironakas-polyhedra-game].
 
 ## Hauser game 
 
 This version of the Hironaka game was suggested by Hauser. A simple winning strategy was given by Zeillinger. The existence of winning 
 strategy proves the resolution theorem for hypersurfaces.
 
-\textbf{The rules:}
-\begin{itemize}
-\item `states`: A finite set of points $S \subset \mathbf{N}^n$, such that $S$ is the set of vertices of the positive 
+**The rules:**
+- `states`: A finite set of points $S \subset \mathbf{N}^n$, such that $S$ is the set of vertices of the positive 
 convex hull $\Delta=\{S+\mathbf{R}^n_+\}$. 
-\item `state change`: Given the pair (I,i) chosen by the host, for $x=(x_1,\cdots,x_n)\in \mathbb Z^n$ we define
+- `state change`: Given the pair (I,i) chosen by the host, for $x=(x_1,\cdots,x_n)\in \mathbb Z^n$ we define
 $T_{I,i}(x)=(x_1',\ldots, x_n')$ where 
 $$x_j' = \begin{cases}x_j, &\qquad\text{if } i\neq j \newline \sum\limits_{k\in I} x_k, &\qquad\text{if }i=j
 \end{cases},$$
 The new `state` $S'$ is formed by the vertices of the Newton polyhedron of $\Delta'=\{T_{I,i}(x):x\in S\}$.
-\item `terminal states`: a state $S$ is terminal if it consists of one single point. 
+- `terminal states`: a state $S$ is terminal if it consists of one single point. 
 \end{enumerate}
 In short, the host wants to reduce the size of $S$ as quickly as possible, but the agent wants to keep the size of
 $S$ large.
@@ -166,21 +238,19 @@ $S$ large.
 This is the original Hironaka game from 1970. A winning strategy for the host
 was given by Mark Spivakovsky in 1980, which proved the resolution theorem for hypersurfaces.  
 
-\textbf{The rules:}
-\begin{itemize}
-\item `states`: A finite set of rational points $S \subset \mathbf{Q}^n$, such that $\sum_{i=1}^n x_i>1$ for all 
+**The rules:**
+- `states`: A finite set of rational points $S \subset \mathbf{Q}^n$, such that $\sum_{i=1}^n x_i>1$ for all 
 $(x_1,\ldots, x_n)\in S$, and $S$ is the set of vertices of the positive 
 convex hull $\Delta=\{S+\mathbf{R}^n_+\}$. 
-\item `move`: The host chooses a subset $I\subset \{1,2,\cdots, n\}$ such that $|I|\geq 2$ and 
+- `move`: The host chooses a subset $I\subset \{1,2,\cdots, n\}$ such that $|I|\geq 2$ and 
 \sum_{i\in I}x_i\ge 1$ for all $(x_1,\ldots, x_n)\in S$. The agent chooses a number $i\in I$.
-\item `state change`: Given the pair (I,i) chosen by the host, for $x=(x_1,\cdots,x_n)\in \mathbb Z^n$ we define
+- `state change`: Given the pair (I,i) chosen by the host, for $x=(x_1,\cdots,x_n)\in \mathbb Z^n$ we define
 $T_{I,i}(x)=(x_1',\ldots, x_n')$ where 
 $$x_j' = \begin{cases}x_j, &\qquad\text{if } i\neq j \newline \sum\limits_{k\in I} x_k -1, &\qquad\text{if }i=j
 \end{cases},$$
 The new `state` $S'$ is formed by the vertices of the Newton polyhedron of $\Delta'=\{T_{I,j}(x):x\in S\}$.
-\item `terminal states`: a state $S$ is terminal if it consists a point $(x_1,\ldots, x_n)$ such that 
+- `terminal states`: a state $S$ is terminal if it consists a point $(x_1,\ldots, x_n)$ such that 
 $\sum_{i=1}^n x_i \le 1$. 
-\end{enumerate}
 
 ## Hard polyhedra game 
 
@@ -189,12 +259,11 @@ Hironaka has proved that an affirmative solution of this game would imply the lo
 algebraic variety over an algebraically closed field of any characteristic.
 Mark Spivakovsky showed that Player A does not always have a winning strategy
 
-\textbf{The rules:}
-\begin{itemize}
-\item `states`: A finite set of rational points $S \subset \mathbf{Q}^n$, such that $\sum_{i=1}^n x_i>1$ for all 
+**The rules:**
+- `states`: A finite set of rational points $S \subset \mathbf{Q}^n$, such that $\sum_{i=1}^n x_i>1$ for all 
 $(x_1,\ldots, x_n)\in S$, the denominators are bounded by some fix $N$, and $S$ is the set of vertices of the positive 
 convex hull $\Delta=\{S+\mathbf{R}^n_+\}$. 
-\item `move`: The host chooses a subset $I\subset \{1,2,\cdots, n\}$ such that $|I|\geq 2$ and 
+- `move`: The host chooses a subset $I\subset \{1,2,\cdots, n\}$ such that $|I|\geq 2$ and 
 \sum_{i\in I}x_i\ge 1$ for all $(x_1,\ldots, x_n)\in S$. 
 The agent chooses some element $i\in S$ and modifies the Newton polygon $\Delta$ to a set $\Delta^*$ by
 the following procedure: first, the agent selects a finite number of points $y=(y_1,\ldots, y_n)$, all of whose 
@@ -202,14 +271,13 @@ coordinates are rational numbers with denominators bounded by $N$ as above, and 
 an $x = (x_1, \ldots, x_n)\in \Delta$ which satisfy some basic relations. $\Delta^*$ is then taken to be the positive 
 convex hull of $\Delta \cup \{selected points\}$.
 
-\item `state change`: Given the pair (I,i) chosen by the host, for $x=(x_1,\cdots,x_n)\in \mathbb Z^n$ we define
+- `state change`: Given the pair (I,i) chosen by the host, for $x=(x_1,\cdots,x_n)\in \mathbb Z^n$ we define
 $T_{I,i}(x)=(x_1',\ldots, x_n')$ where 
 $$x_j' = \begin{cases}x_j, &\qquad\text{if } i\neq j \newline \sum\limits_{k\in I} x_k -1, &\qquad\text{if }i=j
 \end{cases},$$
 The new `state` $S'$ is formed by the vertices of the Newton polyhedron of $\Delta'=\{T_{I,j}(x):x\in S\}$.
-\item `terminal states`: a state $S$ is terminal if it consists a point $(x_1,\ldots, x_n)$ such that 
+- `terminal states`: a state $S$ is terminal if it consists a point $(x_1,\ldots, x_n)$ such that 
 $\sum_{i=1}^n x_i \le 1$. 
-\end{enumerate}
 
 ## The Stratify game 
 
@@ -225,15 +293,14 @@ In 2021 Berczi introduced the Thom game, which is a weighted version of the Hiro
 every run of the game provides a blow-up tree, which encodes a formula for Thom polynomials of singularities, answering 
 long-standing question in enumerative geometry.
 
-\textbf{The rules:}
-\begin{itemize}
-\item `states`: A pair (S,w), where: S is a finite set of points $S \subset \mathbf{N}^n$, such that $S$ is the set of 
+**The rules:**
+- `states`: A pair (S,w), where: S is a finite set of points $S \subset \mathbf{N}^n$, such that $S$ is the set of 
 vertices of the positive convex hull $\Delta=\{S+\mathbf{R}^n_+\}$; $w=(w_1,\ldots, w_n)\in \mathbf{N}^n$ is a weight 
 vector associating a nonnegative integer weight to all coordinates.
-\item `move`: The host chooses a subset $I\subset \{1,2,\cdots, n\}$ such that $|I|\geq 2$ and 
+- `move`: The host chooses a subset $I\subset \{1,2,\cdots, n\}$ such that $|I|\geq 2$ and 
 \sum_{i\in I}x_i\ge 1$ for all $(x_1,\ldots, x_n)\in S$.
 The agent chooses an $i\in I$ such that $w_i$ is minimal in $\{w_j: j\in I\}$.
-\item `state change`: Given the pair (I,i) chosen by the host, for $x=(x_1,\cdots,x_n)\in \mathbb Z^n$ we define
+- `state change`: Given the pair (I,i) chosen by the host, for $x=(x_1,\cdots,x_n)\in \mathbb Z^n$ we define
 $T_{I,i}(x)=(x_1',\ldots, x_n')$ where 
 $$x_j' = \begin{cases}x_j, &\qquad\text{if } i\neq j \newline \sum\limits_{k\in I} x_k, &\qquad\text{if }i=j
 \end{cases},$$
@@ -243,8 +310,7 @@ further shift will move it out.
 The new weight vector is 
 $$w'_j=\begin{cases}w_j, &\qquad\text{if } j=i or j\notin I \newline w_j-w_i &\qquad\text{if } j \in I\setminus \{i\}
 \end{cases},$$
-\item `terminal states`: a state $S$ is terminal if it consists of one single point, and  
-\end{enumerate}
+- `terminal states`: a state $S$ is terminal if it consists of one single point, and  
 
 ## The Abramovich-Tempkin-Vlodarczyk game
 

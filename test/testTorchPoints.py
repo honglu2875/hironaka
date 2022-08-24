@@ -166,3 +166,19 @@ class testTorchPoints(unittest.TestCase):
         p.get_newton_polytope()
 
         assert p.points.eq(r).all()
+
+    def test_rescale_by_0(self):
+        p = torch.FloatTensor(
+            [
+                [[0, 0, 0, 0], [-1, -1, -1, -1], [-1, -1, -1, -1], [-1, -1, -1, -1]],
+                [[0, 1, 3, 5], [1, 1, 1, 1], [9, 8, 2, 1], [-1, -1, -1, -1]]
+            ]
+        )
+        point = TensorPoints(p)
+        point.rescale()
+        assert point.points.isfinite().all()
+
+    def test_points_hash_is_value_based(self):
+        p = TensorPoints(torch.rand(100, 20, 3))
+        assert hash(p) == hash(p.copy())
+

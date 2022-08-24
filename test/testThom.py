@@ -1,13 +1,11 @@
 import unittest
-import sys
-sys.setrecursionlimit(10000)
-from treelib import Tree
 import numpy as np
+from treelib import Tree
 
 from hironaka.agent import AgentMorin
 from hironaka.core import ListPoints
 from hironaka.game import GameMorin
-from hironaka.host import ZeillingerLex, WeakSpivakovsky
+from hironaka.host import WeakSpivakovsky
 from hironaka.src import thom_monomial_ideal, thom_points, thom_points_homogeneous
 from hironaka.util import search_tree_morin
 
@@ -19,7 +17,6 @@ class TestThom(unittest.TestCase):
         agent = AgentMorin()
         points = thom_points_homogeneous(N)
         opoints = thom_points(N)
-        game = GameMorin(ListPoints([points], distinguished_points=[len(points) - 1]), host, agent)
 
         ro = [(4, 1, 0, 1, 0, 0, 0), (4, 1, 0, 0, 0, 1, 0), (4, 1, 0, 0, 0, 0, 1), (4, 0, 2, 0, 0, 0, 0),
               (4, 0, 1, 0, 1, 0, 0), (4, 0, 0, 0, 2, 0, 0), (3, 2, 1, 0, 0, 0, 0), (3, 2, 0, 0, 1, 0, 0),
@@ -34,6 +31,7 @@ class TestThom(unittest.TestCase):
         assert str(opoints) == str(ro)
         assert str(rhom) == str(points)
 
+        game = GameMorin(ListPoints([points], distinguished_points=[len(points) - 1]), host, agent)
         for i in range(100):
             print('Game state:', game.state)
             game.step()
@@ -55,13 +53,15 @@ class TestThom(unittest.TestCase):
         MAX_SIZE = 100000
 
         host = WeakSpivakovsky()
-        weights = [1]*dimension
+        weights = [1] * dimension
         search_tree_morin(initial_points, tree, 0, weights, host, max_size=MAX_SIZE)
         tree.show(data_property="points", idhidden=False)
         tree.depth()
 
     def test_ThomTreeOriginal(self):
-        points = [list(np.array(thom_points(4)[i])+[np.dot([0,1,1,1,1,1,1],np.array(thom_points(4)[i]))-4,0,0,0,0,0,0]) for i in range(len(thom_points(4)))]
+        points = [list(
+            np.array(thom_points(4)[i]) + [np.dot([0, 1, 1, 1, 1, 1, 1], np.array(thom_points(4)[i])) - 4, 0, 0, 0, 0,
+                                           0, 0]) for i in range(len(thom_points(4)))]
         print(f"Points: {points}")
         dimension = len(points[0])
         initial_points = ListPoints([points], distinguished_points=[len(points) - 1])
@@ -71,7 +71,7 @@ class TestThom(unittest.TestCase):
         MAX_SIZE = 100000
 
         host = WeakSpivakovsky()
-        weights = [1,1,2,3,2,3,3]
+        weights = [1, 1, 2, 3, 2, 3, 3]
         search_tree_morin(initial_points, tree, 0, weights, host, max_size=MAX_SIZE)
         tree.show(data_property="points", idhidden=False)
         assert tree.size() == 37

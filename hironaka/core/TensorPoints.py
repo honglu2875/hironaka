@@ -26,12 +26,12 @@ class TensorPoints(PointsBase):
         assert padding_value <= 0, f"'padding_value' must be a non-positive number. Got {padding_value} instead."
 
         if isinstance(points, list):
-            points = torch.FloatTensor(
+            points = torch.tensor(
                 get_batched_padded_array(points,
                                          new_length=config['max_num_points'],
                                          constant_value=padding_value))
         elif isinstance(points, np.ndarray):
-            points = torch.FloatTensor(points)
+            points = torch.tensor(points)
         elif isinstance(points, torch.Tensor):
             points = points.type(torch.float32)
         else:
@@ -55,12 +55,12 @@ class TensorPoints(PointsBase):
             return torch.max(self.points) >= self.value_threshold
         return False
 
-    def get_num_points(self) -> List[int]:
+    def get_num_points(self) -> torch.Tensor:
         """
             The number of points for each batch.
         """
         num_points = torch.sum(self.points[:, :, 0].ge(0), dim=1)
-        return num_points.cpu().tolist()
+        return num_points
 
     def get_features(self):
         sorted_args = torch.argsort(self.points[:, :, 0], dim=1, descending=True)
@@ -106,3 +106,6 @@ class TensorPoints(PointsBase):
 
     def __repr__(self):
         return str(self.points)
+
+    def __hash__(self):
+        return hash(self.points.detach().cpu().numpy().round(8).tostring())

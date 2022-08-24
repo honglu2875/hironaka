@@ -1,10 +1,11 @@
 import abc
 import logging
 from itertools import combinations
-from typing import Optional
+from typing import Optional, Union
 
 import numpy as np
 
+from hironaka.Points import Points
 from hironaka.core import ListPoints
 from hironaka.policy.Policy import Policy
 
@@ -24,7 +25,10 @@ class Host(abc.ABC):
         # If the agent only has one batch and wants to ignore batch dimension in the parameters, set it to True.
         self.ignore_batch_dimension = ignore_batch_dimension
 
-    def select_coord(self, points: ListPoints, debug=False):
+    def select_coord(self, points: Union[ListPoints, Points], debug=False):
+        if isinstance(points, Points):
+            points = points.points
+
         if self.ignore_batch_dimension:
             return self._select_coord(points)[0]
         else:
@@ -38,7 +42,13 @@ class Host(abc.ABC):
 class RandomHost(Host):
     def _select_coord(self, points: ListPoints):
         dim = points.dimension
-        return [np.random.choice(list(range(dim)), size=2).tolist() for _ in range(points.batch_size)]
+        return [np.random.choice(list(range(dim)), size=2, replace=False).tolist() for _ in range(points.batch_size)]
+
+
+class AllCoordHost(Host):
+    def _select_coord(self, points: ListPoints):
+        dim = points.dimension
+        return [list(range(dim)) for _ in range(points.batch_size)]
 
 
 class Zeillinger(Host):
@@ -133,7 +143,7 @@ class WeakSpivakovsky(Host):
             subsets = [set(np.nonzero(point)[0]) for point in pts]
             "Find a minimal hitting set, brute-force"
             U = set.union(*subsets)
-            for i in range(2, len(U)+1):
+            for i in range(2, len(U) + 1):
                 combs = combinations(U, i)
                 for c in combs:
                     if all(set(c) & l for l in subsets):

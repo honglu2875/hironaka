@@ -1,0 +1,65 @@
+use_tensorboard: true
+log_time: true
+layerwise_logging: true
+use_cuda: false
+scale_observation: true
+version_string: 'mcts_v0'
+
+dimension: 3
+max_num_points: 10
+max_value: 20  # Not sure if this impacts the game at all
+max_grad_norm: 10
+
+# MCTS only trains one player at a time
+# If host is specified, agent will need to be passed during initialization, and vice-versa.
+host:
+  # Note: Simulation is always run step-by-step, but the number of batches is used when training the policy net.
+  batch_size: 10
+  iterations: 200,
+  c_puct: 0.5,
+  max_depth: 20,
+  MSE_coefficient: 1.0,
+  optim:
+    name: 'adam'
+    args: # Pass optimizer parameters here
+      lr: 0.000001
+    lr_schedule:
+      mode: 'exponential'
+      initial_lr: 0.001
+      rate: 0.996
+  er: 0.2  # Exploration rate
+  er_schedule:
+    mode: 'exponential'
+    initial_er: 0.5
+    rate: 0.996
+  net_arch: [ 32, { repeat: 2, net_arch: [ 32, 'b' ] }, 16 ]
+
+agent:
+  # Note: Simulation is always run step-by-step, but the number of batches is used when training the policy net.
+  batch_size: 10
+  iterations: 200,
+  c_puct: 0.5,
+  max_depth: 20,
+  MSE_coefficient: 1.0,
+  optim:
+    name: 'adam'
+    args: # Pass optimizer parameters here
+      lr: 0.000001
+    lr_schedule:
+      mode: 'exponential'
+      initial_lr: 0.001
+      rate: 0.996
+  er: 0.2  # Exploration rate
+  er_schedule:
+    mode: 'exponential'
+    initial_er: 0.5
+    rate: 0.996
+  net_arch: [ 32, { repeat: 2, net_arch: [ 32, 'b' ] }, 16 ]
+
+
+# Replay buffer will be deactivated
+replay_buffer:
+  deactivate: true  # (Optional) to deactivate the use of replay buffer for the whole training
+
+
+

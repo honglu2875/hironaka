@@ -24,7 +24,7 @@ class HironakaValidator(GameHironaka):
         config = {**config_kwargs, **kwargs}
 
         self.points_config = {
-            'n': config.get('max_number_points', 10),
+            'n': config.get('max_num_points', 10),
             'batch_num': 1,
             'dimension': config.get('dimension', 3),
             'max_value': config.get('max_value', 50)

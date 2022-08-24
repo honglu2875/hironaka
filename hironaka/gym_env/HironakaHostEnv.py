@@ -77,7 +77,7 @@ class HironakaHostEnv(HironakaBase):
         coords_multi_bin = self._get_coords_multi_bin()
         f = np.array(self._points.get_features()[0])
         f = np.pad(f,
-                   ((0, self.max_number_points - len(f)),
+                   ((0, self.max_num_points - len(f)),
                     (0, 0)),
                    mode='constant',
                    constant_values=self.padding_value)

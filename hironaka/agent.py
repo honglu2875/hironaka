@@ -1,9 +1,18 @@
 import abc
 import logging
-from typing import Final
+from typing import Union
+
+# Sorry about this block of codes. Blame google colab for not updating their python version...
+from hironaka.src import get_python_version_in_float
+
+if get_python_version_in_float() <= 3.7:
+    Final = Union  # Basically we ignore Final in versions <= 3.7
+else:
+    from typing import Final
 
 import numpy as np
 
+from hironaka.Points import Points
 from hironaka.core import ListPoints
 from hironaka.policy.Policy import Policy
 
@@ -32,11 +41,13 @@ class Agent(abc.ABC):
             if not hasattr(self, s) or getattr(self, s) is None:
                 raise NotImplementedError(f"Please specify {s} for the subclass.")
 
-    def move(self, points: ListPoints, coords, weights=None, inplace=True):
+    def move(self, points: Union[ListPoints, Points], coords, weights=None, inplace=True):
         if self.USE_WEIGHTS and weights is None:
             raise Exception("Please specify weights in the parameters.")
         if not self.USE_WEIGHTS and weights is not None:
             self.logger.warning("The weights parameter will be ignored.")
+        if isinstance(points, Points):
+            points = points.points
 
         if not self.ignore_batch_dimension:
             assert points.batch_size == len(coords)
@@ -46,10 +57,6 @@ class Agent(abc.ABC):
 
         batch_actions = self._get_actions(points, batch_coords, batch_weights)
         new_weights = self._get_weights(points, batch_coords, batch_weights, batch_actions)
-
-        # Sanity check on the resulting actions
-        for action, coords in zip(batch_actions, batch_coords):
-            assert action in coords or action is None
 
         actions = batch_actions[0] if self.ignore_batch_dimension else batch_actions
         new_weights = new_weights[0] if self.ignore_batch_dimension else new_weights

@@ -8,6 +8,7 @@ Submodules:
 - [hironaka.gym_env](gym_env)
 - [hironaka.policy](policy)
 - [hironaka.src](src)
+- [hironaka.trainer](trainer)
 - [hironaka.validator](validator)
 
 Non-essential (but still important!) functions and classes:

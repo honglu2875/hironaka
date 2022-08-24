@@ -2,6 +2,7 @@ import abc
 import logging
 from typing import Optional, Union
 
+from hironaka.Points import Points
 from hironaka.agent import Agent
 from hironaka.core import ListPoints
 from hironaka.host import Host
@@ -15,9 +16,10 @@ class Game(abc.ABC):
 
     @abc.abstractmethod
     def __init__(self,
-                 state,
-                 host,
-                 agent,
+                 state: Union[ListPoints, Points, None],
+                 host: Host,
+                 agent: Agent,
+                 scale_observation: Optional[bool] = True,
                  **kwargs):
         """
             state: initial state
@@ -27,13 +29,27 @@ class Game(abc.ABC):
         if self.logger is None:
             self.logger = logging.getLogger(__class__.__name__)
 
-        self.state = state
+        if isinstance(state, Points):
+            self.state = state.points
+        else:
+            self.state = state
+
         self.dimension = state.dimension if state is not None else None
         self.host = host
         self.agent = agent
 
         self.coord_history = []
         self.move_history = []
+
+        self.scale_observation = scale_observation
+
+        if self.state is not None:
+            self.state.get_newton_polytope()  # Clear up extra points
+            self.stopped = self.state.ended
+            if self.scale_observation:
+                self.state.rescale()
+        else:
+            self.stopped = True
 
     @abc.abstractmethod
     def step(self, verbose: int = 0) -> bool:
@@ -66,17 +82,14 @@ class Game(abc.ABC):
 
 class GameHironaka(Game):
     def __init__(self,
-                 state: Union[ListPoints, None],
+                 state: Union[ListPoints, Points, None],
                  host: Host,
                  agent: Agent,
-                 scale_observation: Optional[bool] = True,
                  **kwargs):
         if self.logger is None:
             self.logger = logging.getLogger(__class__.__name__)
 
         super().__init__(state, host, agent, **kwargs)
-        self.scale_observation = scale_observation
-        self.stopped = False
 
     def step(self, verbose: int = 0) -> bool:
         """
@@ -119,18 +132,15 @@ class GameMorin(Game):
     after the shift"""
 
     def __init__(self,
-                 state: Union[ListPoints, None],
+                 state: Union[ListPoints, Points, None],
                  host: Host,
                  agent: Agent,
-                 scale_observation: Optional[bool] = True,
                  **kwargs):
         if self.logger is None:
             self.logger = logging.getLogger(__class__.__name__)
 
         super().__init__(state, host, agent, **kwargs)
         self.weights = [[1] * self.state.dimension for _ in range(self.state.batch_size)]
-        self.scale_observation = scale_observation
-        self.stopped = False
 
     def step(self, verbose: int = 0) -> bool:
         if self.stopped:
