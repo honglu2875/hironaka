@@ -163,7 +163,9 @@ replaces a subspace of a given space  with all the directions pointing out of th
 For example, the blowup of a point in a plane replaces the point 
 with the projectivized tangent space at that point. The geometric picture looks like the following: 
 
-![alt text](img/blow_up.png)
+![blow-up](img/blow-up.png)
+
+([The original lecture note](https://www.maths.tcd.ie/~btyrrel/flatness.pdf).)
 
 ## Hironaka's theorem
 
@@ -228,9 +230,9 @@ This version of the Hironaka game was suggested by Hauser. A simple winning stra
 strategy proves the resolution theorem for hypersurfaces.
 
 **The rules:**
-- `states`: A finite set of points $S \subset \mathbf{N}^n$, such that $S$ is the set of vertices of the positive 
+- `states`: A finite set of points $S\subset\mathbf{N}^n$, such that $S$ is the set of vertices of the positive 
 convex hull $\Delta=\{S+\mathbf{R}^n_+\}$. 
-- `state change`: Given the pair (I,i) chosen by the host, for $x=(x_1,\cdots,x_n)\in \mathbb Z^n$ we define
+- `state change`: Given the pair $(I,i)$ chosen by the host, for $x=(x_1,\cdots,x_n)\in\mathbb Z^n$ we define
 $T_{I,i}(x)=(x_1',\ldots, x_n')$ where
 
 $$x_j' = \begin{cases}x_j, &\qquad\text{if } i\neq j \newline \sum\limits_{k\in I} x_k, &\qquad\text{if }i=j
@@ -248,7 +250,7 @@ This is the original Hironaka game from 1970. A winning strategy for the host
 was given by Mark Spivakovsky in 1980, which proved the resolution theorem for hypersurfaces.  
 
 **The rules:**
-- `states`: A finite set of rational points $S \subset \mathbf{Q}^n$, such that $\sum_{i=1}^n x_i>1$ for all 
+- `states`: A finite set of rational points $S \subset \mathbf{Q}^n$, such that $\sum\limits_{i=1}^n x_i>1$ for all 
 $(x_1,\ldots, x_n)\in S$, and $S$ is the set of vertices of the positive 
 convex hull $\Delta=\{S+\mathbf{R}^n_+\}$. 
 - `move`: The host chooses a subset $I\subset \{1,2,\cdots, n\}$ such that $|I|\geq 2$ and 
