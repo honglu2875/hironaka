@@ -95,6 +95,8 @@ have been telling us to focus on the original one.
 
 ### An interesting metric: $\rho$
 
+With certain amount of abuse of notations (please forgive me for omitting the dependence on random initial states and sequences of actions), the metric is heuristically described as follows:
+
 Fix a pair of host and agent. Given an integer $n$, we can run a random game for $n$ steps (restart another random game
 if ended). Let $g(n)$ be the number of games that happen during the $n$ steps. An important metric that measures the
 pair of host and agent is the ratio
@@ -106,7 +108,7 @@ agent). If a limit
 
 $$\DeclareMathOperator*{\lim}{\text{lim}}\rho = \displaystyle\lim_\limits{n\rightarrow\infty}\rho(n)$$
 
-exists, it would be an important measure for the pair of host and agent:
+exists (w.r.t. random initializations over a compact subspace of states), it would be an important measure for the pair of host and agent:
 
 - if $\rho$ is high, the host is strong;
 - if $\rho$ is low, the agent is strong.
@@ -125,7 +127,7 @@ This is directly related to the current progress of the model training. I hope t
 self-explanatory.
 
 ---
-Now the big question is, how is this game related to some fundamental questions in pure math, or specifically, algebraic
+Now the big question is, how this game is related to some fundamental questions in pure math, or specifically, algebraic
 geometry.
 
 # What is a resolution of singularity
