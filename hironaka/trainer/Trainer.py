@@ -114,6 +114,7 @@ class Trainer(abc.ABC):
         # Get feature dimension by constructing a dummy tensor
         pts = self.point_cls(torch.rand(1, self.max_num_points, self.dimension))
         self.feature_dim = pts.get_features().reshape(-1).shape[0]
+        self.feature_shape = pts.get_features().shape[1:]
 
         # Add networks. The designed behavior should be the following:
         #   if 'host' is present in config:
@@ -358,14 +359,16 @@ class Trainer(abc.ABC):
             If a subclass would like to copy other models or variables, it MUST be overridden.
         """
         return self.__class__(self.config, node=self.node, device_num=self.device_num,
-                              host_net=deepcopy(self.get_net('host')), agent_net=deepcopy(self.get_net('agent')))
+                              host_net=deepcopy(self.get_net('host')), agent_net=deepcopy(self.get_net('agent')),
+                              reward_func=self.reward_func, point_cls=self.point_cls)
 
     def save(self, path: str):
         """
             Save only models and config as a dict (Caution: ReplayBuffer is NOT saved).
             If a subclass creates extra models (e.g., DQNTrainer.{role}_q_net_target), it MUST be overridden.
         """
-        saved = {'host_net': self.get_net('host'), 'agent_net': self.get_net('agent'), 'config': self.config}
+        saved = {'host_net': self.get_net('host'), 'agent_net': self.get_net('agent'), 'config': self.config,
+                 'reward_func': self.reward_func, 'point_cls': self.point_cls}
         torch.save(saved, path)
 
     def save_replay_buffer(self, path: str):
@@ -397,8 +400,9 @@ class Trainer(abc.ABC):
             Load from the model-config dict and reconstruct the Trainer object.
         """
         saved = torch.load(path)
-        new_trainer = cls(saved['config'], node=node, device_num=device_num)
-        new_trainer.replace_nets(saved['host_net'], saved['agent_net'])
+        new_trainer = cls(saved['config'], node=node, device_num=device_num,
+                          host_net=saved['host_net'], agent_net=saved['agent_net'],
+                          reward_func=saved['reward_func'], point_cls=saved['point_cls'])
         return new_trainer
 
     @abc.abstractmethod
@@ -493,9 +497,9 @@ class Trainer(abc.ABC):
                 device = torch.device('cpu')
 
             if role == 'host':
-                input_shape = (self.max_num_points, self.dimension)
+                input_shape = self.feature_shape
             elif role == 'agent':
-                input_shape = {'points': (self.max_num_points, self.dimension),
+                input_shape = {'points': self.feature_shape,
                                'coords': (self.dimension,)}
             else:
                 raise Exception('Impossible code path.')
