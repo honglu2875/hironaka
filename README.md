@@ -57,7 +57,7 @@ For math-oriented viewers or ML experts who are intrigued about the background s
 - [What is a resolution of singularity](#what-is-a-resolution-of-singularity)
 - [What is Hironaka's polyhedral game](#what-is-hironakas-polyhedral-game)
 - [Variations of Hironaka's game](#variations-of-hironakas-game)
-- [Further topics](#further-topics)
+- [Further topics](#applications-and-open-questions)
 
 # Rule of the game
 
@@ -71,11 +71,13 @@ a move, and the agents makes a move. Their moves change the `state` and the game
 
 A `state` is represented by a set of points $S\in\mathbb Z^n$ satisfying certain rules depending of the different versions
 of the game. At each turn,
+
 - The host chooses a subset $I\subset \{1,2,\cdots, n\}$ such that $|I|\geq 2$.
 - The agent chooses a number $i\in I$.
 
 ### State change
-The pair $(i, I)$ defines a state change, which is a simple linear transformation from $S$ to $S'$ according to a 
+
+The pair $(I, i)$ defines a state change, which is a simple linear transformation from $S$ to $S'$ according to a 
 certain rule. Player A wins if 
 the `state` becomes `terminal state`, where the set of `terminal states` are defined in each version 
 slightly different ways. 
@@ -165,7 +167,8 @@ with the projectivized tangent space at that point. The geometric picture looks 
 
 ![blow-up](img/blow-up.png)
 
-([The original lecture note](https://www.maths.tcd.ie/~btyrrel/flatness.pdf).)
+([The lecture note where I took the screenshot from](https://www.maths.tcd.ie/~btyrrel/flatness.pdf). 
+This picture ultimately came from our beloved textbook: Algebraic geometry *by Robin Hartshorne*)
 
 ## Hironaka's theorem
 
@@ -221,8 +224,8 @@ formulas over Hilbert scheme of points on manifolds.
 
 ## The basic version of the game
 
-This project started out with (this basic version of the game)[##the-definition-of-the-game] (see the link for the rules). 
-It is a simplified version of (Hironaka's original polyhedra game)[##hironakas-polyhedra-game].
+This project started out with [this basic version of the game](#the-definition-of-the-game) (see the link for the rules). 
+It is a simplified version of [Hironaka's original polyhedra game](#hironakas-polyhedra-game).
 
 ## Hauser game 
 
@@ -254,8 +257,8 @@ was given by Mark Spivakovsky in 1980, which proved the resolution theorem for h
 $(x_1,\ldots, x_n)\in S$, and $S$ is the set of vertices of the positive 
 convex hull $\Delta=\{S+\mathbf{R}^n_+\}$. 
 - `move`: The host chooses a subset $I\subset \{1,2,\cdots, n\}$ such that $|I|\geq 2$ and 
-\sum_{i\in I}x_i\ge 1$ for all $(x_1,\ldots, x_n)\in S$. The agent chooses a number $i\in I$.
-- `state change`: Given the pair (I,i) chosen by the host, for $x=(x_1,\cdots,x_n)\in \mathbb Z^n$ we define
+\sum\limits_{i\in I}x_i\ge 1$ for all $(x_1,\ldots, x_n)\in S$. The agent chooses a number $i\in I$.
+- `state change`: Given the pair $(I,i)$ chosen by the host, for $x=(x_1,\cdots,x_n)\in \mathbb Z^n$ we define
 $T_{I,i}(x)=(x_1',\ldots, x_n')$ where
 
 $$x_j' = \begin{cases}x_j, &\qquad\text{if } i\neq j \newline \sum\limits_{k\in I} x_k -1, &\qquad\text{if }i=j
@@ -263,7 +266,7 @@ $$x_j' = \begin{cases}x_j, &\qquad\text{if } i\neq j \newline \sum\limits_{k\in 
 
 The new `state` $S'$ is formed by the vertices of the Newton polyhedron of $\Delta'=\{T_{I,j}(x):x\in S\}$.
 - `terminal states`: a state $S$ is terminal if it consists a point $(x_1,\ldots, x_n)$ such that 
-$\sum_{i=1}^n x_i \le 1$. 
+$\sum\limits_{i=1}^n x_i \le 1$. 
 
 ## Hard polyhedra game 
 
@@ -273,18 +276,18 @@ algebraic variety over an algebraically closed field of any characteristic.
 Mark Spivakovsky showed that Player A does not always have a winning strategy
 
 **The rules:**
-- `states`: A finite set of rational points $S \subset \mathbf{Q}^n$, such that $\sum_{i=1}^n x_i>1$ for all 
+- `states`: A finite set of rational points $S \subset \mathbf{Q}^n$, such that $\sum\limits_{i=1}^n x_i>1$ for all 
 $(x_1,\ldots, x_n)\in S$, the denominators are bounded by some fix $N$, and $S$ is the set of vertices of the positive 
 convex hull $\Delta=\{S+\mathbf{R}^n_+\}$. 
 - `move`: The host chooses a subset $I\subset \{1,2,\cdots, n\}$ such that $|I|\geq 2$ and 
-\sum_{i\in I}x_i\ge 1$ for all $(x_1,\ldots, x_n)\in S$. 
+\sum\limits_{i\in I}x_i\ge 1$ for all $(x_1,\ldots, x_n)\in S$. 
 The agent chooses some element $i\in S$ and modifies the Newton polygon $\Delta$ to a set $\Delta^*$ by
 the following procedure: first, the agent selects a finite number of points $y=(y_1,\ldots, y_n)$, all of whose 
 coordinates are rational numbers with denominators bounded by $N$ as above, and for each of which there exists
 an $x = (x_1, \ldots, x_n)\in \Delta$ which satisfy some basic relations. $\Delta^*$ is then taken to be the positive 
 convex hull of $\Delta \cup \{selected points\}$.
 
-- `state change`: Given the pair (I,i) chosen by the host, for $x=(x_1,\cdots,x_n)\in \mathbb Z^n$ we define
+- `state change`: Given the pair $(I,i)$ chosen by the host, for $x=(x_1,\cdots,x_n)\in \mathbb Z^n$ we define
 $T_{I,i}(x)=(x_1',\ldots, x_n')$ where
 
 $$x_j' = \begin{cases}x_j, &\qquad\text{if } i\neq j \newline \sum\limits_{k\in I} x_k -1, &\qquad\text{if }i=j
@@ -292,7 +295,7 @@ $$x_j' = \begin{cases}x_j, &\qquad\text{if } i\neq j \newline \sum\limits_{k\in 
 
 The new `state` $S'$ is formed by the vertices of the Newton polyhedron of $\Delta'=\{T_{I,j}(x):x\in S\}$.
 - `terminal states`: a state $S$ is terminal if it consists a point $(x_1,\ldots, x_n)$ such that 
-$\sum_{i=1}^n x_i \le 1$. 
+$\sum\limits_{i=1}^n x_i \le 1$. 
 
 ## The Stratify game 
 
@@ -313,7 +316,7 @@ long-standing question in enumerative geometry.
 vertices of the positive convex hull $\Delta=\{S+\mathbf{R}^n_+\}$; $w=(w_1,\ldots, w_n)\in \mathbf{N}^n$ is a weight 
 vector associating a nonnegative integer weight to all coordinates.
 - `move`: The host chooses a subset $I\subset \{1,2,\cdots, n\}$ such that $|I|\geq 2$ and 
-\sum_{i\in I}x_i\ge 1$ for all $(x_1,\ldots, x_n)\in S$.
+\sum\limits_{i\in I}x_i\ge 1$ for all $(x_1,\ldots, x_n)\in S$.
 The agent chooses an $i\in I$ such that $w_i$ is minimal in $\{w_j: j\in I\}$.
 - `state change`: Given the pair (I,i) chosen by the host, for $x=(x_1,\cdots,x_n)\in \mathbb Z^n$ we define
 $T_{I,i}(x)=(x_1',\ldots, x_n')$ where
@@ -326,7 +329,7 @@ a positive integer multiple of $(-1,\ldots, -1)$ such that $S'$ still sits in th
 further shift will move it out. 
 The new weight vector is
 
-$$w'_j=\begin{cases}w_j, &\qquad\text{if } j=i or j\notin I \newline w_j-w_i &\qquad\text{if } j \in I\setminus \{i\}
+$$w'_j=\begin{cases}w_j, &\qquad\text{if } j=i \quad\text{or}\quad j\notin I \newline w_j-w_i &\qquad\text{if } j \in I\setminus \{i\}
 \end{cases},$$
 
 - `terminal states`: a state $S$ is terminal if it consists of one single point, and  
