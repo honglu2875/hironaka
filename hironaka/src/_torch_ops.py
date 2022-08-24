@@ -59,7 +59,7 @@ def shift_torch(points: torch.Tensor,
             They are not equivalent. E.g.,
                 dimension is 3, coord = [[1,2]] is equivalent to coord = Tensor([[0,1,1]])
     """
-    _TENSOR_TYPE = torch.float32
+    _TENSOR_TYPE = points.dtype
     device = points.device
 
     assert len(points.shape) == 3
@@ -115,7 +115,7 @@ def reposition_torch(points: torch.Tensor,
                      padding_value: Optional[float] = -1.):
     available_points = points.ge(0)
     maximum = torch.max(points)
-    _TENSOR_TYPE = torch.float32
+    _TENSOR_TYPE = points.dtype
     device = points.device
 
     preprocessed = points * available_points + \
