@@ -27,10 +27,7 @@ class DQNTrainer(Trainer):
         self.max_grad_norm = self.config['max_grad_norm']
 
         # Set up target Q-networks for both host and agent
-        for role in ['host', 'agent']:
-            if self.is_dummy(role):
-                continue
-
+        for role in self.trained_roles:
             net = self.get_net(role)
             setattr(self, f'{role}_net_target', deepcopy(net).to(self.device))
 
@@ -50,7 +47,7 @@ class DQNTrainer(Trainer):
         # Sample replay buffer
         with Timer(log_prefix + '-sample_replay_buffer_total', self.time_log, active=self.log_time,
                    use_cuda=self.use_cuda):
-            replay_data = replay_buffer.sample(batch_size)
+            replay_data = replay_buffer.sample(batch_size, device=self.device)
             observations, actions, rewards, dones, next_observations = replay_data
 
         with Timer(log_prefix + '-get_target_q_value_total', self.time_log, active=self.log_time,
@@ -91,7 +88,7 @@ class DQNTrainer(Trainer):
             # Logging
             # We hard-coded the 20-step interval for now. Profiling analysis shows it is about 1/10 on time cost
             #   comparing to autograd happening above.
-            if self.use_tensorboard and self.layerwise_logging and (self.total_num_steps + current_step) % 20 == 0:
+            if self.use_tensorboard and self.layerwise_logging and (self.total_num_steps + current_step) % 100 == 0:
                 for j, layer in enumerate(q_net.parameters()):
                     self.tb_writer.add_scalar(f'{log_prefix}/model/layer-{j}/avg_wt', layer.mean().item(),
                                               self.total_num_steps + current_step)
@@ -110,6 +107,13 @@ class DQNTrainer(Trainer):
         losses = []
         param = {}
         net_param = {}
+
+        for role in players:
+            if role not in self.trained_roles:
+                self.logger.error(
+                    f'{role} is not trainable. Either it is not present in config or it was set as a dummy module.')
+                return
+
         for role in players:
             net_param[role] = self.get_net(role), self.get_net_target(role), self.get_optim(
                 role), self.get_replay_buffer(role)
@@ -119,10 +123,6 @@ class DQNTrainer(Trainer):
         for i in range(steps):
             self.set_learning_rate()
             for role in players:
-                # Ignore the update if the network is DummyModule
-                if isinstance(net_param[role][0], DummyModule):
-                    continue
-
                 # Updating target network with a delay helps the stability.
                 with Timer(f'update_{role}_target_net', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
                     if (self.total_num_steps + i) % param[role]['steps_before_update_target'] == 0:

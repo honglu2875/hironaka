@@ -5,7 +5,7 @@ import numpy as np
 import torch
 
 from hironaka.policy.Policy import Policy
-from hironaka.src import batched_coord_list_to_binary, decode_action, mask_encoded_action
+from hironaka.src import batched_coord_list_to_binary, decode_action, mask_encoded_action, HostActionEncoder
 
 
 class NNPolicy(Policy):
@@ -19,7 +19,8 @@ class NNPolicy(Policy):
                  device_key: Optional[str] = 'cpu',
                  masked: Optional[bool] = True,
                  eval_mode: Optional[bool] = False,
-                 use_discrete_actions_for_host: Optional[bool] = False,
+                 use_discrete_actions_for_host: Optional[bool] = True,
+                 compressed_host_output: Optional[bool] = True,
                  config_kwargs: Optional[Dict[str, Any]] = None,
                  **kwargs):
         if self.logger is None:
@@ -33,9 +34,13 @@ class NNPolicy(Policy):
 
         self.masked = config.get('masked', masked)
         self.use_discrete_actions_for_host = config.get('use_discrete_actions_for_host', use_discrete_actions_for_host)
+        self.compressed_host_output = config.get('compress_host_output', compressed_host_output)
         self.discrete_host_mask = torch.tensor(mask_encoded_action(self.dimension), device=self._device) \
             if self.masked and self.use_discrete_actions_for_host else None
         self.eval_mode = config.get('eval_mode', eval_mode)
+
+        if self.mode == 'host' and self.compressed_host_output:
+            self.host_encoder = HostActionEncoder(self.dimension)
 
     def predict(self, features: Any, debug: Optional[bool] = False) -> Any:
         """
@@ -82,14 +87,17 @@ class NNPolicy(Policy):
             # discrete action -> one-hot encoding.
             if self.use_discrete_actions_for_host:
                 output_tensor = torch.softmax(output_tensor, dim=1)
-                if self.masked:
-                    output_tensor *= self.discrete_host_mask
+                if self.compressed_host_output:
+                    return self.host_encoder.decode_tensor(torch.argmax(output_tensor, dim=1))
+                else:  # Below are legacy codes. Need to clean up.
+                    if self.masked:
+                        output_tensor *= self.discrete_host_mask
 
-                encoded_actions = torch.argmax(output_tensor, dim=1).detach().cpu().numpy()
-                # TODO: Slow. Could be improved if necessary.
-                return np.array(
-                    [decode_action(encoded_actions[b], self.dimension)
-                     for b in range(encoded_actions.shape[0])])
+                    encoded_actions = torch.argmax(output_tensor, dim=1).detach().cpu().numpy()
+                    # TODO: Slow. Could be improved if necessary.
+                    return np.array(
+                        [decode_action(encoded_actions[b], self.dimension)
+                         for b in range(encoded_actions.shape[0])])
 
             # multi-binary action -> apply sigmoid on each coordinate.
             output_tensor = torch.sigmoid(output_tensor)
