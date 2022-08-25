@@ -10,7 +10,7 @@ from .HironakaBase import HironakaBase
 
 class HironakaAgentEnv(HironakaBase):
     """
-        The environment fixes an Agent inside, and is expected to receive actions from a host.
+    The environment fixes an Agent inside, and is expected to receive actions from a host.
     """
 
     def __init__(self,

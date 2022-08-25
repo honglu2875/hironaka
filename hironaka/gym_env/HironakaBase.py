@@ -16,19 +16,19 @@ GYM_VERSION = get_gym_version_in_float()
 
 class HironakaBase(gym.Env, abc.ABC):
     """
-        Base gym class for both host and agent in Hironaka polyhedral game.
-        As an abstract class, the subclasses need to implement:
-            __init__
-            _post_reset_update
-            step
-            _get_obs
+    Base gym class for both host and agent in Hironaka polyhedral game.
+    As an abstract class, the subclasses need to implement:
+        __init__
+        _post_reset_update
+        step
+        _get_obs
     """
-    metadata = {"render_modes": ["ansi"], "render_fps": 1}
+    metadata = {"render_modes": ["ansi"]}
 
+    # Override these two
     config_key_for_points = ["value_threshold"]
     config_key_for_generate_points = ["dimension", "max_value"]
 
-    # Implement these two
     if GYM_VERSION >= 0.22:
         action_space: gym.spaces.Space[ActType]
         observation_space: gym.spaces.Space[ObsType]
@@ -38,14 +38,14 @@ class HironakaBase(gym.Env, abc.ABC):
                  dimension: Optional[int] = 3,
                  max_num_points: Optional[int] = 10,
                  max_value: Optional[int] = 10,
-                 padding_value: Optional[float] = -1e-8,
+                 padding_value: Optional[float] = -1.0,
                  value_threshold: Optional[float] = None,
                  step_threshold: Optional[int] = 1000,
                  fixed_penalty_crossing_threshold: Optional[int] = None,
                  stop_at_threshold: Optional[bool] = True,
                  improve_efficiency: Optional[bool] = False,
                  scale_observation: Optional[bool] = True,
-                 reward_based_on_point_reduction: Optional[bool] = True,
+                 reward_based_on_point_reduction: Optional[bool] = False,
                  **kwargs):
         self.dimension = dimension
         self.max_num_points = max_num_points
@@ -118,9 +118,9 @@ class HironakaBase(gym.Env, abc.ABC):
     @abc.abstractmethod
     def _post_reset_update(self):
         """
-            implement the action taken after the environment is reset. It may include but is not limited to:
-                - update self._coord
-                - clean up state-related internal attributes (if any)
+        implement the action taken after the environment is reset. It may include but is not limited to:
+            - update self._coord
+            - clean up state-related internal attributes (if any)
         """
         pass
 
@@ -138,24 +138,24 @@ class HironakaBase(gym.Env, abc.ABC):
     @abc.abstractmethod
     def _get_obs(self):
         """
-            a utility method to be implemented: return the data that matches with the gym environment observation.
+        a utility method to be implemented: return the data that matches with the gym environment observation.
         """
         pass
 
-    def _get_padded_points(self, constant_value: Optional[int] = -1e-8) -> np.ndarray:
+    def _get_padded_points(self, constant_value: Optional[int] = -1.0) -> np.ndarray:
         """
-            a utility method that returns -1 padded point information.
-            return: numpy array of shape (self.max_num_points, self.dimension)
+        a utility method that returns -1 padded point information.
+        return: numpy array of shape (self.max_num_points, self.dimension)
         """
         return get_padded_array(self._points.get_features()[0], new_length=self.max_num_points,
                                 constant_value=constant_value).astype(np.float32)
 
     def _get_coords_multi_bin(self) -> np.ndarray:
         """
-            a utility method that returns a 1d numpy array of shape (self.dimension,). Chosen coordinates are marked
-            as 1, and others are 0.
-            If the game has ended or the length of self._coord is less than 2, return np.zeros(self.dimension).
-            return: numpy array of shape (self.dimension,).
+        a utility method that returns a 1d numpy array of shape (self.dimension,). Chosen coordinates are marked
+        as 1, and others are 0.
+        If the game has ended or the length of self._coord is less than 2, return np.zeros(self.dimension).
+        return: numpy array of shape (self.dimension,).
         """
         coords_multi_bin = np.zeros(self.dimension)
         if not self._points.ended and len(self._coords) >= 2:

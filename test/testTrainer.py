@@ -1,17 +1,11 @@
 import pathlib
 import unittest
 
-import gym
 import torch
-from gym import register
-from stable_baselines3 import DQN
 
-from hironaka.agent import ChooseFirstAgent
 from hironaka.core import TensorPoints
-from hironaka.host import Zeillinger
 from hironaka.src import merge_experiences
 from hironaka.trainer.DQNTrainer import DQNTrainer
-from hironaka.trainer.FusedGame import FusedGame
 from hironaka.trainer.ReplayBuffer import ReplayBuffer
 from hironaka.trainer.player_modules import RandomAgentModule
 

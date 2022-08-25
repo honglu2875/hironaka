@@ -4,14 +4,14 @@ from typing import Union
 
 class Scheduler(abc.ABC):
     """
-        Scheduler for learning rate, exploration rate, etc.
-        How it works:
-            - It records a value at initialization (`value`).
-            - It is fed with an indefinite amount of parameters in `kwargs`. Each subclass chooses what to use.
-            - get_value() takes a parameter called steps, and returns a new value.
-        It is basically a function. But the minor extra features are:
-            - One can optionally record some parameters and states
-            - It enforces `mandatory_keys` when fed with parameters at initialization.
+    Scheduler for learning rate, exploration rate, etc.
+    How it works:
+        - It records a value at initialization (`value`).
+        - It is fed with an indefinite amount of parameters in `kwargs`. Each subclass chooses what to use.
+        - get_value() takes a parameter called steps, and returns a new value.
+    It is basically a function. But the minor extra features are:
+        - One can optionally record some parameters and states
+        - It enforces `mandatory_keys` when fed with parameters at initialization.
     """
     key_name = None
     mandatory_keys = []

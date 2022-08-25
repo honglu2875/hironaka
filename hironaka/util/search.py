@@ -8,7 +8,7 @@ from hironaka.host import Host
 
 def search_depth(points: ListPoints, host: Host, debug=False):
     """
-        Given the host, return the maximal length of the game that an agent can achieve.
+    Given the host, return the maximal length of the game that an agent can achieve.
     """
     assert points.batch_size == 1  # Only search a single starting case.
 
@@ -54,7 +54,7 @@ def search_tree(points, tree, curr_node, host, max_size=100):
 
 def search_tree_morin(points: ListPoints, tree, curr_node, curr_weights, host, max_size=100):
     """
-        Perform a full tree search and store the full result in a Tree object.
+    Perform a full tree search and store the full result in a Tree object.
     """
     Node = namedtuple('Node', ['points'])
 

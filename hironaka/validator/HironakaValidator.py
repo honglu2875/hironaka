@@ -8,8 +8,8 @@ from hironaka.src import generate_batch_points
 
 class HironakaValidator(GameHironaka):
     """
-        Given an agent and a host, this class inherits GameHironaka and handles the validation process.
-        It behaves like
+    Given an agent and a host, this class inherits GameHironaka and handles the validation process.
+    It behaves like
     """
 
     def __init__(self,

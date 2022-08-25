@@ -2,7 +2,7 @@ import abc
 import contextlib
 import logging
 from copy import deepcopy
-from typing import List, Any, Dict, Union, Callable, Optional, Tuple, Type
+from typing import List, Any, Dict, Union, Callable, Optional, Type
 
 import torch
 import yaml
@@ -308,9 +308,9 @@ class Trainer(abc.ABC):
 
         result = []
         dummy_param = (self.dimension, self.max_num_points, self.device)
-        hosts = [self.host_net]*3 + [RandomHostModule(*dummy_param), AllCoordHostModule(*dummy_param)]
+        hosts = [self.host_net] * 3 + [RandomHostModule(*dummy_param), AllCoordHostModule(*dummy_param)]
         agents = [self.agent_net, RandomAgentModule(*dummy_param), ChooseFirstAgentModule(*dummy_param)] + \
-                 [self.agent_net]*2
+                 [self.agent_net] * 2
 
         for host, agent in zip(hosts, agents):
             points = self._generate_random_points(num_samples)
@@ -342,7 +342,7 @@ class Trainer(abc.ABC):
 
         rollouts = self.get_rollout(role, games, max_steps, er=er)
         if role == 'host':
-            max_num = 2**self.dimension
+            max_num = 2 ** self.dimension
         elif role == 'agent':
             max_num = self.dimension
         else:
@@ -549,7 +549,7 @@ class Trainer(abc.ABC):
     def _generate_random_points(self, samples: int) -> TensorPoints:
         pts = torch.randint(self.max_value + 1, (samples, self.max_num_points, self.dimension), dtype=torch.float32,
                             device=self.device)
-        points = self.point_cls(pts, device_key=self.device_key)
+        points = self.point_cls(pts, device=self.device)
         points.get_newton_polytope()
         if self.scale_observation:
             points.rescale()
@@ -562,7 +562,3 @@ class Trainer(abc.ABC):
         with open(file_path, "r") as stream:
             config = yaml.safe_load(stream)
         return config
-
-    @property
-    def device_key(self):
-        return f'cuda:{self.device_num}' if self.use_cuda else 'cpu'

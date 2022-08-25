@@ -1,5 +1,6 @@
 import abc
 import logging
+import random
 from typing import Union
 
 # Sorry about this block of codes. Blame google colab for not updating their python version...
@@ -19,9 +20,9 @@ from hironaka.policy.Policy import Policy
 
 class Agent(abc.ABC):
     """
-        An agent can either modify the points in-place, or just return the action (the chosen coordinate)
-        Must implement:
-            _get_actions
+    An agent can either modify the points in-place, or just return the action (the chosen coordinate)
+    Must implement:
+        _get_actions
     """
     logger = None
 
@@ -85,7 +86,7 @@ class RandomAgent(Agent):
     USE_REPOSITION: Final[bool] = False
 
     def _get_actions(self, points, batch_coords, batch_weights):
-        return [np.random.choice(coord, size=1)[0].tolist() if len(coord) > 1 else None for coord in batch_coords]
+        return [random.choice(coord) if len(coord) > 1 else None for coord in batch_coords]
 
 
 class ChooseFirstAgent(Agent):
@@ -106,7 +107,7 @@ class PolicyAgent(Agent):
 
     def _get_actions(self, points, batch_coords, batch_weights):
         features = points.get_features()
-        return self._policy.predict((features, batch_coords))
+        return self._policy.predict((features, batch_coords)).tolist()
 
 
 class AgentMorin(Agent):

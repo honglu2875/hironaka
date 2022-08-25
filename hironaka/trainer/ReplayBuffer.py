@@ -5,12 +5,12 @@ import torch
 
 class ReplayBuffer:
     """
-        Replay buffer. Most of the codes are inspired by stable-baselines3, but the central data type is Tensor instead
-            of np.ndarray.
-        This is the base class that does things in basic fashions.
+    Replay buffer. Most of the codes are inspired by stable-baselines3, but the central data type is Tensor instead
+        of np.ndarray.
+    This is the base class that does things in basic fashions.
 
-        An experience is the following tuple (order matters!!):
-        observations, actions, rewards, dones, next_observations
+    An experience is the following tuple (order matters!!):
+    observations, actions, rewards, dones, next_observations
     """
 
     def __init__(self, input_shape: Union[Dict, Tuple],
@@ -19,11 +19,11 @@ class ReplayBuffer:
                  device: torch.device,
                  **kwargs):
         """
-            Parameters:
-                input_shape: Either a tuple or a dict of tuples. The shape of the input.
-                output_dim: int. The dimension of the output.
-                buffer_size: int. The maximal size (on the 0-th axis, the batch-dimension).
-                device: torch.device. Specifies which device to save.
+        Parameters:
+            input_shape: Either a tuple or a dict of tuples. The shape of the input.
+            output_dim: int. The dimension of the output.
+            buffer_size: int. The maximal size (on the 0-th axis, the batch-dimension).
+            device: torch.device. Specifies which device to save.
         """
         self.input_shape = input_shape
         self.output_dim = output_dim

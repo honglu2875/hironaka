@@ -1,6 +1,5 @@
 from typing import Optional, Tuple, Union, Callable
 
-import numpy as np
 import torch
 
 from hironaka.core import PointsBase, TensorPoints
@@ -10,10 +9,10 @@ from hironaka.trainer.Timer import Timer
 
 class FusedGame:
     """
-        A fused game class processing a large batch of games. It avoids all the wrappers (especially gym) other than
-        `TensorPoints`. Aim to maximize speed and simplify training/validation.
+    A fused game class processing a large batch of games. It avoids all the wrappers (especially gym) other than
+    `TensorPoints`. Aim to maximize speed and simplify training/validation.
 
-        """
+    """
 
     def __init__(self,
                  host_net: torch.nn.Module,
@@ -22,14 +21,14 @@ class FusedGame:
                  log_time: Optional[bool] = True,
                  reward_func: Optional[Callable] = None):
         """
-            host_net: a nn.Module where
-                input: a 3-dim tensor representing a batch of points.
-                    Negative numbers are regarded as padding for removed points.
-                output: a 2-dim tensor consisting of the logits of the probability of choosing each coordinate.
-            agent_net: a nn.Module where
-                input: a dict
-                    "points": 3-dim tensor of points.
-                    "coords": 2-dim tensor of chosen coordinates. (Is not forced to only take values 0/1.)
+        host_net: a nn.Module where
+            input: a 3-dim tensor representing a batch of points.
+                Negative numbers are regarded as padding for removed points.
+            output: a 2-dim tensor consisting of the logits of the probability of choosing each coordinate.
+        agent_net: a nn.Module where
+            input: a dict
+                "points": 3-dim tensor of points.
+                "coords": 2-dim tensor of chosen coordinates. (Is not forced to only take values 0/1.)
         """
         self.device = torch.device(device)
         self.use_cuda = self.device != torch.device('cpu')  # only used for Timer
@@ -53,8 +52,8 @@ class FusedGame:
              scale_observation=True,
              exploration_rate=0.2):
         """
-            Progress the game and return:
-                observations, actions (depending on sample_for), rewards, dones, next_observations
+        Progress the game and return:
+            observations, actions (depending on sample_for), rewards, dones, next_observations
         """
         assert sample_for in ["host", "agent"], f"sample_for must be one of 'host' and 'agent'. Got {sample_for}."
 
