@@ -16,11 +16,8 @@ class Host(abc.ABC):
     Must implement:
         _select_coord
     """
-    logger = None
-
     def __init__(self, ignore_batch_dimension=False, **kwargs):
-        if self.logger is None:
-            self.logger = logging.getLogger(__class__.__name__)
+        self.logger = logging.getLogger(__class__.__name__)
 
         # If the agent only has one batch and wants to ignore batch dimension in the parameters, set it to True.
         self.ignore_batch_dimension = ignore_batch_dimension

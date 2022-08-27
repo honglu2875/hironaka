@@ -1,7 +1,7 @@
 import abc
 import logging
 import random
-from typing import Union
+from typing import Union, List
 
 # Sorry about this block of codes. Blame google colab for not updating their python version...
 from hironaka.src import get_python_version_in_float
@@ -24,16 +24,13 @@ class Agent(abc.ABC):
     Must implement:
         _get_actions
     """
-    logger = None
-
-    # Please implement the following. They are *constants*!
+    # Please set the following. They are *class constants*!
     USE_WEIGHTS: bool
     USE_REPOSITION: bool  # apply a self.points.reposition() between shift() and get_newton_polytope()
     must_implement = ["USE_WEIGHTS", "USE_REPOSITION"]
 
-    def __init__(self, ignore_batch_dimension=False, **kwargs):
-        if self.logger is None:
-            self.logger = logging.getLogger(__class__.__name__)
+    def __init__(self, ignore_batch_dimension: bool = False, **kwargs):
+        self.logger = logging.getLogger(__class__.__name__)
 
         # If the agent only has one batch and wants to ignore batch dimension in the parameters, set it to True.
         self.ignore_batch_dimension = ignore_batch_dimension
@@ -42,12 +39,23 @@ class Agent(abc.ABC):
             if not hasattr(self, s) or getattr(self, s) is None:
                 raise NotImplementedError(f"Please specify {s} for the subclass.")
 
-    def move(self, points: Union[ListPoints, Points], coords, weights=None, inplace=True):
+    def move(self, points: Union[ListPoints, Points], coords: List, weights: List = None, inplace: bool = True):
+        """
+        Make moves on (the set of) points.
+        Parameters:
+            points: either `ListPoints` (a batch of different collection of points) or `Points` (a simple wrapper with
+                one single collection of points).
+            coords: host's choice(-s) of coordinates. Not including the batch axis if points is a `Points` object.
+            weights: a list of weights (only for those weight-related games).
+            inplace: whether the modification happens directly on mutable objects `points`, `coords` and `weights`.
+        """
         if self.USE_WEIGHTS and weights is None:
             raise Exception("Please specify weights in the parameters.")
         if not self.USE_WEIGHTS and weights is not None:
             self.logger.warning("The weights parameter will be ignored.")
         if isinstance(points, Points):
+            # `Points` is a wrapper of one single collection of points (i.e., one single game).
+            # Here we turn it into a batch with batch size 1.
             points = points.points
 
         if not self.ignore_batch_dimension:

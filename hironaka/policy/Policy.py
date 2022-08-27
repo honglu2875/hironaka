@@ -2,11 +2,14 @@ import abc
 import logging
 from typing import Any, Optional, List, Tuple, Union, Type
 
+import numpy as np
 import torch
 
 from hironaka.src import get_batched_padded_array, batched_coord_list_to_binary
 
-PointsDataTypes = Union[torch.Tensor, List[List[List[Any]]]]
+PointsDataTypes = Union[torch.Tensor, List[List[List[Any]]], np.ndarray]
+CoordsDataTypes = Union[torch.Tensor, List[List[int]], np.ndarray]
+PlayerInputTypes = Tuple[PointsDataTypes, CoordsDataTypes]
 
 
 class Policy(abc.ABC):
@@ -28,6 +31,7 @@ class Policy(abc.ABC):
                  max_num_points: int,
                  padding_value: Optional[float] = -1.0,
                  dimension: Optional[int] = 3,
+                 device: Optional[Union[str, torch.device]] = 'cpu',
                  dtype: Optional[Type] = torch.float32,
                  **kwargs):
         self.logger = logging.getLogger(__class__.__name__)
@@ -38,15 +42,28 @@ class Policy(abc.ABC):
         self.dimension = dimension
         self.max_num_points = max_num_points
         self.padding_value = padding_value
+        self.device = torch.device(device)
         self.dtype = dtype
 
     @abc.abstractmethod
-    def predict(self, features: PointsDataTypes, debug: Optional[bool] = False) -> PointsDataTypes:
+    def predict(self, features: PlayerInputTypes, debug: Optional[bool] = False) -> PointsDataTypes:
         """
         Return the prediction based on the observed features.
 
         this method by default should be to handle both host and agent input using
         self.input_preprocess_for_host() and self.input_preprocess_for_agent()
+
+        When self.mode=='host':
+            features is either a tensor or a nested list representing the batch of points.
+            E.g.,
+                [[[1, 2, 3], [0, 1, 2]]], or torch.FloatTensor([[[1, 2, 3], [0, 1, 2]]])
+        When self.mode=='agent':
+            features needs to be a tuple of points and coordinates.
+            E.g.,
+                ([[[1, 2, 3], [0, 1, 2]]], [[1, 2]])
+                or use multi-binary tensor to represent coordinates:
+                ([[[1, 2, 3], [0, 1, 2]]], torch.tensor([[0, 1, 1]]))
+                point data can also be a tensor but we do not list all possibilities.
         """
         pass
 
@@ -61,15 +78,14 @@ class Policy(abc.ABC):
                 torch.tensor(
                     get_batched_padded_array(features, self.max_num_points, constant_value=self.padding_value),
                     dtype=self.dtype, device=self.device), start_dim=1)
-        elif isinstance(features, torch.Tensor):
-            feature_tensor = torch.flatten(features, start_dim=1)
+        elif isinstance(features, (torch.Tensor, np.ndarray)):
+            feature_tensor = torch.flatten(torch.tensor(features, dtype=self.dtype, device=self.device), start_dim=1)
         else:
             raise TypeError(f"Unsupported input type. Got {type(features)}.")
 
         return feature_tensor
 
-    def input_preprocess_for_agent(self, features: Tuple[PointsDataTypes, Union[torch.Tensor, List[List[int]]]]) -> \
-            PointsDataTypes:
+    def input_preprocess_for_agent(self, features: PlayerInputTypes) -> PointsDataTypes:
         """
         An agent will pass on a tuple:
             a nested list or tensor for points and a 2d nested list or tensor for coordinates.
@@ -79,15 +95,22 @@ class Policy(abc.ABC):
         """
         assert isinstance(features, Tuple)
 
-        feature_tensor = torch.flatten(
-            torch.tensor(
-                get_batched_padded_array(features[0], self.max_num_points, constant_value=self.padding_value),
-                dtype=self.dtype, device=self.device), start_dim=1)
-
-        if isinstance(features[1], torch.Tensor):
-            coord_tensor = features[1]
+        if isinstance(features[0], List):
+            feature_tensor = torch.flatten(
+                torch.tensor(
+                    get_batched_padded_array(features[0], self.max_num_points, constant_value=self.padding_value),
+                    dtype=self.dtype, device=self.device), start_dim=1)
+        elif isinstance(features[0], (torch.Tensor, np.ndarray)):
+            feature_tensor = torch.flatten(torch.tensor(features[0], dtype=self.dtype, device=self.device), start_dim=1)
         else:
+            raise TypeError(f"Unsupported input type. Got {type(features[0])}.")
+
+        if isinstance(features[1], (torch.Tensor, np.ndarray)):
+            coord_tensor = torch.tensor(features[1], dtype=self.dtype, device=self.device)
+        elif isinstance(features[1], List):
             coord_tensor = torch.tensor(batched_coord_list_to_binary(features[1], self.dimension),
                                         device=self.device, dtype=self.dtype)
+        else:
+            raise TypeError(f"Unsupported input type. Got {type(features[0])}.")
 
         return torch.cat([feature_tensor, coord_tensor], dim=1)

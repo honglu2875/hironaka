@@ -12,8 +12,6 @@ class Game(abc.ABC):
     """
     This framework simulates a fully autonomous game without interference from outside.
     """
-    logger = None
-
     @abc.abstractmethod
     def __init__(self,
                  state: Union[ListPoints, Points, None],
@@ -26,8 +24,7 @@ class Game(abc.ABC):
         host: the host player
         agent: the agent player
         """
-        if self.logger is None:
-            self.logger = logging.getLogger(__class__.__name__)
+        self.logger = logging.getLogger(__class__.__name__)
 
         if isinstance(state, Points):
             self.state = state.points
@@ -86,9 +83,6 @@ class GameHironaka(Game):
                  host: Host,
                  agent: Agent,
                  **kwargs):
-        if self.logger is None:
-            self.logger = logging.getLogger(__class__.__name__)
-
         super().__init__(state, host, agent, **kwargs)
 
     def step(self, verbose: int = 0) -> bool:
@@ -138,9 +132,6 @@ class GameMorin(Game):
                  host: Host,
                  agent: Agent,
                  **kwargs):
-        if self.logger is None:
-            self.logger = logging.getLogger(__class__.__name__)
-
         super().__init__(state, host, agent, **kwargs)
         self.weights = [[1] * self.state.dimension for _ in range(self.state.batch_size)]
 

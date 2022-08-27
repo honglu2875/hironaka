@@ -14,35 +14,24 @@ class NNPolicy(Policy):
 
     def __init__(self,
                  model: torch.nn.Module,
-                 device: Optional[Union[str, torch.device]] = 'cpu',
                  masked: Optional[bool] = True,
                  eval_mode: Optional[bool] = False,
-                 use_discrete_actions_for_host: Optional[bool] = True,
-                 compressed_host_output: Optional[bool] = True,
                  **kwargs):
         super().__init__(**kwargs)
-
-        self.device = torch.device(device)
         self.model = model.to(self.device)
-
         self.masked = masked
-        self.use_discrete_actions_for_host = use_discrete_actions_for_host
-        self.compressed_host_output = compressed_host_output
-        self.discrete_host_mask = torch.tensor(mask_encoded_action(self.dimension), device=self.device) \
-            if self.masked and self.use_discrete_actions_for_host else None
         self.eval_mode = eval_mode
 
-        if self.mode == 'host' and self.compressed_host_output:
+        # Always use compressed output dimension.
+        # E.g., in 3d, 0, 1, 2, 3 -> [1, 1, 0], [1, 0, 1], [0, 1, 1], [1, 1, 1]
+        if self.mode == 'host':
             self.host_encoder = HostActionEncoder(self.dimension)
 
     def predict(self, features: Any, debug: Optional[bool] = False) -> np.ndarray:
         """
         Predict an action based on a neural network.
-        The input varies depending on whether it is a host or an agent.
-        But the output tensors (directly from the network) are the same: float of shape
-            (batch_size, self.dimension).
-        If it is a host, the output should be turned into batches of binary array,
-        If it is an agent, the output should be the argmax (of the whole array or the masked entries only).
+        If self.mode=='host', the output should be turned into a batch of multi-binary array,
+        If self.mode=='agent', the output should be the argmax (of the whole array or the masked entries only).
         """
         if self.mode == 'host':
             input_tensor = self.input_preprocess_for_host(features)
@@ -75,30 +64,10 @@ class NNPolicy(Policy):
                 output_tensor = output_tensor * mask
             return torch.argmax(output_tensor, dim=1).detach().numpy()
         elif self.mode == 'host':
-            # discrete action -> one-hot encoding.
-            if self.use_discrete_actions_for_host:
-                output_tensor = torch.softmax(output_tensor, dim=1)
-                if self.compressed_host_output:
-                    return self.host_encoder.decode_tensor(torch.argmax(output_tensor, dim=1)).detach().numpy()
-                else:  # Below are legacy codes. Need to clean up.
-                    if self.masked:
-                        output_tensor *= self.discrete_host_mask
-
-                    encoded_actions = torch.argmax(output_tensor, dim=1).detach().cpu().numpy()
-                    # TODO: Slow. Could be improved if necessary.
-                    return np.array(
-                        [decode_action(encoded_actions[b], self.dimension)
-                         for b in range(encoded_actions.shape[0])])
-
-            # multi-binary action -> apply sigmoid on each coordinate.
-            output_tensor = torch.sigmoid(output_tensor)
-            out = torch.gt(output_tensor, 0.5)
-            if self.masked:
-                for b in range(out.shape[0]):
-                    if torch.sum(out[b]) < 2:
-                        t = torch.topk(output_tensor[b], k=2)[1]
-                        out[b][t[0]], out[b][t[1]] = True, True
-            return out.astype(int).detach().numpy()
+            # action probabilities -> decode into multi-binary.
+            # E.g., output [[0.5, 0.7, 0.5, 0.3]] --argmax--> [[1]] --decode_tensor--> [[1, 0, 1]]
+            output_tensor = torch.softmax(output_tensor, dim=1)
+            return self.host_encoder.decode_tensor(torch.argmax(output_tensor, dim=1)).detach().numpy()
 
     def _evaluate(self, input_tensor):
         """
