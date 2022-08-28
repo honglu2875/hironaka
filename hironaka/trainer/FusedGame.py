@@ -165,7 +165,8 @@ class FusedGame:
         """
         for role in ['host', 'agent']:
             net = getattr(self, f'{role}_net')
-            if next(net.parameters()).dtype != dtype:
+            param = next(net.parameters(), None)
+            if param is not None and param.dtype != dtype:
                 setattr(self, f'{role}_net', deepcopy(net).type(dtype))
 
     @staticmethod
