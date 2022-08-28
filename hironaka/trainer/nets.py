@@ -9,7 +9,7 @@ TensorDict = Dict[Union[str, int], torch.Tensor]
 
 def expand_net_list(net_arch: List[Any]) -> List[Any]:
     """
-        Utility function for `create_mlp`. Recursively expand the dict objects in the list.
+    Utility function for `create_mlp`. Recursively expand the dict objects in the list.
     """
     expanded = []
     for item in net_arch:
@@ -27,15 +27,15 @@ def expand_net_list(net_arch: List[Any]) -> List[Any]:
 def create_mlp(head: nn.Module, net_arch: List[Any], input_dim: int, output_dim: int,
                activation_fn: Type[nn.Module] = nn.ReLU) -> nn.Module:
     """
-        A basic MLP network will be constructed according to `head` followed by `net_arch`.
-        `head` must output tensors with dim (-1, input_dim).
-        `net_arch` does not need to specify input and output dimension as they are already in the argument.
-            Numbers in `net_arch` represents network layers.
-            'b' represents a BatchNorm1d layer (attached to the previous layer before activation).
-            A dict represents (recursively) a repeated part of the networks:
-                'repeat': number of times to repeat.
-                'net_arch': a net_arch list described here (recursively).
-            activation functions defaults to relu (may change in the future).
+    A basic MLP network will be constructed according to `head` followed by `net_arch`.
+    `head` must output tensors with dim (-1, input_dim).
+    `net_arch` does not need to specify input and output dimension as they are already in the argument.
+        Numbers in `net_arch` represents network layers.
+        'b' represents a BatchNorm1d layer (attached to the previous layer before activation).
+        A dict represents (recursively) a repeated part of the networks:
+            'repeat': number of times to repeat.
+            'net_arch': a net_arch list described here (recursively).
+        activation functions defaults to relu (may change in the future).
     """
     nets = [head, activation_fn()]
     network_list = expand_net_list(net_arch)
@@ -105,11 +105,11 @@ def make_residual(in_channels: int, out_channels: int) -> ResidualBlock:
 
 class BaseFeaturesExtractor(nn.Module, abc.ABC):
     """
-        A feature extractor (inspired by stable-baselines3).
-        Must assign
-            self._feature_dim
-        Must implement
-            forward()
+    A feature extractor (inspired by stable-baselines3).
+    Must assign
+        self._feature_dim
+    Must implement
+        forward()
     """
 
     def __init__(self, input_dim: int):
@@ -145,4 +145,3 @@ class HostFeatureExtractor(BaseFeaturesExtractor):
 
     def forward(self, observations: torch.Tensor) -> torch.Tensor:
         return self.flatten(observations)
-

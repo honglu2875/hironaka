@@ -10,12 +10,13 @@ from .HironakaBase import HironakaBase
 
 class HironakaAgentEnv(HironakaBase):
     """
-        The environment fixes an Agent inside, and is expected to receive actions from a host.
+    The environment fixes an Agent inside, and is expected to receive actions from a host.
     """
 
     def __init__(self,
                  agent: Agent,
                  use_discrete_actions_for_host: Optional[bool] = False,
+                 compressed_host_output: Optional[bool] = True,
                  config_kwargs: Optional[Dict[str, Any]] = None,
                  **kwargs):
         config = kwargs if config_kwargs is None else {**kwargs, **config_kwargs}
@@ -23,10 +24,14 @@ class HironakaAgentEnv(HironakaBase):
 
         self.agent = agent
         self.use_discrete_actions_for_host = config.get('use_discrete_actions_for_host', use_discrete_actions_for_host)
+        self.compressed_host_output = compressed_host_output
 
         self.observation_space = self.point_observation_space
         if self.use_discrete_actions_for_host:
-            self.action_space = spaces.Discrete(2 ** self.dimension)
+            if self.compressed_host_output:
+                self.action_space = spaces.Discrete(2 ** self.dimension - self.dimension - 1)
+            else:
+                self.action_space = spaces.Discrete(2 ** self.dimension)
         else:
             self.action_space = spaces.MultiBinary(self.dimension)
 

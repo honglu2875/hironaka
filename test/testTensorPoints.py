@@ -182,3 +182,15 @@ class testTorchPoints(unittest.TestCase):
         p = TensorPoints(torch.rand(100, 20, 3))
         assert hash(p) == hash(p.copy())
 
+    def test_type(self):
+        p = torch.FloatTensor(
+            [
+                [[0, 0, 0, 0], [-1, -1, -1, -1], [-1, -1, -1, -1], [-1, -1, -1, -1]],
+                [[0, 1, 3, 5], [1, 1, 1, 1], [9, 8, 2, 1], [-1, -1, -1, -1]]
+            ]
+        )
+        point = TensorPoints(p, dtype=torch.float32)
+        assert point.points.dtype == torch.float32
+        point.type(torch.float16)
+        assert point.dtype == torch.float16
+        assert point.points.dtype == torch.float16

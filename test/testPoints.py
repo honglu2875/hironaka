@@ -67,14 +67,35 @@ class TestPoints(unittest.TestCase):
         assert str(q) == str(r2)
 
     def test_features(self):
-        p = ListPoints(make_nested_list(
+        class CustomListPoints(ListPoints):
+            def get_features(self):
+                """
+                Say the points are ((x_1)_1, ...,(x_1)_n), ...,((x_k)_1, ...,(x_k)_n)
+                We generate the Newton polynomials of each coordinate and output the new array as features.
+                The output becomes
+                ((sum_i (x_i)_1^1), ..., (sum_i (x_i)_n^1)),
+                ...,
+                ((sum_i (x_i)_1^length), ..., (sum_i (x_i)_n^length))
+                """
+                features = [
+                    [
+                        [
+                            sum([
+                                x[i] ** j for x in batch
+                            ]) for i in range(self.dimension)
+                        ] for j in range(1, self.max_num_points + 1)
+                    ] for batch in self.points
+                ]
+                return features
+
+        p = CustomListPoints(make_nested_list(
             [(7, 5, 3, 8), (8, 9, 8, 18), (8, 3, 17, 8),
              (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)]
         ))
         r = [[[61, 51, 52, 65], [675, 501, 712, 885], [8125, 5271, 11410, 14147], [105411, 57285, 193300, 246081],
               [1453021, 633351, 3345562, 4446755], [20962275, 7076901, 58428292, 81675705]]]
-        print(p.get_sym_features())
-        assert str(p.get_sym_features()) == str(r)
+        print(p.get_features())
+        assert str(p.get_features()) == str(r)
 
     def test_get_batch(self):
         p = ListPoints(make_nested_list(
@@ -85,7 +106,7 @@ class TestPoints(unittest.TestCase):
         ))
         r = [[0, 1, 0, 1], [0, 2, 0, 0], [1, 0, 0, 1], [1, 0, 1, 0], [1, 1, 0, 0], [2, 0, 0, 0]]
 
-        assert str(p.get_batch(1)) == str(r)
+        assert str(p[1]) == str(r)
 
     def test_numpy_input_without_use_np(self):
         p = ListPoints(np.array(
@@ -179,3 +200,5 @@ class TestPoints(unittest.TestCase):
 
         points.get_newton_polytope()
         assert str(points.points) == str(r)
+
+

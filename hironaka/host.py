@@ -12,15 +12,12 @@ from hironaka.policy.Policy import Policy
 
 class Host(abc.ABC):
     """
-        A host that returns the subset of coordinates according to the given set of points.
-        Must implement:
-            _select_coord
+    A host that returns the subset of coordinates according to the given set of points.
+    Must implement:
+        _select_coord
     """
-    logger = None
-
     def __init__(self, ignore_batch_dimension=False, **kwargs):
-        if self.logger is None:
-            self.logger = logging.getLogger(__class__.__name__)
+        self.logger = logging.getLogger(__class__.__name__)
 
         # If the agent only has one batch and wants to ignore batch dimension in the parameters, set it to True.
         self.ignore_batch_dimension = ignore_batch_dimension
@@ -56,10 +53,10 @@ class Zeillinger(Host):
     @staticmethod
     def get_char_vector(vt):
         """
-            Character vector (L, S),
-                L: maximum coordinate - minimum coordinate
-                S: sum of the numbers of maximum coordinates and minimum coordinates
-            e.g., (1, 1, -1, -1) -> (L=2, S=4)
+        Character vector (L, S),
+            L: maximum coordinate - minimum coordinate
+            S: sum of the numbers of maximum coordinates and minimum coordinates
+        e.g., (1, 1, -1, -1) -> (L=2, S=4)
         """
         mx = max(vt)
         mn = min(vt)
@@ -74,7 +71,7 @@ class Zeillinger(Host):
         dim = points.dimension
         result = []
         for b in range(points.batch_size):
-            pts = points.get_batch(b)
+            pts = points[b]
             if len(pts) <= 1:
                 result.append([])
                 continue
@@ -135,13 +132,13 @@ class WeakSpivakovsky(Host):
         assert not points.ended
         result = []
         for b in range(points.batch_size):
-            pts = points.get_batch(b)
+            pts = points[b]
             if len(pts) <= 1:
                 result.append([])
                 continue
-            "For each point we store the subset of nonzero coordinates"
+            # For each point we store the subset of nonzero coordinates
             subsets = [set(np.nonzero(point)[0]) for point in pts]
-            "Find a minimal hitting set, brute-force"
+            # Find a minimal hitting set, brute-force
             U = set.union(*subsets)
             for i in range(2, len(U) + 1):
                 combs = combinations(U, i)

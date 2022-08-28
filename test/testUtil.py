@@ -194,4 +194,3 @@ class TestUtil(unittest.TestCase):
         for i in range(11):
             assert encoder.encode(encoder.decode(i)) == i
         assert encoder.encode_tensor(encoder.decode_tensor(torch.arange(11))).eq(torch.arange(11)).all()
-

@@ -8,8 +8,7 @@ from hironaka.src import generate_batch_points
 
 class HironakaValidator(GameHironaka):
     """
-        Given an agent and a host, this class inherits GameHironaka and handles the validation process.
-        It behaves like
+    Given an agent and a host, this class inherits GameHironaka and handles the validation process.
     """
 
     def __init__(self,
@@ -17,9 +16,6 @@ class HironakaValidator(GameHironaka):
                  agent,
                  config_kwargs: Optional[Dict[str, Any]] = None,
                  **kwargs):
-        if self.logger is None:
-            self.logger = logging.getLogger(__class__.__name__)
-
         config_kwargs = dict() if config_kwargs is None else config_kwargs
         config = {**config_kwargs, **kwargs}
 

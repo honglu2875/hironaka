@@ -1,5 +1,5 @@
-from typing import Iterable
 from copy import deepcopy
+from typing import Iterable
 
 import torch
 from torch import nn
@@ -8,15 +8,14 @@ from hironaka.src import polyak_update
 from hironaka.trainer.ReplayBuffer import ReplayBuffer
 from hironaka.trainer.Timer import Timer
 from hironaka.trainer.Trainer import Trainer
-from hironaka.trainer.player_modules import DummyModule
 
 
 class DQNTrainer(Trainer):
     """
-        Operate the standard DDQN.
+    Operate the standard DDQN.
 
-        Extra configs:
-            max_grad_norm
+    Extra global configs:
+        max_grad_norm
     """
 
     role_specific_hyperparameters = ['batch_size', 'gamma', 'tau', 'initial_rollout_size', 'max_rollout_step',
@@ -40,9 +39,9 @@ class DQNTrainer(Trainer):
                      batch_size: int, gamma: int,
                      log_prefix: str = '', current_step: int = 0, **kwargs) -> int:
         """
-            Update the q_net and q_net_target. Adopted from stable-baselines3.
-            Return:
-                loss: int (only for logging purpose)
+        Update the q_net and q_net_target. Adopted from stable-baselines3.
+        Return:
+            loss: int (only for logging purpose)
         """
         # Sample replay buffer
         with Timer(log_prefix + '-sample_replay_buffer_total', self.time_log, active=self.log_time,

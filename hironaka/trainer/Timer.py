@@ -6,8 +6,8 @@ import torch
 
 class Timer:
     """
-        (Special thank to Panpan Huang who wrote the initial codes.)
-        A simple timer class that logs into an external dict.
+    (Special thank to Panpan Huang who wrote the initial codes.)
+    A simple timer class that logs into an external dict.
     """
 
     def __init__(self, name: str, log_dict: dict, active=True, use_cuda=False):

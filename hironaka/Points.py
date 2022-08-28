@@ -3,7 +3,7 @@ from hironaka.core import ListPoints
 
 class Points:
     """
-        A simple wrapper allowing for simple usage of basic functions of `ListPoints`
+    A simple wrapper allowing for simple usage of basic functions of `ListPoints`
     """
     points_config = {
         'use_precise_newton_polytope': True,

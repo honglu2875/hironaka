@@ -1,3 +1,4 @@
+import collections as col
 import logging
 import random
 import sys
@@ -7,15 +8,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from hironaka.core import TensorPoints
-from hironaka.agent import RandomAgent, ChooseFirstAgent
-from hironaka.src import _snippets as snip
 from hironaka import host
-from hironaka.validator import HironakaValidator
+from hironaka.agent import ChooseFirstAgent
+from hironaka.core import TensorPoints
+from hironaka.src import _fn as snip
 from hironaka.trainer import Trainer
-from hironaka.trainer.player_modules import ChooseFirstAgentModule, RandomAgentModule, RandomHostModule
-
-import collections as col
+from hironaka.trainer.player_modules import ChooseFirstAgentModule
+from hironaka.validator import HironakaValidator
 
 ITERATIONS = 1000
 
@@ -111,9 +110,9 @@ def hashify(s: TensorPoints):
 class MCTS:
     def __init__(self, state, nn, **config):
         options = {
-            'env' : ChooseFirstAgent(),
-            'max_depth' : 15,
-            'c_puct' : 0.5
+            'env': ChooseFirstAgent(),
+            'max_depth': 15,
+            'c_puct': 0.5
         }
         options.update(config)
 
@@ -145,7 +144,7 @@ class MCTS:
     def get_sample(self, state: TensorPoints):
         this_key = hashify(state)
 
-        return torch.softmax(self.N[this_key],0)
+        return torch.softmax(self.N[this_key], 0)
 
     def _search(self, s: TensorPoints, depth=0):
         hashed_s = hashify(s)
@@ -213,10 +212,9 @@ class MCTSTrainer2(Trainer.Trainer):
             self.config = config
 
         options.update(self.config)
-        super().__init__(options, agent_net = ChooseFirstAgentModule) #todo: get agent module from initialization.
+        super().__init__(options, agent_net=ChooseFirstAgentModule)  # todo: get agent module from initialization.
 
-
-        self.my_agent = ChooseFirstAgent() #todo: change this to cooperate with the Trainer.Trainer class.
+        self.my_agent = ChooseFirstAgent()  # todo: change this to cooperate with the Trainer.Trainer class.
         self.c_puct = options['c_puct']
         self.max_depth = options['max_depth']
         self.lr = options['lr']
@@ -225,8 +223,7 @@ class MCTSTrainer2(Trainer.Trainer):
         self.coder = snip.HostActionEncoder(dim=self.dimension)
 
     def _make_network(self, head: nn.Module, net_arch: list, input_dim: int, output_dim: int) -> nn.Module:
-        return HironakaNet(dim = self.dimension)
-
+        return HironakaNet(dim=self.dimension)
 
     def _policy_iter(self, net, state: TensorPoints, c_puct=0.5, max_depth=20):
         # This method returns samples of a single complete game.
@@ -241,7 +238,7 @@ class MCTSTrainer2(Trainer.Trainer):
             current_sample = mcts_instance.get_sample(state)
             examples[0].append(state.points[0])
             examples[1].append(current_sample)
-            best_action = torch.argmax(current_sample,0).item()
+            best_action = torch.argmax(current_sample, 0).item()
 
             coords = self.coder.decode(best_action)
 
@@ -255,7 +252,7 @@ class MCTSTrainer2(Trainer.Trainer):
 
             if state.ended:
                 for i, sample in enumerate(examples[1]):
-                    examples[1][i] = torch.cat((sample, torch.zeros(1) + 1),0)
+                    examples[1][i] = torch.cat((sample, torch.zeros(1) + 1), 0)
                 break
             elif depth >= max_depth:
                 for i, sample in enumerate(examples[1]):
@@ -265,7 +262,7 @@ class MCTSTrainer2(Trainer.Trainer):
         return examples
 
     def _loss_function(self, pred, y: List[torch.FloatTensor]):
-        #change list of tensors into batches.
+        # change list of tensors into batches.
         # loss function is a linear combination of MSE on winning/lossing prediction and cross entropy on probability
         # vectors.
 
@@ -284,7 +281,7 @@ class MCTSTrainer2(Trainer.Trainer):
 
         return loss
 
-    def _train(self, steps = 100, **config):
+    def _train(self, steps=100, **config):
 
         evaluation_interval = config['evaluation_interval']
 
@@ -300,7 +297,8 @@ class MCTSTrainer2(Trainer.Trainer):
 
             losses = []
 
-            examples = self._policy_iter(state=test_points, net = self.host_net, c_puct=self.c_puct, max_depth=self.max_depth)
+            examples = self._policy_iter(state=test_points, net=self.host_net, c_puct=self.c_puct,
+                                         max_depth=self.max_depth)
 
             data = [torch.FloatTensor(_) for _ in examples[0]]
 
@@ -320,17 +318,13 @@ class MCTSTrainer2(Trainer.Trainer):
             if len(losses) > evaluation_interval:
                 losses.pop(0)
             if i % evaluation_interval == 0:
-                self.log.info("The MA of last " + str(evaluation_interval) + " iterations is: " +  str(sum(losses) / len(losses)))
+                self.log.info(
+                    "The MA of last " + str(evaluation_interval) + " iterations is: " + str(sum(losses) / len(losses)))
                 self.log.info("Current iteration: " + str(i) + '/' + str(steps))
-
-
 
     def save(self, path='test_model.pth'):
         torch.save(self.host_net, path)
         self.log.info("Saved model as: " + path)
-
-
-
 
 
 class MCTSTrainer:
@@ -398,7 +392,7 @@ class MCTSTrainer:
             current_sample = mcts_instance.get_sample(state)
             examples[0].append(state.points[0])
             examples[1].append(current_sample)
-            best_action = torch.argmax(current_sample,0).item()
+            best_action = torch.argmax(current_sample, 0).item()
 
             coords = self.coder.decode(best_action)
 
@@ -412,7 +406,7 @@ class MCTSTrainer:
 
             if state.ended:
                 for i, sample in enumerate(examples[1]):
-                    examples[1][i] = torch.cat((sample, torch.zeros(1) + 1),0)
+                    examples[1][i] = torch.cat((sample, torch.zeros(1) + 1), 0)
                 break
             elif depth >= max_depth:
                 for i, sample in enumerate(examples[1]):
@@ -442,7 +436,6 @@ class MCTSTrainer:
             "MSE_coefficient": 1.0,
             "agent": ChooseFirstAgent()
         }
-
 
         options.update(config)
         self.ITERATIONS = options["ITERATIONS"]
@@ -484,7 +477,7 @@ class MCTSTrainer:
             if len(losses) > 10:
                 losses.pop(0)
             if i % 10 == 0:
-                self.log.info("The MA of last 10 iterations is: " +  str(sum(losses) / len(losses)))
+                self.log.info("The MA of last 10 iterations is: " + str(sum(losses) / len(losses)))
                 self.log.info("Current iteration: " + str(i) + '/' + str(self.ITERATIONS))
 
     def save_model(self, path='test_model.pth'):
@@ -493,10 +486,9 @@ class MCTSTrainer:
 
 
 if __name__ == '__main__':
-
     test = MCTSTrainer2("mcts_host_config_example.yml")
 
-    test.train(steps= 100, evaluation_interval= 10)
+    test.train(steps=100, evaluation_interval=10)
 
     test.save("test_model.pth")
 

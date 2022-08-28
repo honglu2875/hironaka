@@ -2,7 +2,7 @@ import abc
 import contextlib
 import logging
 from copy import deepcopy
-from typing import List, Any, Dict, Union, Callable, Optional, Tuple, Type
+from typing import List, Any, Dict, Union, Callable, Optional, Type
 
 import torch
 import yaml
@@ -78,7 +78,8 @@ class Trainer(abc.ABC):
                  host_net: Optional[nn.Module] = None,  # Pre-assigned host_net. Will ignore host config if set.
                  agent_net: Optional[nn.Module] = None,  # Pre-assigned agent_net. Will ignore agent config if set.
                  reward_func: Optional[Callable] = None,
-                 point_cls: Optional[Type[TensorPoints]] = TensorPoints  # the class to construct points
+                 point_cls: Optional[Type[TensorPoints]] = TensorPoints,  # the class to construct points
+                 dtype: Optional[Union[Type, torch.dtype]] = torch.float32,
                  ):
         self.logger = logging.getLogger(__class__.__name__)
 
@@ -110,6 +111,7 @@ class Trainer(abc.ABC):
         self.max_num_points = self.config['max_num_points']
         self.max_value = self.config['max_value']
         self.point_cls = point_cls
+        self.dtype = dtype
 
         # Get feature dimension by constructing a dummy tensor
         pts = self.point_cls(torch.rand(1, self.max_num_points, self.dimension))
@@ -308,9 +310,9 @@ class Trainer(abc.ABC):
 
         result = []
         dummy_param = (self.dimension, self.max_num_points, self.device)
-        hosts = [self.host_net]*3 + [RandomHostModule(*dummy_param), AllCoordHostModule(*dummy_param)]
+        hosts = [self.host_net] * 3 + [RandomHostModule(*dummy_param), AllCoordHostModule(*dummy_param)]
         agents = [self.agent_net, RandomAgentModule(*dummy_param), ChooseFirstAgentModule(*dummy_param)] + \
-                 [self.agent_net]*2
+                 [self.agent_net] * 2
 
         for host, agent in zip(hosts, agents):
             points = self._generate_random_points(num_samples)
@@ -342,7 +344,7 @@ class Trainer(abc.ABC):
 
         rollouts = self.get_rollout(role, games, max_steps, er=er)
         if role == 'host':
-            max_num = 2**self.dimension
+            max_num = 2 ** self.dimension
         elif role == 'agent':
             max_num = self.dimension
         else:
@@ -473,8 +475,8 @@ class Trainer(abc.ABC):
             param_group["lr"] = new_lr
 
     def _make_fused_game(self):
-        self.fused_game = FusedGame(self.host_net, self.agent_net, device=self.device, reward_func=self.reward_func,
-                                    log_time=self.log_time)
+        self.fused_game = FusedGame(self.host_net, self.agent_net, device=self.device, log_time=self.log_time,
+                                    reward_func=self.reward_func)
 
     def _set_optim(self, role: str):
         """
@@ -547,9 +549,9 @@ class Trainer(abc.ABC):
         return create_mlp(head, net_arch, input_dim, output_dim)
 
     def _generate_random_points(self, samples: int) -> TensorPoints:
-        pts = torch.randint(self.max_value + 1, (samples, self.max_num_points, self.dimension), dtype=torch.float32,
+        pts = torch.randint(self.max_value + 1, (samples, self.max_num_points, self.dimension), dtype=self.dtype,
                             device=self.device)
-        points = self.point_cls(pts, device_key=self.device_key)
+        points = self.point_cls(pts, device=self.device)
         points.get_newton_polytope()
         if self.scale_observation:
             points.rescale()
@@ -562,7 +564,3 @@ class Trainer(abc.ABC):
         with open(file_path, "r") as stream:
             config = yaml.safe_load(stream)
         return config
-
-    @property
-    def device_key(self):
-        return f'cuda:{self.device_num}' if self.use_cuda else 'cpu'

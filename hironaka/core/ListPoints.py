@@ -1,47 +1,55 @@
-from typing import List, Any, Dict, Optional, Union
+from typing import List, Any, Optional, Union, Tuple
 
 import numpy as np
+import torch
 
 from hironaka.src import shift_lst, get_newton_polytope_lst, get_shape, scale_points, reposition_lst, \
     get_newton_polytope_approx_lst
 from .PointsBase import PointsBase
 
+PointsAsNestedLists = List[List[List[Any]]]
+
 
 class ListPoints(PointsBase):
     """
-        When dealing with small batches, small dimension and small point numbers, list is much better than numpy.
+    An abstraction of (batches of) collection of points. Point data is saved as python lists.
+    Rmk: When dealing with small batches, small dimension and small point numbers, list is much better than numpy.
     """
     subcls_config_keys = ['value_threshold', 'use_precise_newton_polytope']
-    copied_attributes = ['distinguished_points']
+    running_attributes = ['distinguished_points']
 
     def __init__(self,
-                 points: Union[List[List[List[float]]], List[List[float]], np.ndarray],
+                 points: Union[PointsAsNestedLists, List[List[float]], np.ndarray],
                  value_threshold: Optional[float] = 1e8,
                  use_precise_newton_polytope: Optional[bool] = False,
                  distinguished_points: Optional[Union[List[int], None]] = None,
-                 config_kwargs: Optional[Dict[str, Any]] = None,
                  **kwargs):
-        config = kwargs if config_kwargs is None else {**config_kwargs, **kwargs}
+        """
+        Parameters:
+            points: representation of points.
+            value_threshold: the threshold above which the game will stop.
+            use_precise_newton_polytope: use a proper convex cone algorithm instead of the approximate version.
+            distinguished_points: a distinguished point which we keep track of (call )
+        """
         self.value_threshold = value_threshold
         self.use_precise_newton_polytope = use_precise_newton_polytope
         self.distinguished_points = distinguished_points
 
-        # Be lenient and allow numpy array as input.
+        # Be lenient and (try to) allow numpy array/tensor as input.
         # The input might already be a padded arrays. Thus, we do a thorough check to clean that up.
         # WARNING: padding value must be *STRICTLY* negative for the numpy array!
-        if isinstance(points, np.ndarray):
+        if isinstance(points, np.ndarray) or isinstance(points, torch.Tensor):
             points = points.tolist()
-            assert isinstance(points, list)
             for p in points:
                 while p[-1][0] < 0:
                     p.pop()
                     assert len(p) != 0  # Should not be empty batch
 
-        super().__init__(points, **config)
+        super().__init__(points, **kwargs)
 
     def exceed_threshold(self) -> bool:
         """
-            Check whether the maximal value exceeds the threshold.
+        Check whether the maximal value exceeds the threshold.
         """
         if self.value_threshold is not None:
             for b in range(self.batch_size):
@@ -53,22 +61,24 @@ class ListPoints(PointsBase):
 
     def get_num_points(self) -> List[int]:
         """
-            The number of points for each batch.
+        The number of points for each batch.
         """
         return [len(batch) for batch in self.points]
 
     def _shift(self,
-               points: Any,
+               points: PointsAsNestedLists,
                coords: List[List[int]],
                axis: List[int],
                inplace: Optional[bool] = True,
-               **kwargs):
+               **kwargs) -> Union[PointsAsNestedLists, None]:
         return shift_lst(points, coords, axis, inplace=inplace)
 
-    def _reposition(self, points: Any, inplace: Optional[bool] = True, **kwargs):
+    def _reposition(self, points: PointsAsNestedLists,
+                    inplace: Optional[bool] = True, **kwargs) -> Union[PointsAsNestedLists, None]:
         return reposition_lst(points, inplace=inplace)
 
-    def _get_newton_polytope(self, points: Any, inplace: Optional[bool] = True, **kwargs):
+    def _get_newton_polytope(self, points: PointsAsNestedLists,
+                             inplace: Optional[bool] = True, **kwargs) -> Union[PointsAsNestedLists, None]:
         # Mark distinguished points
         if self.distinguished_points is not None:
             # Apply marks to the distinguished points before the operation
@@ -98,46 +108,22 @@ class ListPoints(PointsBase):
 
         return result
 
-    def _get_shape(self, points: Any):
+    def _get_shape(self, points: PointsAsNestedLists) -> Tuple[int, int, int]:
         return get_shape(points)
 
-    def _rescale(self, points: Any, inplace: Optional[bool] = True, **kwargs):
+    def _rescale(self, points: PointsAsNestedLists,
+                 inplace: Optional[bool] = True, **kwargs) -> Union[PointsAsNestedLists, None]:
         return scale_points(points, inplace=inplace)
 
-    def _points_copy(self, points: Any):
-        return [[point.copy() for point in batch] for batch in points]
-
-    def _add_batch_axis(self, points: Any):
+    def _add_batch_axis(self, points: PointsAsNestedLists) -> PointsAsNestedLists:
         return [points]
 
-    def _get_batch_ended(self, points: Any):
+    def _get_batch_ended(self, points: PointsAsNestedLists) -> List[bool]:
         ended_each_batch = []
         for p in points:
             assert len(p) != 0
             ended_each_batch.append(True if len(p) <= 1 else False)
         return ended_each_batch
 
-    def get_sym_features(self):
-        """
-            [currently not in-use]
-            Say the points are ((x_1)_1, ...,(x_1)_n), ...,((x_k)_1, ...,(x_k)_n)
-            We generate the Newton polynomials of each coordinate and output the new array as features.
-            The output becomes
-                ((sum_i (x_i)_1^1), ..., (sum_i (x_i)_n^1)),
-                ...,
-                ((sum_i (x_i)_1^length), ..., (sum_i (x_i)_n^length))
-        """
-        features = [
-            [
-                [
-                    sum([
-                        x[i] ** j for x in batch
-                    ]) for i in range(self.dimension)
-                ] for j in range(1, self.max_num_points + 1)
-            ] for batch in self.points
-        ]
-
-        return features
-
-    def __repr__(self):
+    def __repr__(self) -> str:
         return str(self.points)

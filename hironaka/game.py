@@ -10,10 +10,8 @@ from hironaka.host import Host
 
 class Game(abc.ABC):
     """
-        This framework simulates a fully autonomous game without interference from outside.
+    This framework simulates a fully autonomous game without interference from outside.
     """
-    logger = None
-
     @abc.abstractmethod
     def __init__(self,
                  state: Union[ListPoints, Points, None],
@@ -22,12 +20,11 @@ class Game(abc.ABC):
                  scale_observation: Optional[bool] = True,
                  **kwargs):
         """
-            state: initial state
-            host: the host player
-            agent: the agent player
+        state: initial state
+        host: the host player
+        agent: the agent player
         """
-        if self.logger is None:
-            self.logger = logging.getLogger(__class__.__name__)
+        self.logger = logging.getLogger(__class__.__name__)
 
         if isinstance(state, Points):
             self.state = state.points
@@ -54,15 +51,15 @@ class Game(abc.ABC):
     @abc.abstractmethod
     def step(self, verbose: int = 0) -> bool:
         """
-            Make the game one step forward.
+        Make the game one step forward.
 
-            Return: True if successful, False if unsuccessful
+        Return: True if successful, False if unsuccessful
 
-            Remark:
-                The two agents should proceed according to their own policy based on the current observation.
-                Therefore, no input is given.
-                Even in the case of MCTS, the corresponding agent should have specific codes to handle MCTS search,
-                and then come up with an action.
+        Remark:
+            The two agents should proceed according to their own policy based on the current observation.
+            Therefore, no input is given.
+            Even in the case of MCTS, the corresponding agent should have specific codes to handle MCTS search,
+            and then come up with an action.
         """
         pass
 
@@ -86,22 +83,19 @@ class GameHironaka(Game):
                  host: Host,
                  agent: Agent,
                  **kwargs):
-        if self.logger is None:
-            self.logger = logging.getLogger(__class__.__name__)
-
         super().__init__(state, host, agent, **kwargs)
 
     def step(self, verbose: int = 0) -> bool:
         """
-            Make one move forward.
+        Make one move forward.
 
-            In particular,
-            1. the host selects coordinates
-                (use: Host.select_coord(state));
-            2. the agent makes one move according to the selected coordinates
-                (use: Agent.move(state, coords)).
+        In particular,
+        1. the host selects coordinates
+            (use: Host.select_coord(state));
+        2. the agent makes one move according to the selected coordinates
+            (use: Agent.move(state, coords)).
 
-            Return: True if successful, False if unsuccessful
+        Return: True if successful, False if unsuccessful
         """
         if self.stopped:
             return False
@@ -127,18 +121,17 @@ class GameHironaka(Game):
 
 
 class GameMorin(Game):
-    """The agent is Thom (picks the action coordinate with the smallest weight), but the game terminates with a
+    """
+    The agent is Thom (picks the action coordinate with the smallest weight), but the game terminates with a
     label 'NO CONTRIBUTION' if the distinguished Porteous point is not a vertex of the Newton polytope
-    after the shift"""
+    after the shift
+    """
 
     def __init__(self,
                  state: Union[ListPoints, Points, None],
                  host: Host,
                  agent: Agent,
                  **kwargs):
-        if self.logger is None:
-            self.logger = logging.getLogger(__class__.__name__)
-
         super().__init__(state, host, agent, **kwargs)
         self.weights = [[1] * self.state.dimension for _ in range(self.state.batch_size)]
 

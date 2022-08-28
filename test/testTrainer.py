@@ -1,14 +1,9 @@
 import pathlib
 import unittest
 
-import gym
 import torch
-from gym import register
-from stable_baselines3 import DQN
 
-from hironaka.agent import ChooseFirstAgent
 from hironaka.core import TensorPoints
-from hironaka.host import Zeillinger
 from hironaka.src import merge_experiences
 from hironaka.trainer.DQNTrainer import DQNTrainer
 from hironaka.trainer.FusedGame import FusedGame
@@ -61,12 +56,14 @@ class TestTrainer(unittest.TestCase):
         r = game.step(p, 'host', scale_observation=False)
         r = game.step(p, 'agent', scale_observation=False)
 
-    def test_replay_buffer_shape(self):
-        points_t = torch.randint(5, (2, 20, 3)).type(torch.float)
-        p = TensorPoints(points_t, padding_value=-1e-8)
+    def test_replay_buffer_shape_and_type(self):
+        points_t = torch.randint(5, (2, 20, 3)).type(torch.float16)
+        # Also deliberately causing a type mismatch
+        p = TensorPoints(points_t, padding_value=-1.0, dtype=torch.float16)
 
         game = self.dqn_trainer.fused_game
-        replay_buffer = ReplayBuffer((20, 3), 4, 100, torch.device('cpu'))
+        # Type should be forced when putting into buffer
+        replay_buffer = ReplayBuffer((20, 3), 4, 100, torch.device('cpu'), dtype=torch.float32)
         exp = game.step(p, 'host', scale_observation=False)
         length = exp[0].shape[0]
 
@@ -82,6 +79,21 @@ class TestTrainer(unittest.TestCase):
             game.step(p, 'agent', scale_observation=False, exploration_rate=0)
             for _ in range(5)]
         replay_buffer.add(*merge_experiences(roll_outs))
+
+    def test_type(self):
+        # A more careful test on data typing
+        _TEST_TYPE = torch.float64
+        points_t = torch.randint(5, (2, 20, 3)).type(_TEST_TYPE)
+        p = TensorPoints(points_t, padding_value=-1.0, dtype=_TEST_TYPE, device='cpu')
+        host_net = torch.nn.Sequential(self.dqn_trainer.host_net[0], torch.nn.Linear(60, 64), torch.nn.Linear(64, 4))
+        agent_net = torch.nn.Sequential(self.dqn_trainer.agent_net[0], torch.nn.Linear(63, 64), torch.nn.Linear(64, 3))
+        game = FusedGame(host_net, agent_net, device='cpu', dtype=_TEST_TYPE)
+        exp = game.step(p, 'host', scale_observation=False)
+        assert exp[0].dtype == _TEST_TYPE
+        assert exp[1].dtype == torch.int32
+        assert exp[2].dtype == torch.float32
+        assert exp[3].dtype == torch.bool
+        assert exp[4].dtype == _TEST_TYPE
 
     def test_dqn_trainer(self):
         self.dqn_trainer.train(1)
