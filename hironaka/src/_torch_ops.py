@@ -95,7 +95,7 @@ def shift_torch(points: torch.Tensor,
 
     # Generate transition matrices
     trans_matrix = axis_binary.unsqueeze(2) * coord.unsqueeze(1) + \
-                   torch.diag(torch.ones(dimension, device=device)).repeat(batch_size, 1, 1) - \
+                   torch.diag(torch.ones(dimension, device=device, dtype=_TENSOR_TYPE)).repeat(batch_size, 1, 1) - \
                    axis_binary.unsqueeze(2) * axis_binary.unsqueeze(1)
     trans_matrix = trans_matrix.unsqueeze(1).repeat(1, max_num_points, 1, 1)
 

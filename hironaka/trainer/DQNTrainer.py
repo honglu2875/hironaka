@@ -14,7 +14,7 @@ class DQNTrainer(Trainer):
     """
     Operate the standard DDQN.
 
-    Extra configs:
+    Extra global configs:
         max_grad_norm
     """
 

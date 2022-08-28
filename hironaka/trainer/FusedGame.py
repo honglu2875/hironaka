@@ -1,4 +1,5 @@
-from typing import Optional, Tuple, Union, Callable
+from copy import deepcopy
+from typing import Optional, Tuple, Union, Callable, Type
 
 import torch
 
@@ -19,7 +20,8 @@ class FusedGame:
                  agent_net: torch.nn.Module,
                  device: Optional[Union[str, torch.device]] = 'cpu',
                  log_time: Optional[bool] = True,
-                 reward_func: Optional[Callable] = None):
+                 reward_func: Optional[Callable] = None,
+                 dtype: Optional[Union[Type, torch.dtype]] = torch.float32):
         """
         host_net: a nn.Module where
             input: a 3-dim tensor representing a batch of points.
@@ -41,6 +43,9 @@ class FusedGame:
             assert isinstance(reward_func, Callable), \
                 f"reward_function must be callable. Got {type(reward_func)}."
             self._rewards = reward_func
+        self.dtype = dtype
+        # Force to copy host/agent net if dtype mismatches (to prevent polluting the original model).
+        self._make_type_for_nets(self.dtype)
 
         self.host_action_encoder = None
         self.time_log = dict()
@@ -56,6 +61,8 @@ class FusedGame:
             observations, actions (depending on sample_for), rewards, dones, next_observations
         """
         assert sample_for in ["host", "agent"], f"sample_for must be one of 'host' and 'agent'. Got {sample_for}."
+        if points.dtype != self.dtype:
+            points.type(self.dtype)
 
         with Timer(f'step-get_features_total', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
             observations = points.get_features()
@@ -112,12 +119,12 @@ class FusedGame:
         output = output * ~random_mask + noise * random_mask
         with Timer(f'host_move-decode_tensor', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
             # The random noises still have to go through decode_tensor, therefore are still never illegal moves.
-            chosen_actions = torch.argmax(output, dim=1)
-            host_move_binary = self.host_action_encoder.decode_tensor(chosen_actions)
+            chosen_actions = torch.argmax(output, dim=1).type(torch.int32)
+            host_move_binary = self.host_action_encoder.decode_tensor(chosen_actions, dtype=self.dtype)
 
         return host_move_binary, chosen_actions
 
-    def agent_move(self, points: PointsBase,
+    def agent_move(self, points: TensorPoints,
                    host_moves: torch.Tensor,
                    masked: Optional[bool] = True,
                    scale_observation: Optional[bool] = True,
@@ -151,6 +158,15 @@ class FusedGame:
                     if scale_observation:
                         points.rescale()
         return actions
+
+    def _make_type_for_nets(self, dtype: torch.dtype):
+        """
+        If there is a type mismatch with host/agent net, make a copy and recast the type.
+        """
+        for role in ['host', 'agent']:
+            net = getattr(self, f'{role}_net')
+            if next(net.parameters()).dtype != dtype:
+                setattr(self, f'{role}_net', deepcopy(net).type(dtype))
 
     @staticmethod
     def _default_reward(sample_for: str,

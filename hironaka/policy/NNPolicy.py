@@ -58,6 +58,8 @@ class NNPolicy(Policy):
             self.logger.debug(output_tensor)
 
         if self.mode == 'agent':
+            # action probability -> (masked) action
+            # E.g., output [[0.7, 0.5, 0.6]] with host coord [[0, 1, 1]] produce a [[2]] if self.masked==True.
             output_tensor = torch.softmax(output_tensor, dim=1)
             if self.masked:
                 mask = torch.tensor(batched_coord_list_to_binary(features[1], self.dimension), device=self.device)

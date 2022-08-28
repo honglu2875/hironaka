@@ -5,7 +5,7 @@ import torch
 
 """
     This file consolidates helper functions directly borrowed from other repos. We consolidate important helper 
-        functions in active but relatively small projects to prevent unexpected changes. Credits are documented 
+        functions in this file instead of importing to prevent future unexpected changes. Credits are documented 
         and given to the original repos.
 """
 

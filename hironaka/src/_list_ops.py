@@ -3,7 +3,7 @@ from typing import List
 import numpy as np
 from scipy.spatial import ConvexHull
 
-from ._snippets import get_shape
+from ._fn import get_shape
 
 
 def get_newton_polytope_approx_lst(points: List[List[List[float]]], inplace=True, get_ended=False):

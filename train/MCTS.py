@@ -11,7 +11,7 @@ import torch.nn.functional as F
 from hironaka import host
 from hironaka.agent import ChooseFirstAgent
 from hironaka.core import TensorPoints
-from hironaka.src import _snippets as snip
+from hironaka.src import _fn as snip
 from hironaka.trainer import Trainer
 from hironaka.trainer.player_modules import ChooseFirstAgentModule
 from hironaka.validator import HironakaValidator

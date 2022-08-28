@@ -18,7 +18,7 @@ class TensorPoints(PointsBase):
                  device: Optional[Union[str, torch.device]] = 'cpu',
                  padding_value: Optional[float] = -1.0,
                  distinguished_points: Optional[List[int]] = None,
-                 dtype: Optional[Type] = torch.float32,
+                 dtype: Optional[Union[Type, torch.dtype]] = torch.float32,
                  **kwargs):
         self.value_threshold = value_threshold
 
@@ -69,6 +69,10 @@ class TensorPoints(PointsBase):
     def get_features(self) -> torch.Tensor:
         sorted_args = torch.argsort(self.points[:, :, 0], dim=1, descending=True)
         return self.points.gather(1, sorted_args.unsqueeze(-1).repeat(1, 1, self.dimension)).clone()
+
+    def type(self, t: Union[Type, torch.dtype]):
+        self.dtype = t
+        self.points = self.points.type(t)
 
     def _shift(self,
                points: torch.Tensor,

@@ -263,6 +263,8 @@ class HostActionEncoder:
                 if b[j] == '1':
                     self.binary_table[i][len(b) - 1 - j] = 1
         self.binary_table = self.binary_table[self.action_translate, :]
+        # Cache binary tables on different devices
+        self.cached_binary_tables = {}
 
     def encode(self, coords: List[int]) -> int:
         """
@@ -286,8 +288,8 @@ class HostActionEncoder:
         assert len(coords.shape) == 2
         device = coords.device
 
-        actions = torch.sum(2 ** torch.arange(self.dim, device=device) * coords.type(torch.int64), dim=1)
-        actions = actions - torch.log2(actions).type(torch.int64) - 2
+        actions = torch.sum(2 ** torch.arange(self.dim, device=device) * coords.type(torch.int32), dim=1)
+        actions = actions - torch.log2(actions).type(torch.int32) - 2
         return actions
 
     def decode(self, action: int) -> List[int]:
@@ -306,7 +308,7 @@ class HostActionEncoder:
             action = action // 2
         return coords
 
-    def decode_tensor(self, actions: torch.Tensor) -> torch.Tensor:
+    def decode_tensor(self, actions: torch.Tensor, dtype: torch.dtype = torch.float32) -> torch.Tensor:
         """
             Inverse function of encode_tensor.
             E.g., turning [0, 1] -> torch.Tensor([[1, 1, 0], [1, 0, 1]])
@@ -314,4 +316,8 @@ class HostActionEncoder:
         assert len(actions.shape) == 1
         assert all(actions.le(2 ** self.dim - self.dim - 2)) and all(actions.ge(0)), str(actions)
         device = actions.device
-        return torch.tensor(self.binary_table, device=device, dtype=torch.float32)[actions]
+        device_str = str(device)
+        # Use cached binary table
+        if device_str not in self.cached_binary_tables:
+            self.cached_binary_tables[device_str] = torch.tensor(self.binary_table, device=device, dtype=dtype)
+        return self.cached_binary_tables[device_str].type(dtype)[actions.long()]
