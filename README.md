@@ -202,14 +202,6 @@ We can interpret resolution as a game between two players. Player A attempts to 
 Player B is some malevolent adversary who tries to keep the singularities alive as long as possible. 
 The first player chooses the centres of the blowups, the second provides new order functions after each blowup. 
 
-## Monomial ideals
-
-[definition] & [examples]
-
-## Rephrasing the local resolution of singularity problem
-
-[definitions]
-
 # Variations of Hironaka's game
 
 ## Short summary 
@@ -286,8 +278,8 @@ convex hull $\Delta=\{S+\mathbf{R}^n_+\}$.
 The agent chooses some element $i\in S$ and modifies the Newton polygon $\Delta$ to a set $\Delta^*$ by
 the following procedure: first, the agent selects a finite number of points $y=(y_1,\ldots, y_n)$, all of whose 
 coordinates are rational numbers with denominators bounded by $N$ as above, and for each of which there exists
-an $x = (x_1, \ldots, x_n)\in \Delta$ which satisfy some basic relations. $\Delta^*$ is then taken to be the positive 
-convex hull of $\Delta \cup \{selected points\}$.
+an $x = (x_1, \ldots, x_n)\in \Delta$ which satisfy some basic relations. $\Delta^\star$ is then taken to be the positive 
+convex hull of $\Delta \cup \{\text{selected points}\}$.
 
 - `state change`: Given the pair $(I,i)$ chosen by the host, for $x=(x_1,\cdots,x_n)\in \mathbb Z^n$ we define
 $T_{I,i}(x)=(x_1',\ldots, x_n')$ where
@@ -343,18 +335,49 @@ simplifies the resolution process and uses intrinstic invariants of singularitie
 after each blow-up. 
 
 # Applications and open questions
+The goal in each version of the game is to find better (i.e shorter) blow-up trees. This question has more precise formulation in specific problems. Here is a list of applications we are interested in.
 
-## Hilbert scheme of points on manifolds
+- **Application in Enumerative Geometry 1**: Original motivation for the first author is his recent work [3] which reduces a classical topological enumerative question (calculation of Thom polynomials for Morin singularities) to the modified Hironaka game. This paper presents the Thom polynomial as an iterated residue of a sum of rational forms, where the terms correspond to the leaves of (any) solution of the Hironaka game for a specific Morin monomial map. Hence the exact form of the formula depends on the blow-up tree, but the iterated residue of the sum si the same for any solution of the Hironaka game. We would like to see/estimate the number of leaves in these trees. 
+    
+  A very interesting further direction is the proof of the positivity conjecture on Thom polynomials: this asserts that all coefficients of the residue formula after expansion on a specific contour is positive.
+  For this we need to understand the blow-up trees.
+- **Application in Enumerative Geometry 2**: The iterated residue formula with special parameters give us tautological integrals over Hilbert scheme of points on surfaces. Understanding the blow-up trees would be a new approach to understand the Segre-Verline duality of Lothar Gottsche/Pandharipande/Voisin/Lehn. 
+- Computational aspects of the Hironaka game: optimal solution, estimates of depth, width of tree etc
+- Unsolved problems on resolution of maps, see Levine's paper. 
+ - Unsolved problem: when does Hironaka's hard polyhedra game has a winning strategy?
 
-## Singularity theory and Thom polynomials
-
-## Comparing performance of different winning strategies
-
-
-## Other problems
-
+There are further listed problems in Hauser's paper. 
 
 
 ## References
 
-[]
+[1] Dan Abramovich, Michael Temkin, and Jaroslaw Wlodarczyk, Functorial embedded resolution via weighted blowing ups, 2019 preprint
+
+[2] G. Berczi, Non-reductive GIT and Thom polynomials, 2020 preprint
+
+[3] G. Berczi, Tautological integrals on curvilinear Hilbert schemes, Geom. Topol, 21 (2017), no. 5, 2897-2944
+
+[4] G. Berczi, Tautological integrals on Hilbert scheme of points on manifolds I,II, in preparation
+
+[5] G. Berczi and A. Szenes, Thom polynomials of Morin singularities, Annals of Mathematics, 175 (2012), 567-629.
+
+[6] G. Berczi and A. Szenes, Multiple-point residue formulas for holomorphic maps, arXiv:2112.15502
+
+[7] E. Bierstone and P. Milman, ‘Canonical desingularization in characteristic zero by blowing up the maximum strata of a local invariant’, Invent. Math. 128 (1997) 207–302.
+
+[8] H. Hauser and J. Schicho, 'A game for the resolution of singularities', Proceedings of LMS, Volume 105, Issue 6, Pages 1149-1182
+
+[9] H. Hironaka, ‘Resolution of singularities of an algebraic variety over a field of characteristic 0’, Ann. of Math. 79 (1964) 109–326.
+Press, Princeton, NJ, 2007).
+
+[10] H. Hironaka, ‘Characteristic polyhedra of singularities’, J. Math. Kyoto Univ. 7 (1967) 251–293.
+
+[11] M. Spivakovsky, ‘A counterexample to Hironaka’s “hard” polyhedral game’, Publ. Res. Inst. Math. Sci. 18 (1982) 1009–1012.
+
+[12] M. Spivakovsky, ‘A solution to Hironaka’s polyhedral game’, Arithmetic and geometry (eds M. Artin and J. Tate; Birkḧauser, Basel, 1983) 419–432.
+
+[13] J. Vlodarczyk, ‘Simple Hironaka resolution in characteristic zero’, J. Amer. Math. Soc. 18 (2005) 779– 822.
+
+[14] Michael McQuillan, Very fast, very functorial, and very easy resolution of singularities, 2019, preprint, written with the collaboration of G. Marzo.
+
+[15] D. Zeillinger, ‘Polyhedral games and resolution of singularities’, PhD Thesis, Univ. Innsbruck, 2006.
