@@ -342,13 +342,23 @@ In 2020 Abramovich-Tempkin-Vlodarczyk introduced a new resolution algorithm, bas
 simplifies the resolution process and uses intrinstic invariants of singularities which improve
 after each blow-up. 
 
-# Applications and open questions
+# Mathematical applications
 
 ## Hilbert scheme of points on manifolds
 
+Let $X$ be a smooth projective variety and $n$ a positive integer. Assume that we have $n$ distinct points
+which can freely move around on $X$. If we want to compactify this phase space, we must let the points collide in 
+a geometrically meaningful way. The Hilbert scheme of $n$ points on $X$, denoted by $\mathrm{Hilb}^n(X)$, is 
+a compactification of this parameter space which plays a central role in enumerative geometry. 
+Many old problems can be reformulated as Integration of tautological forms on the Hilbert space 
+
 ## Singularity theory and Thom polynomials
 
-## Comparing performance of different winning strategies
+## The Chern Positivity Conjecture for singularities
+
+## The Monomialisation Conjecture of morphisms
+
+## Comparing performance of resolution games
 
 
 ## Other problems
