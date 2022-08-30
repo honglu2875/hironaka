@@ -8,7 +8,8 @@ from hironaka.src import merge_experiences
 from hironaka.trainer.DQNTrainer import DQNTrainer
 from hironaka.trainer.FusedGame import FusedGame
 from hironaka.trainer.ReplayBuffer import ReplayBuffer
-from hironaka.trainer.player_modules import RandomAgentModule
+from hironaka.trainer.player_modules import RandomAgentModule, ChooseFirstAgentModule, ChooseLastAgentModule, \
+    AllCoordHostModule
 
 
 class TestTrainer(unittest.TestCase):
@@ -23,6 +24,17 @@ class TestTrainer(unittest.TestCase):
         trainer = DQNTrainer(str(pathlib.Path(__file__).parent.resolve()) + '/dqn_config_test_host_only.yml',
                              agent_net=self.dqn_trainer.agent_net)
         assert trainer.trained_roles == ['host']
+
+    def test_dummy_modules(self):
+        agent_obs = {'points': torch.tensor([[[1, 0, 0]]]), 'coords': torch.tensor([[1, 1, 0]])}
+        host_obs = torch.tensor([[[1, 0, 0]]])
+        device = torch.device('cpu')
+        agent = ChooseFirstAgentModule(3, 20, device)
+        assert torch.all(agent(agent_obs).isclose(torch.tensor([[1., 0., 0.]])))
+        agent = ChooseLastAgentModule(3, 20, device)
+        assert torch.all(agent(agent_obs).isclose(torch.tensor([[0., 1., 0.]])))
+        host = AllCoordHostModule(3, 20, device)
+        assert torch.all(host(host_obs).isclose(torch.tensor([0., 0., 0., 1.])))
 
     def test_replace_net(self):
         trainer = DQNTrainer(str(pathlib.Path(__file__).parent.resolve()) + '/dqn_config_test_host_only.yml',

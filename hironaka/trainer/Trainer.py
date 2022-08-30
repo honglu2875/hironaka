@@ -29,7 +29,7 @@ class Trainer(abc.ABC):
         A Trainer (and its subclasses) is responsible for training either a single player (either host or agent), or
             a pair of (host, agent) altogether.
         A few important points before using/inheriting:
-          - All parameters come from one single nested dict `config` as the positional argument in the constructor.
+          - All hyperparameters come from one single nested dict `config` as the positional argument in the constructor.
             A sample config should be given in YAML format for every implementation.
           - NONE of the keys in config may have default values in the class. Not having a lazy mode means the user
             is educated/reminded about every parameter that goes into the RL training. Also avoids messy parameter
@@ -315,23 +315,29 @@ class Trainer(abc.ABC):
                  [self.agent_net] * 2
 
         for host, agent in zip(hosts, agents):
-            points = self._generate_random_points(num_samples)
-            fused_game = FusedGame(host, agent, device=self.device, reward_func=self.reward_func)
-            initial = sum(points.ended_batch_in_tensor)
-            previous = initial
-            total_steps = 0
-            for i in range(max_steps):
-                host_move, _ = fused_game.host_move(points, exploration_rate=0.)
-                fused_game.agent_move(points, host_move,
-                                      scale_observation=self.scale_observation,
-                                      inplace=True,
-                                      exploration_rate=0.)
-                new_ended = sum(points.ended_batch_in_tensor) - previous
-                total_steps += new_ended * (i + 1)
-                previous = sum(points.ended_batch_in_tensor)
-            total_steps += sum(~points.ended_batch_in_tensor) * max_steps
-            result.append((num_samples - initial) / total_steps)
+            result.append(self.get_rho_for_pair(host, agent, num_samples, max_steps))
         return result
+
+    @torch.inference_mode()
+    def get_rho_for_pair(self, host_candidate: nn.Module, agent_candidate: nn.Module,
+                         num_samples: int, max_steps: int) -> torch.Tensor:
+        points = self._generate_random_points(num_samples)
+        fused_game = FusedGame(host_candidate, agent_candidate, device=self.device, reward_func=self.reward_func,
+                               dtype=self.dtype)
+        initial = sum(points.ended_batch_in_tensor)
+        previous = initial
+        total_steps = 0
+        for i in range(max_steps):
+            host_move, _ = fused_game.host_move(points, exploration_rate=0.)
+            fused_game.agent_move(points, host_move,
+                                  scale_observation=self.scale_observation,
+                                  inplace=True,
+                                  exploration_rate=0.)
+            new_ended = sum(points.ended_batch_in_tensor) - previous
+            total_steps += new_ended * (i + 1)
+            previous = sum(points.ended_batch_in_tensor)
+        total_steps += sum(~points.ended_batch_in_tensor) * max_steps
+        return (num_samples - initial) / total_steps
 
     @torch.inference_mode()
     def count_actions(self, role: str, games: int, max_steps: int = 100, er: float = None) -> torch.Tensor:
@@ -370,7 +376,7 @@ class Trainer(abc.ABC):
             If a subclass creates extra models (e.g., DQNTrainer.{role}_q_net_target), it MUST be overridden.
         """
         saved = {'host_net': self.get_net('host'), 'agent_net': self.get_net('agent'), 'config': self.config,
-                 'reward_func': self.reward_func, 'point_cls': self.point_cls}
+                 'reward_func': self.reward_func, 'point_cls': self.point_cls, 'dtype': self.dtype}
         torch.save(saved, path)
 
     def save_replay_buffer(self, path: str):
@@ -404,7 +410,8 @@ class Trainer(abc.ABC):
         saved = torch.load(path)
         new_trainer = cls(saved['config'], node=node, device_num=device_num,
                           host_net=saved['host_net'], agent_net=saved['agent_net'],
-                          reward_func=saved['reward_func'], point_cls=saved['point_cls'])
+                          reward_func=saved.get('reward_func'), point_cls=saved.get('point_cls', TensorPoints),
+                          dtype=saved.get('dtype', torch.float32))
         return new_trainer
 
     @abc.abstractmethod
@@ -476,7 +483,7 @@ class Trainer(abc.ABC):
 
     def _make_fused_game(self):
         self.fused_game = FusedGame(self.host_net, self.agent_net, device=self.device, log_time=self.log_time,
-                                    reward_func=self.reward_func)
+                                    reward_func=self.reward_func, dtype=self.dtype)
 
     def _set_optim(self, role: str):
         """
@@ -510,6 +517,7 @@ class Trainer(abc.ABC):
                 input_shape=input_shape,
                 output_dim=output_dim,
                 device=device,
+                dtype=self.dtype,
                 **cfg)
             setattr(self, f'{role}_replay_buffer', replay_buffer)
 
@@ -551,7 +559,7 @@ class Trainer(abc.ABC):
     def _generate_random_points(self, samples: int) -> TensorPoints:
         pts = torch.randint(self.max_value + 1, (samples, self.max_num_points, self.dimension), dtype=self.dtype,
                             device=self.device)
-        points = self.point_cls(pts, device=self.device)
+        points = self.point_cls(pts, device=self.device, dtype=self.dtype)
         points.get_newton_polytope()
         if self.scale_observation:
             points.rescale()
