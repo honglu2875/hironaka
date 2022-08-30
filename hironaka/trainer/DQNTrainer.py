@@ -87,22 +87,24 @@ class DQNTrainer(Trainer):
             # Logging
             # We hard-coded the 20-step interval for now. Profiling analysis shows it is about 1/10 on time cost
             #   comparing to autograd happening above.
-            if self.use_tensorboard and self.layerwise_logging and (self.total_num_steps + current_step) % 100 == 0:
-                for j, layer in enumerate(q_net.parameters()):
-                    self.tb_writer.add_scalar(f'{log_prefix}/model/layer-{j}/avg_wt', layer.mean().item(),
-                                              self.total_num_steps + current_step)
-                    self.tb_writer.add_scalar(f'{log_prefix}/model/layer-{j}/std', layer.std().item(),
-                                              self.total_num_steps + current_step)
-                    self.tb_writer.add_scalar(f'{log_prefix}/gradient/layer-{j}/grad_avg',
-                                              layer.grad.mean().item(), self.total_num_steps + current_step)
-                    self.tb_writer.add_scalar(f'{log_prefix}/gradient/layer-{j}/grad_std',
-                                              layer.grad.std().item(), self.total_num_steps + current_step)
+            if self.use_tensorboard and (self.total_num_steps + current_step) % 100 == 0:
+                if self.layerwise_logging:
+                    for j, layer in enumerate(q_net.parameters()):
+                        self.tb_writer.add_scalar(f'{log_prefix}/model/layer-{j}/avg_wt', layer.mean().item(),
+                                                  self.total_num_steps + current_step)
+                        self.tb_writer.add_scalar(f'{log_prefix}/model/layer-{j}/std', layer.std().item(),
+                                                  self.total_num_steps + current_step)
+                        self.tb_writer.add_scalar(f'{log_prefix}/gradient/layer-{j}/grad_avg',
+                                                  layer.grad.mean().item(), self.total_num_steps + current_step)
+                        self.tb_writer.add_scalar(f'{log_prefix}/gradient/layer-{j}/grad_std',
+                                                  layer.grad.std().item(), self.total_num_steps + current_step)
                 self.tb_writer.add_scalar(f'{log_prefix}/loss',
                                           loss.item(), self.total_num_steps + current_step)
 
         return loss
 
-    def _train(self, steps: int, evaluation_interval: int = 1000, players: Iterable[str] = ('host', 'agent')):
+    def _train(self, steps: int, evaluation_interval: int = 1000, players: Iterable[str] = ('host', 'agent'),
+               prefix: str = ''):
         losses = []
         param = {}
         net_param = {}
@@ -117,7 +119,7 @@ class DQNTrainer(Trainer):
             net_param[role] = self.get_net(role), self.get_net_target(role), self.get_optim(
                 role), self.get_replay_buffer(role)
             param[role] = self.get_all_role_specific_param(role)
-        model_prefix = f"{self.version_string}-n{self.node}-{self.device_num}"
+        model_prefix = f"{prefix}-{self.version_string}-{self.device_num}"
 
         for i in range(steps):
             self.set_learning_rate()
@@ -142,7 +144,7 @@ class DQNTrainer(Trainer):
                             self.collect_rollout(role, param[role]['rollout_size'])
 
             with Timer(f'evaluate_total', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
-                if i % evaluation_interval == 0:
+                if i % evaluation_interval == 0 and i != 0:
                     with self.inference_mode():
                         rhos = self.evaluate_rho()
                         for role in players:
@@ -150,16 +152,17 @@ class DQNTrainer(Trainer):
                             self.logger.info(actions)
                         self.logger.info(rhos)
 
-                        self.tb_writer.add_scalar(f'{model_prefix}/rhos/host-agent',
-                                                  rhos[0].item(), self.total_num_steps + i)
-                        self.tb_writer.add_scalar(f'{model_prefix}/rhos/host-random',
-                                                  rhos[1].item(), self.total_num_steps + i)
-                        self.tb_writer.add_scalar(f'{model_prefix}/rhos/host-choosefirst',
-                                                  rhos[2].item(), self.total_num_steps + i)
-                        self.tb_writer.add_scalar(f'{model_prefix}/rhos/random-agent',
-                                                  rhos[3].item(), self.total_num_steps + i)
-                        self.tb_writer.add_scalar(f'{model_prefix}/rhos/allcoord-agent',
-                                                  rhos[4].item(), self.total_num_steps + i)
+                        if self.use_tensorboard:
+                            self.tb_writer.add_scalar(f'{model_prefix}/rhos/host-agent',
+                                                      rhos[0].item(), self.total_num_steps + i)
+                            self.tb_writer.add_scalar(f'{model_prefix}/rhos/host-random',
+                                                      rhos[1].item(), self.total_num_steps + i)
+                            self.tb_writer.add_scalar(f'{model_prefix}/rhos/host-choosefirst',
+                                                      rhos[2].item(), self.total_num_steps + i)
+                            self.tb_writer.add_scalar(f'{model_prefix}/rhos/random-agent',
+                                                      rhos[3].item(), self.total_num_steps + i)
+                            self.tb_writer.add_scalar(f'{model_prefix}/rhos/allcoord-agent',
+                                                      rhos[4].item(), self.total_num_steps + i)
 
         self.total_num_steps += steps
 

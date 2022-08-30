@@ -222,7 +222,7 @@ class MCTSTrainer2(Trainer.Trainer):
 
         self.coder = snip.HostActionEncoder(dim=self.dimension)
 
-    def _make_network(self, head: nn.Module, net_arch: list, input_dim: int, output_dim: int) -> nn.Module:
+    def _create_network(self, head: nn.Module, net_arch: list, input_dim: int, output_dim: int) -> nn.Module:
         return HironakaNet(dim=self.dimension)
 
     def _policy_iter(self, net, state: TensorPoints, c_puct=0.5, max_depth=20):
