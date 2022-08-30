@@ -17,10 +17,10 @@ def get_newton_polytope_approx_torch(points: torch.Tensor,
 
     # get a filter matrix
     filter_matrix = available_points.unsqueeze(2).repeat(1, 1, max_num_points, 1) & \
-                    available_points.unsqueeze(1).repeat(1, max_num_points, 1, 1)
+        available_points.unsqueeze(1).repeat(1, max_num_points, 1, 1)
     # get the difference matrix for the second axis
     difference = points.unsqueeze(2).repeat(1, 1, max_num_points, 1) - \
-                 points.unsqueeze(1).repeat(1, max_num_points, 1, 1)
+        points.unsqueeze(1).repeat(1, max_num_points, 1, 1)
 
     # filter the diagonal
     diag_filter = ~torch.diag(torch.ones(max_num_points, device=device)).type(torch.bool)

@@ -23,6 +23,21 @@ class ChooseFirstAgentModule(nn.Module, DummyModule):
         return torch.nn.functional.one_hot(x['coords'].argmax(1), num_classes=self.dimension).type(torch.float32)
 
 
+class ChooseLastAgentModule(nn.Module, DummyModule):
+    def __init__(self, dimension: int, max_num_points: int, device: torch.device):
+        super().__init__()
+        self.dimension = dimension
+        self.max_num_points = max_num_points
+        self.device = device
+
+    def forward(self, x):
+        _DEVICE = x['coords'].device
+        augmented = (x['coords'].type(torch.float32) + torch.arange(self.dimension,
+                                                                    dtype=torch.float32,
+                                                                    device=_DEVICE) * 1e-4)
+        return torch.nn.functional.one_hot(augmented.argmax(1), num_classes=self.dimension).type(torch.float32)
+
+
 class RandomAgentModule(nn.Module, DummyModule):
     def __init__(self, dimension: int, max_num_points: int, device: torch.device):
         super().__init__()
