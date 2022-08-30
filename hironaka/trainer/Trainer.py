@@ -106,8 +106,7 @@ class Trainer(abc.ABC):
         self.scale_observation = self.config['scale_observation']
         self.version_string = self.config['version_string']
         # Record the list of cuda devices to be used. Ignore if use_cuda is False.
-        if self.use_cuda:
-            self.use_cuda_ids = use_cuda_ids if use_cuda_ids else [self.device_num]
+        self.use_cuda_ids = use_cuda_ids if use_cuda_ids else [self.device_num]
 
         self.dimension = self.config['dimension']
         self.host_action_encoder = HostActionEncoder(self.dimension)
