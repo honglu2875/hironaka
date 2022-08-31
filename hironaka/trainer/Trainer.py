@@ -7,6 +7,7 @@ from typing import List, Any, Dict, Union, Callable, Optional, Type
 import torch
 import yaml
 from torch import nn
+from torch.nn import DataParallel
 from torch.utils.tensorboard import SummaryWriter
 
 from hironaka.core import TensorPoints
@@ -21,40 +22,40 @@ from ..src import HostActionEncoder
 
 class Trainer(abc.ABC):
     """
-        Build all the facilities and handle training. Largely inspired by stable-baselines3, but we fuse everything
-            together for better clarity and easier modifications.
-        To maximize performances and lay the foundation for distributed training, we skip gym environments and game
-            wrappers (Host, Agent, Game, etc.).
+    Build all the facilities and handle training. Largely inspired by stable-baselines3, but we fuse everything
+        together for better clarity and easier modifications.
+    To maximize performances and lay the foundation for distributed training, we skip gym environments and game
+        wrappers (Host, Agent, Game, etc.).
 
-        A Trainer (and its subclasses) is responsible for training either a single player (either host or agent), or
-            a pair of (host, agent) altogether.
-        A few important points before using/inheriting:
-          - All parameters come from one single nested dict `config` as the positional argument in the constructor.
-            A sample config should be given in YAML format for every implementation.
-          - NONE of the keys in config may have default values in the class. Not having a lazy mode means the user
-            is educated/reminded about every parameter that goes into the RL training. Also avoids messy parameter
-            passing when there are crazy chains of configs from subclasses with clashing keys.
-            It is okay to have optional config keys though (default: None).
-          - Please include role-specific hyperparameters in `role_specific_hyperparameters`. The rest is taken care of.
-            You can find the parameters in the dict returned by `get_all_role_specific_param()`
-          - The `__init__` of this base class is supposed to handle EVERYTHING about the reading of config. You will be
-            given all the attributes after calling `super().__init__(config, **kwargs)` on which your `_train()`
-            implementation should be based. The most commonly used attributes in `_train()` are:
-                self.host_net, self.host_optim, self.host_replay_buffer,
-                self.agent_net, self.agent_optim, self.agent_replay_buffer,
-                self.fused_game
-            Also use `self.get_all_role_specific_param(role)` to get role-specific attributes defined in
-            `role_specific_hyperparameters`.
+    A Trainer (and its subclasses) is responsible for training either a single player (either host or agent), or
+        a pair of (host, agent) altogether.
+    A few important points before using/inheriting:
+      - All hyperparameters come from one single nested dict `config` as the positional argument in the constructor.
+        A sample config should be given in YAML format for every implementation.
+      - NONE of the keys in config may have default values in the class. Not having a lazy mode means the user
+        is educated/reminded about every parameter that goes into the RL training. Also avoids messy parameter
+        passing when there are crazy chains of configs from subclasses with clashing keys.
+        It is okay to have optional config keys though (default: None).
+      - Please include role-specific hyperparameters in `role_specific_hyperparameters`. The rest is taken care of.
+        You can find the parameters in the dict returned by `get_all_role_specific_param()`
+      - The `__init__` of this base class is supposed to handle EVERYTHING about the reading of config. You will be
+        given all the attributes after calling `super().__init__(config, **kwargs)` on which your `_train()`
+        implementation should be based. The most commonly used attributes in `_train()` are:
+            self.host_net, self.host_optim, self.host_replay_buffer,
+            self.agent_net, self.agent_optim, self.agent_replay_buffer,
+            self.fused_game
+        Also use `self.get_all_role_specific_param(role)` to get role-specific attributes defined in
+        `role_specific_hyperparameters`.
 
-        Please implement:
-            _train()
-        Feel free to override:
-            _make_network()  # override if one wants to involve more complicated network structures (CNN, GNN, ...).
-            _update_learning_rate()
-            _generate_rollout()
-            copy()  # override if a subclass needs to copy other models/variables.
-            save()  # override if a subclass needs to save other models/variables.
-            load()
+    Please implement:
+        _train()
+    Feel free to override:
+        _make_network()  # override if one wants to involve more complicated network structures (CNN, GNN, ...).
+        _update_learning_rate()
+        _generate_rollout()
+        copy()  # override if a subclass needs to copy other models/variables.
+        save()  # override if a subclass needs to save other models/variables.
+        load()
 
     """
     optim_dict = {'adam': torch.optim.Adam,
@@ -73,17 +74,16 @@ class Trainer(abc.ABC):
 
     def __init__(self,
                  config: Union[Dict[str, Any], str],  # Either the config dict or the path to the YAML file
-                 node: int = 0,  # For distributed training: the number of node
                  device_num: int = 0,  # For distributed training: the number of cuda device
                  host_net: Optional[nn.Module] = None,  # Pre-assigned host_net. Will ignore host config if set.
                  agent_net: Optional[nn.Module] = None,  # Pre-assigned agent_net. Will ignore agent config if set.
                  reward_func: Optional[Callable] = None,
                  point_cls: Optional[Type[TensorPoints]] = TensorPoints,  # the class to construct points
                  dtype: Optional[Union[Type, torch.dtype]] = torch.float32,
+                 use_cuda_ids: List[int] = None,  # list of cuda id to use. Used only when self.use_cuda==True.
                  ):
         self.logger = logging.getLogger(__class__.__name__)
 
-        self.node = node
         self.device_num = device_num
 
         if isinstance(config, str):
@@ -105,6 +105,8 @@ class Trainer(abc.ABC):
         self.use_cuda = self.config['use_cuda']
         self.scale_observation = self.config['scale_observation']
         self.version_string = self.config['version_string']
+        # Record the list of cuda devices to be used. Ignore if use_cuda is False.
+        self.use_cuda_ids = use_cuda_ids if use_cuda_ids else [self.device_num]
 
         self.dimension = self.config['dimension']
         self.host_action_encoder = HostActionEncoder(self.dimension)
@@ -143,14 +145,13 @@ class Trainer(abc.ABC):
         self.time_log = dict()
 
         # The suffix string used for logging and saving
-        self.string_suffix = f"-{self.version_string}-node_{node}-cuda_{device_num}"
+        self.string_suffix = f"-{self.version_string}-cuda_{device_num}"
 
         # Initialize TensorBoard settings
         if self.use_tensorboard:
             self.tb_writer = SummaryWriter(comment=self.string_suffix)
 
         # Set torch device
-        self.node = node
         self.device = torch.device(f'cuda:{device_num}') if self.use_cuda else torch.device('cpu')
 
         # Initialize host and agent parameters
@@ -167,24 +168,8 @@ class Trainer(abc.ABC):
             if role not in self.config:
                 continue
 
-            head_cls, input_dim, output_dim, pretrained_net = \
-                heads[role], input_dims[role], output_dims[role], pretrained_nets[role]
-
-            # Initialize hyperparameters
-            for key in self.role_specific_hyperparameters:
-                setattr(self, f'{role}_{key}', self.config[role][key])
-
-            # Construct networks
-            if pretrained_net is not None:
-                # The pretrained network should have been set. Or there must be a broken update.
-                assert self.get_net(role) is not None
-            else:
-                net_arch = self.config[role]['net_arch']
-                assert isinstance(net_arch, list), f"'net_arch' must be a list. Got {type(net_arch)}."
-
-                head = head_cls(input_dim)
-                input_dim = head.feature_dim
-                setattr(self, f'{role}_net', self._make_network(head, net_arch, input_dim, output_dim).to(self.device))
+            # Save the hyperparameters and construct the network
+            self._make_network(role, heads[role], input_dims[role], output_dims[role], pretrained_nets[role])
 
             # Construct exploration rate scheduler
             self._make_er_scheduler(role)
@@ -193,7 +178,7 @@ class Trainer(abc.ABC):
             setattr(self, f'{role}_optim_config', self.config[role]['optim'])
             if not isinstance(self.get_net(role), DummyModule):
                 self._make_optimizer_and_lr(role)
-                self._make_replay_buffer(role, output_dim)
+                self._make_replay_buffer(role, output_dims[role])
 
         # -------- Initialize states -------- #
 
@@ -208,8 +193,8 @@ class Trainer(abc.ABC):
 
     def replace_nets(self, host_net: nn.Module = None, agent_net: nn.Module = None) -> None:
         """
-            Override the internal host_net and agent_net with custom networks.
-            It is the user's responsibility to make sure the input dimension and the output dimension are correct.
+        Override the internal host_net and agent_net with custom networks.
+        It is the user's responsibility to make sure the input dimension and the output dimension are correct.
         """
         for role, net in zip(['host', 'agent'], [host_net, agent_net]):
             if net is not None:
@@ -233,16 +218,16 @@ class Trainer(abc.ABC):
 
     def replace_reward_func(self, reward_func: Callable):
         """
-            Replace the reward function by a new one, and reconstruct the self.fused_game object
+        Replace the reward function by a new one, and reconstruct the self.fused_game object
         """
         self.reward_func = reward_func
         self._make_fused_game()
 
     def train(self, steps: int, evaluation_interval: int = 1000, **kwargs):
         """
-            Train the networks for a number of steps.
-            The definition of 'step' is up to the subclasses. Ideally, each step is one unit that updates both host
-                and agent together (but, for example, could already be many epochs of gradient descent.)
+        Train the networks for a number of steps.
+        The definition of 'step' is up to the subclasses. Ideally, each step is one unit that updates both host
+            and agent together (but, for example, could already be many epochs of gradient descent.)
         """
         self.set_training(True)
         # The subclass will implement the training logic in _train()
@@ -254,10 +239,10 @@ class Trainer(abc.ABC):
 
     def collect_rollout(self, role: str, num_of_games: int):
         """
-            Play random games `num_of_games` number of times, and add all the outputs into the replay buffer.
-            Parameters:
-                role: str. Either 'host' or 'agent'.
-                num_of_games: int. Number of steps to play.
+        Play random games `num_of_games` number of times, and add all the outputs into the replay buffer.
+        Parameters:
+            role: str. Either 'host' or 'agent'.
+            num_of_games: int. Number of steps to play.
         """
         net = self.get_net(role)
 
@@ -277,16 +262,17 @@ class Trainer(abc.ABC):
 
     def get_rollout(self, role: str, num_of_games: int, steps: int, er: float = None) -> List:
         """
-            Generate roll-out `step` number of times, and return the experiences as a tuple
-                (obs, act, rew, done, next_obs).
-            Parameters:
-                role: str. Either 'host' or 'agent'.
-                num_of_games: int. Number of games to play.
-                steps: int. Number of maximal steps to play.
-                er: int. Learning rate.
+        Generate roll-out `step` number of times, and return the experiences as a tuple
+            (obs, act, rew, done, next_obs).
+        Note: if self.use
+        Parameters:
+            role: str. Either 'host' or 'agent'.
+            num_of_games: int. Number of games to play.
+            steps: int. Number of maximal steps to play.
+            er: int. Learning rate.
         """
         er = self.get_er(role) if er is None else er
-        points = self._generate_random_points(num_of_games)
+        points = self._generate_random_points(num_of_games, self.device)
         exps = []
 
         for i in range(steps):
@@ -299,11 +285,10 @@ class Trainer(abc.ABC):
     @torch.inference_mode()
     def evaluate_rho(self, num_samples: int = 100, max_steps: int = 100) -> List[torch.Tensor]:
         """
-            Estimate the rho value for pairs:
-                host_net vs (agent_net, RandomAgent, ChooseFirstAgent)
-                (RandomHost, AllCoordHost) vs agent_net
+        Estimate the rho value for pairs:
+            host_net vs (agent_net, RandomAgent, ChooseFirstAgent)
+            (RandomHost, AllCoordHost) vs agent_net
         """
-        # TODO: add count_actions into this evaluation and rename
         if self.host_net.training or self.agent_net.training:
             self.logger.error("Host net or agent net is still in training mode. Eval will not be executed")
             return []
@@ -315,28 +300,37 @@ class Trainer(abc.ABC):
                  [self.agent_net] * 2
 
         for host, agent in zip(hosts, agents):
-            points = self._generate_random_points(num_samples)
-            fused_game = FusedGame(host, agent, device=self.device, reward_func=self.reward_func)
-            initial = sum(points.ended_batch_in_tensor)
-            previous = initial
-            total_steps = 0
-            for i in range(max_steps):
-                host_move, _ = fused_game.host_move(points, exploration_rate=0.)
-                fused_game.agent_move(points, host_move,
-                                      scale_observation=self.scale_observation,
-                                      inplace=True,
-                                      exploration_rate=0.)
-                new_ended = sum(points.ended_batch_in_tensor) - previous
-                total_steps += new_ended * (i + 1)
-                previous = sum(points.ended_batch_in_tensor)
-            total_steps += sum(~points.ended_batch_in_tensor) * max_steps
-            result.append((num_samples - initial) / total_steps)
+            result.append(self.get_rho_for_pair(host, agent, num_samples, max_steps))
         return result
+
+    @torch.inference_mode()
+    def get_rho_for_pair(self, host_candidate: nn.Module, agent_candidate: nn.Module,
+                         num_samples: int, max_steps: int) -> torch.Tensor:
+        """
+        Estimate the rho number for a pair of host and agent modules.
+        """
+        points = self._generate_random_points(num_samples, self.device)
+        fused_game = FusedGame(host_candidate, agent_candidate, device=self.device, reward_func=self.reward_func,
+                               dtype=self.dtype)
+        initial = sum(points.ended_batch_in_tensor)
+        previous = initial
+        total_steps = 0
+        for i in range(max_steps):
+            host_move, _ = fused_game.host_move(points, exploration_rate=0.)
+            fused_game.agent_move(points, host_move,
+                                  scale_observation=self.scale_observation,
+                                  inplace=True,
+                                  exploration_rate=0.)
+            new_ended = sum(points.ended_batch_in_tensor) - previous
+            total_steps += new_ended * (i + 1)
+            previous = sum(points.ended_batch_in_tensor)
+        total_steps += sum(~points.ended_batch_in_tensor) * max_steps
+        return (num_samples - initial) / total_steps
 
     @torch.inference_mode()
     def count_actions(self, role: str, games: int, max_steps: int = 100, er: float = None) -> torch.Tensor:
         """
-            Get samples of rollout and count the action distributions.
+        Get samples of rollout and count the action distributions.
         """
         if self.get_net(role).training:
             self.logger.error("Host net or agent net is still in training mode. Eval will not be executed")
@@ -344,7 +338,7 @@ class Trainer(abc.ABC):
 
         rollouts = self.get_rollout(role, games, max_steps, er=er)
         if role == 'host':
-            max_num = 2 ** self.dimension
+            max_num = 2 ** self.dimension - self.dimension - 1
         elif role == 'agent':
             max_num = self.dimension
         else:
@@ -357,25 +351,25 @@ class Trainer(abc.ABC):
 
     def copy(self):
         """
-            Copy the models and the config to create a new object. (Caution: ReplayBuffer is NOT copied).
-            If a subclass would like to copy other models or variables, it MUST be overridden.
+        Copy the models and the config to create a new object. (Caution: ReplayBuffer is NOT copied).
+        If a subclass would like to copy other models or variables, it MUST be overridden.
         """
-        return self.__class__(self.config, node=self.node, device_num=self.device_num,
+        return self.__class__(self.config, device_num=self.device_num,
                               host_net=deepcopy(self.get_net('host')), agent_net=deepcopy(self.get_net('agent')),
                               reward_func=self.reward_func, point_cls=self.point_cls)
 
     def save(self, path: str):
         """
-            Save only models and config as a dict (Caution: ReplayBuffer is NOT saved).
-            If a subclass creates extra models (e.g., DQNTrainer.{role}_q_net_target), it MUST be overridden.
+        Save only models and config as a dict (Caution: ReplayBuffer is NOT saved).
+        If a subclass creates extra models (e.g., DQNTrainer.{role}_q_net_target), it MUST be overridden.
         """
         saved = {'host_net': self.get_net('host'), 'agent_net': self.get_net('agent'), 'config': self.config,
-                 'reward_func': self.reward_func, 'point_cls': self.point_cls}
+                 'reward_func': self.reward_func, 'point_cls': self.point_cls, 'dtype': self.dtype}
         torch.save(saved, path)
 
     def save_replay_buffer(self, path: str):
         """
-            Save replay buffers as a dict.
+        Save replay buffers as a dict.
         """
         saved = {'host_replay_buffer': self.get_replay_buffer('host'),
                  'agent_replay_buffer': self.get_replay_buffer('agent')}
@@ -383,7 +377,7 @@ class Trainer(abc.ABC):
 
     def load_replay_buffer(self, path: str):
         """
-            Load replay buffers from file.
+        Load replay buffers from file.
         """
         saved = torch.load(path)
         for key in ['host_replay_buffer', 'agent_replay_buffer']:
@@ -397,14 +391,15 @@ class Trainer(abc.ABC):
             setattr(self, key, saved[key])
 
     @classmethod
-    def load(cls, path: str, node: int = 0, device_num: int = 0):
+    def load(cls, path: str, device_num: int = 0, use_cuda_ids: List[int] = None):
         """
-            Load from the model-config dict and reconstruct the Trainer object.
+        Load from the model-config dict and reconstruct the Trainer object.
         """
         saved = torch.load(path)
-        new_trainer = cls(saved['config'], node=node, device_num=device_num,
+        new_trainer = cls(saved['config'], device_num=device_num,
                           host_net=saved['host_net'], agent_net=saved['agent_net'],
-                          reward_func=saved['reward_func'], point_cls=saved['point_cls'])
+                          reward_func=saved.get('reward_func'), point_cls=saved.get('point_cls', TensorPoints),
+                          dtype=saved.get('dtype', torch.float32), use_cuda_ids=use_cuda_ids)
         return new_trainer
 
     @abc.abstractmethod
@@ -474,13 +469,37 @@ class Trainer(abc.ABC):
         for param_group in optimizer.param_groups:
             param_group["lr"] = new_lr
 
+    def _make_network(self, role: str, head_cls: Any, input_dim: int, output_dim: int, pretrained_net: nn.Module):
+        # Initialize hyperparameters
+        for key in self.role_specific_hyperparameters:
+            setattr(self, f'{role}_{key}', self.config[role][key])
+
+        # Construct networks
+        if pretrained_net is not None:
+            # The pretrained network should have been set. Or there must be a broken update.
+            assert self.get_net(role) is not None
+        else:
+            net_arch = self.config[role]['net_arch']
+            assert isinstance(net_arch, list), f"'net_arch' must be a list. Got {type(net_arch)}."
+
+            head = head_cls(input_dim)
+            input_dim = head.feature_dim
+
+            if len(self.use_cuda_ids) > 1:
+                net = DataParallel(self._create_network(head, net_arch, input_dim, output_dim),
+                                   self.use_cuda_ids)
+            else:
+                net = self._create_network(head, net_arch, input_dim, output_dim).to(self.device)
+            setattr(self, f'{role}_net', net)
+
     def _make_fused_game(self):
-        self.fused_game = FusedGame(self.host_net, self.agent_net, device=self.device, log_time=self.log_time,
-                                    reward_func=self.reward_func)
+        device = torch.device(f'cuda:{self.use_cuda_ids[0]}') if len(self.use_cuda_ids) > 1 else self.device
+        self.fused_game = FusedGame(self.host_net, self.agent_net, device=device, log_time=self.log_time,
+                                    reward_func=self.reward_func, dtype=self.dtype)
 
     def _set_optim(self, role: str):
         """
-            Use `self.{role}_optim_config` to (re-)build `self.{role}_optimizer` using `self.{role}_net.parameters()`
+        Use `self.{role}_optim_config` to (re-)build `self.{role}_optimizer` using `self.{role}_net.parameters()`
         """
         cfg = getattr(self, f'{role}_optim_config')
         net = getattr(self, f'{role}_net')
@@ -488,7 +507,7 @@ class Trainer(abc.ABC):
 
     def _make_replay_buffer(self, role: str, output_dim: int):
         """
-            Create replay buffer and learning rate scheduler inside __init__. Should only be called during initialization.
+        Create replay buffer and learning rate scheduler inside __init__. Should only be called during initialization.
         """
         cfg = self.config['replay_buffer']
         self.use_replay_buffer = not cfg.get('deactivate', False)
@@ -510,12 +529,13 @@ class Trainer(abc.ABC):
                 input_shape=input_shape,
                 output_dim=output_dim,
                 device=device,
+                dtype=self.dtype,
                 **cfg)
             setattr(self, f'{role}_replay_buffer', replay_buffer)
 
     def _make_optimizer_and_lr(self, role: str):
         """
-            Create optimizer inside __init__. Should only be called during initialization.
+        Create optimizer inside __init__. Should only be called during initialization.
         """
         optim = self.config[role]['optim']['name']
         assert optim in self.optim_dict, f"'optim' must be one of {self.optim_dict.keys()}. Got {optim}."
@@ -534,7 +554,7 @@ class Trainer(abc.ABC):
 
     def _make_er_scheduler(self, role: str):
         """
-            Create exploration rate scheduler inside __init__. Should only be called during initialization.
+        Create exploration rate scheduler inside __init__. Should only be called during initialization.
         """
         cfg = self.config[role]
         er = cfg['er']
@@ -545,13 +565,13 @@ class Trainer(abc.ABC):
         setattr(self, f'{role}_er_scheduler', er_scheduler)
 
     @staticmethod
-    def _make_network(head: nn.Module, net_arch: list, input_dim: int, output_dim: int) -> nn.Module:
+    def _create_network(head: nn.Module, net_arch: list, input_dim: int, output_dim: int) -> nn.Module:
         return create_mlp(head, net_arch, input_dim, output_dim)
 
-    def _generate_random_points(self, samples: int) -> TensorPoints:
+    def _generate_random_points(self, samples: int, device: torch.device) -> TensorPoints:
         pts = torch.randint(self.max_value + 1, (samples, self.max_num_points, self.dimension), dtype=self.dtype,
-                            device=self.device)
-        points = self.point_cls(pts, device=self.device)
+                            device=device)
+        points = self.point_cls(pts, device=device, dtype=self.dtype)
         points.get_newton_polytope()
         if self.scale_observation:
             points.rescale()
