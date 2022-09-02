@@ -53,7 +53,7 @@ class TensorPoints(PointsBase):
 
     def exceed_threshold(self) -> bool:
         """
-            Check whether the maximal value exceeds the threshold.
+        Check whether the maximal value exceeds the threshold.
         """
         if self.value_threshold is not None:
             return torch.max(self.points) >= self.value_threshold
@@ -61,7 +61,7 @@ class TensorPoints(PointsBase):
 
     def get_num_points(self) -> torch.Tensor:
         """
-            The number of points for each batch.
+        The number of points for each batch.
         """
         num_points = torch.sum(self.points[:, :, 0].ge(0), dim=1)
         return num_points
