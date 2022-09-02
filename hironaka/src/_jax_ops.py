@@ -80,11 +80,10 @@ def get_newton_polytope_jax(points: jnp.ndarray, padding_value: float = -1.0):
 def shift_single_batch(points_slice: jnp.ndarray, coord_slice: jnp.ndarray, axis_slice: int) -> jnp.ndarray:
     max_num_points, dimension = points_slice.shape
     dtype = points_slice.dtype
-    axis_binary = jnp.arange(max_num_points) == axis_slice
+    axis_binary = jnp.arange(dimension) == axis_slice
     # Get the raw computation of linear transformation
     return mul_kronecker(jnp.sum(mul_2_1(points_slice, coord_slice.astype(dtype)), axis=1),
-                         axis_binary.astype(dtype)) + \
-        mul_2_1(points_slice, (~axis_binary).astype(dtype))
+                         axis_binary.astype(dtype)) + mul_2_1(points_slice, (~axis_binary).astype(dtype))
 
 
 @jit
