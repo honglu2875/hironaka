@@ -31,10 +31,9 @@ class ChooseLastAgentModule(nn.Module, DummyModule):
         self.device = device
 
     def forward(self, x):
-        _DEVICE = x['coords'].device
         augmented = (x['coords'].type(torch.float32) + torch.arange(self.dimension,
                                                                     dtype=torch.float32,
-                                                                    device=_DEVICE) * 1e-4)
+                                                                    device=x['coords'].device) * 1e-4)
         return torch.nn.functional.one_hot(augmented.argmax(1), num_classes=self.dimension).type(torch.float32)
 
 
@@ -46,9 +45,9 @@ class RandomAgentModule(nn.Module, DummyModule):
         self.device = device
 
     def forward(self, x):
-        coords = x['coords']
-        r = torch.rand((coords.shape[0], self.dimension), device=self.device) * coords
-        return torch.nn.functional.one_hot(r.argmax(1), num_classes=self.dimension).type(torch.float32)
+        return torch.nn.functional.one_hot(
+            (torch.rand((x['coords'].shape[0], self.dimension), device=x['coords'].device) * x['coords']).argmax(1),
+            num_classes=self.dimension).type(torch.float32)
 
 
 class RandomHostModule(nn.Module, DummyModule):
