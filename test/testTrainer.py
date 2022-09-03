@@ -5,7 +5,7 @@ import torch
 
 from hironaka.core import TensorPoints
 from hironaka.src import merge_experiences
-from hironaka.trainer.DQNTrainer import DQNTrainer
+from hironaka.trainer import DQNTrainer
 from hironaka.trainer.FusedGame import FusedGame
 from hironaka.trainer.ReplayBuffer import ReplayBuffer
 from hironaka.trainer.player_modules import RandomAgentModule, ChooseFirstAgentModule, ChooseLastAgentModule, \
