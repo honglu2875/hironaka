@@ -5,7 +5,8 @@ import torch
 import jax.numpy as jnp
 from hironaka.core import TensorPoints, JAXPoints
 from hironaka.jax.players import decode_table, batch_encode, batch_encode_one_hot, all_coord_host_fn, random_host_fn, \
-    char_vector_of_pts, zeillinger_fn_slice, zeillinger_fn, random_agent_fn, decode, batch_decode
+    char_vector_of_pts, zeillinger_fn_slice, zeillinger_fn, random_agent_fn, decode, batch_decode, \
+    choose_first_agent_fn, choose_last_agent_fn
 from hironaka.jax.util import flatten, make_agent_obs
 
 from hironaka.trainer.MCTSJAXTrainer.MCTSJAXTrainer import JAXObs
@@ -201,5 +202,9 @@ class testTorchPoints(unittest.TestCase):
         coords = jnp.array([
             [1, 1, 0], [0, 1, 1]
         ])
+
         random_agent_fn(make_agent_obs(obs, coords), (2, 3))
+        assert jnp.all(choose_first_agent_fn(make_agent_obs(obs, coords), (2, 3)) == jnp.array([[1, 0, 0], [0, 1, 0]]))
+        assert jnp.all(choose_last_agent_fn(make_agent_obs(obs, coords), (2, 3)) == jnp.array([[0, 1, 0], [0, 0, 1]]))
+
 

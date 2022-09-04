@@ -1,8 +1,15 @@
 """
 Fixed Host and Agent policies are implemented as functions here.
+Most of them can be jitted once dtype is fixed using `partial` from functools.
+List of hosts:
+    random_host_fn(pts, key=0, dtype=jnp.float32)
+    all_coord_host_fn(pts, dtype=jnp.float32)
+    zeillinger_fn(pts, dtype=jnp.float32)
+List of agents:
+    random_agent_fn(pts, spec, key=0, dtype=jnp.float32)
 """
 import time
-from functools import lru_cache, partial
+from functools import partial
 from typing import Tuple
 
 import jax
@@ -37,6 +44,8 @@ def decode_table(dimension: int) -> jnp.ndarray:
 # Remark: When `_MAX_DIM` goes up, the computation and memory become very very costly.
 #   To scale up further, the only way is to predict multi-binary vectors instead of
 #   having discrete action of size 2**dim-dim-1.
+#   Thus, for performance reason, we recommend to cap _MAX_DIM at 10.
+
 
 _MAX_DIM = 10
 dec_table = [None, None]
@@ -47,6 +56,7 @@ for i in range(2, _MAX_DIM):
 def decode(one_hot: jnp.ndarray) -> jnp.ndarray:
     """
     Decode a single one hot vector into a multi-binary vector.
+    (Cannot be jitted due to using tracer on list index. Would need a constant dim version to be jitted.)
     E.g., [0, 0, 1, 0] is decoded into [0, 1, 1].
     """
     cls = jnp.argmax(one_hot)
@@ -55,9 +65,6 @@ def decode(one_hot: jnp.ndarray) -> jnp.ndarray:
                          lambda: 2,
                          lambda: jnp.log2(cls_num).astype(jnp.int32) + 1)
     return dec_table[dimension][cls]
-
-
-batch_decode = vmap(decode, 0, 0)
 
 
 @jit
@@ -87,14 +94,11 @@ def encode_one_hot(multi_binary: jnp.ndarray) -> jnp.ndarray:
 
 
 batch_encode = vmap(encode, 0, 0)
+batch_decode = vmap(decode, 0, 0)
 batch_encode_one_hot = vmap(encode_one_hot, 0, 0)
 
 
 # ---------- Host functions ---------- #
-# List of hosts:
-#   random_host_fn(pts, key=0, dtype=jnp.float32)
-#   all_coord_host_fn(pts, dtype=jnp.float32)
-#   zeillinger_fn(pts, dtype=jnp.float32)
 
 
 def random_host_fn(pts: jnp.ndarray, key=0, dtype=jnp.float32) -> jnp.ndarray:
@@ -152,6 +156,7 @@ def char_vector(v1: jnp.ndarray, v2: jnp.ndarray) -> jnp.ndarray:
 char_vector_of_pts = vmap(vmap(char_vector, (None, 0), 0), (0, None), 0)
 
 
+@jit
 def zeillinger_fn_slice(pts: jnp.ndarray) -> jnp.ndarray:
     """
     Apply Zeillinger policy on one single set of points (batch size = 1 and ignore the batch axis).
@@ -185,8 +190,7 @@ def zeillinger_fn(pts: jnp.ndarray, dtype=jnp.float32) -> jnp.ndarray:
 
 
 # ---------- Agent functions ---------- #
-# Agent list:
-#   random_agent_fn(pts, spec, key=0, dtype=jnp.float32)
+
 
 def random_agent_fn(pts: jnp.ndarray, spec: Tuple, key=0, dtype=jnp.float32) -> jnp.ndarray:
     """
@@ -198,8 +202,7 @@ def random_agent_fn(pts: jnp.ndarray, spec: Tuple, key=0, dtype=jnp.float32) -> 
     Return:
         agent action as one-hot array.
     """
-    max_num_points, dimension = spec
-    batch_size = pts.shape[0]
+    (max_num_points, dimension), batch_size = spec, pts.shape[0]
     key = lax.cond(key == 0,
                    lambda: jax.random.PRNGKey(time.time_ns()),
                    lambda: jax.random.PRNGKey(key))
@@ -207,3 +210,62 @@ def random_agent_fn(pts: jnp.ndarray, spec: Tuple, key=0, dtype=jnp.float32) -> 
     return jax.nn.one_hot(jax.random.randint(key, (batch_size,), 0, dimension), dimension, dtype=dtype)
 
 
+@partial(jit, static_argnames=['spec'])
+def choose_first_agent_fn_slice(pts: jnp.ndarray, spec: Tuple) -> jnp.ndarray:
+    """
+    Choose the first action in the set of host coordinates:
+    (Assume the convention that host coordinate is
+        pts[max_num_points * dimension: max_num_points * dimension + dimension])
+    Parameters:
+        pts: a single set of points without batch axis. Shape (max_num_points * dimension + dimension, )
+        spec: specifying (max_num_points, dimension)
+    Returns:
+        a one-hot vector corresponding to the first axis chosen by host
+    """
+    max_num_points, dimension = spec
+    host_action = lax.dynamic_slice(pts, [max_num_points * dimension], [dimension])
+    first_host_action = jnp.argmax(host_action)
+    return (jnp.arange(dimension) == first_host_action).astype(jnp.float32)
+
+
+def choose_first_agent_fn(pts: jnp.ndarray, spec: Tuple, dtype=jnp.float32) -> jnp.ndarray:
+    """
+    Parameters:
+        pts: flattened and concatenated points (batch_size, max_num_points * dimension + dimension)
+        spec: tuple specifying (max_num_points, dimension)
+        dtype: data type
+    Return:
+        agent action as one-hot array.
+    """
+    return vmap(partial(choose_first_agent_fn_slice, spec=spec), 0, 0)(pts).astype(dtype)
+
+
+@partial(jit, static_argnames=['spec'])
+def choose_last_agent_fn_slice(pts: jnp.ndarray, spec: Tuple) -> jnp.ndarray:
+    """
+    Choose the last action in the set of host coordinates:
+    (Assume the convention that host coordinate is
+        pts[max_num_points * dimension: max_num_points * dimension + dimension])
+    Parameters:
+        pts: a single set of points without batch axis. Shape (max_num_points * dimension + dimension, )
+        spec: specifying (max_num_points, dimension)
+    Returns:
+        a one-hot vector corresponding to the first axis chosen by host
+    """
+    max_num_points, dimension = spec
+    host_action = lax.dynamic_slice(pts, [max_num_points * dimension], [dimension])
+    eps = 1e-5  # Assumes dimension is never higher than 1e5
+    last_host_action = jnp.argmax(host_action + jnp.arange(dimension) * eps)
+    return (jnp.arange(dimension) == last_host_action).astype(jnp.float32)
+
+
+def choose_last_agent_fn(pts: jnp.ndarray, spec: Tuple, dtype=jnp.float32) -> jnp.ndarray:
+    """
+    Parameters:
+        pts: flattened and concatenated points (batch_size, max_num_points * dimension + dimension)
+        spec: tuple specifying (max_num_points, dimension)
+        dtype: data type
+    Return:
+        agent action as one-hot array.
+    """
+    return vmap(partial(choose_last_agent_fn_slice, spec=spec), 0, 0)(pts).astype(dtype)
