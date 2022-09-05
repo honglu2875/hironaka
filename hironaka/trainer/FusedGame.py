@@ -2,6 +2,7 @@ from copy import deepcopy
 from typing import Optional, Tuple, Union, Callable, Type
 
 import torch
+from torch.nn import DataParallel
 
 from hironaka.core import PointsBase, TensorPoints
 from hironaka.src import HostActionEncoder
@@ -107,7 +108,7 @@ class FusedGame:
     def host_move(self, points: TensorPoints, masked=True, exploration_rate=0.0) -> Tuple[torch.Tensor, torch.Tensor]:
         with Timer(f'host_move-host_net_inference', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
             with torch.inference_mode():
-                output = self.host_net(points.get_features())
+                output = self.host_net(points.get_features().to(self.device))
 
         _TYPE = output.dtype
 
@@ -133,7 +134,7 @@ class FusedGame:
         with Timer(f'agent_move-agent_net_inference', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
             with torch.inference_mode():
                 action_prob = self.agent_net(
-                    {"points": points.get_features(), "coords": host_moves})
+                    {"points": points.get_features().to(self.device), "coords": host_moves.to(self.device)})
 
         if masked:
             minimum = torch.finfo(action_prob.dtype).min
@@ -148,9 +149,10 @@ class FusedGame:
 
         with Timer(f'agent_move-point_operations', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
             _TYPE = points.points.dtype
+            _PT_DEVICE = points.device
             if inplace:
                 with Timer(f'agent_move-pt_ops_shift', self.time_log, active=self.log_time, use_cuda=self.use_cuda):
-                    points.shift(host_moves.type(_TYPE), actions.type(_TYPE))
+                    points.shift(host_moves.type(_TYPE).to(_PT_DEVICE), actions.type(_TYPE).to(_PT_DEVICE))
                 with Timer(f'agent_move-pt_ops_get_newton_polytope', self.time_log, active=self.log_time,
                            use_cuda=self.use_cuda):
                     points.get_newton_polytope()
