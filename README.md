@@ -235,9 +235,9 @@ $T_{I,i}(x)=(x_1',\ldots, x_n')$ where
 $$x_j' = \begin{cases}x_j, &\qquad\text{if } i\neq j \newline \sum\limits_{k\in I} x_k, &\qquad\text{if }i=j
 \end{cases},$$
 
-The new `state` $S'$ is formed by the vertices of the Newton polyhedron of $\Delta'=\{T_{I,i}(x):x\in S\}$.
-- `terminal states`: a state $S$ is terminal if it consists of one single point. 
-\end{enumerate}
+The new `state` $S'$ is formed by the vertices of the Newton polyhedron of $\Delta'=${$T_{I,i}(x):x\in S$}.
+- `terminal states`: a state $S$ is terminal if it consists of one single point.
+
 In short, the host wants to reduce the size of $S$ as quickly as possible, but the agent wants to keep the size of
 $S$ large.
 
@@ -250,15 +250,15 @@ was given by Mark Spivakovsky in 1980, which proved the resolution theorem for h
 - `states`: A finite set of rational points $S \subset \mathbf{Q}^n$, such that $\sum\limits_{i=1}^n x_i>1$ for all 
 $(x_1,\ldots, x_n)\in S$, and $S$ is the set of vertices of the positive 
 convex hull $\Delta=\{S+\mathbf{R}^n_+\}$. 
-- `move`: The host chooses a subset $I\subset \{1,2,\cdots, n\}$ such that $|I|\geq 2$ and 
-\sum\limits_{i\in I}x_i\ge 1$ for all $(x_1,\ldots, x_n)\in S$. The agent chooses a number $i\in I$.
+- `move`: The host chooses a subset $I\subset${$1,2,\cdots, n$} such that $|I|\geq 2$ and 
+$\sum\limits_{i\in I}x_i\ge 1$ for all $(x_1,\ldots, x_n)\in S$. The agent chooses a number $i\in I$.
 - `state change`: Given the pair $(I,i)$ chosen by the host, for $x=(x_1,\cdots,x_n)\in \mathbb Z^n$ we define
 $T_{I,i}(x)=(x_1',\ldots, x_n')$ where
 
 $$x_j' = \begin{cases}x_j, &\qquad\text{if } i\neq j \newline \sum\limits_{k\in I} x_k -1, &\qquad\text{if }i=j
 \end{cases},$$
 
-The new `state` $S'$ is formed by the vertices of the Newton polyhedron of $\Delta'=\{T_{I,j}(x):x\in S\}$.
+The new `state` $S'$ is formed by the vertices of the Newton polyhedron of $\Delta'=${$T_{I,j}(x):x\in S$}.
 - `terminal states`: a state $S$ is terminal if it consists a point $(x_1,\ldots, x_n)$ such that 
 $\sum\limits_{i=1}^n x_i \le 1$. 
 
@@ -273,8 +273,8 @@ Mark Spivakovsky showed that Player A does not always have a winning strategy
 - `states`: A finite set of rational points $S \subset \mathbf{Q}^n$, such that $\sum\limits_{i=1}^n x_i>1$ for all 
 $(x_1,\ldots, x_n)\in S$, the denominators are bounded by some fix $N$, and $S$ is the set of vertices of the positive 
 convex hull $\Delta=\{S+\mathbf{R}^n_+\}$. 
-- `move`: The host chooses a subset $I\subset \{1,2,\cdots, n\}$ such that $|I|\geq 2$ and 
-\sum\limits_{i\in I}x_i\ge 1$ for all $(x_1,\ldots, x_n)\in S$. 
+- `move`: The host chooses a subset $I\subset${$1,2,\cdots, n$} such that $|I|\geq 2$ and 
+$\sum\limits_{i\in I}x_i\ge 1$ for all $(x_1,\ldots, x_n)\in S$. 
 The agent chooses some element $i\in S$ and modifies the Newton polygon $\Delta$ to a set $\Delta^*$ by
 the following procedure: first, the agent selects a finite number of points $y=(y_1,\ldots, y_n)$, all of whose 
 coordinates are rational numbers with denominators bounded by $N$ as above, and for each of which there exists
@@ -287,7 +287,7 @@ $T_{I,i}(x)=(x_1',\ldots, x_n')$ where
 $$x_j' = \begin{cases}x_j, &\qquad\text{if } i\neq j \newline \sum\limits_{k\in I} x_k -1, &\qquad\text{if }i=j
 \end{cases},$$
 
-The new `state` $S'$ is formed by the vertices of the Newton polyhedron of $\Delta'=\{T_{I,j}(x):x\in S\}$.
+The new `state` $S'$ is formed by the vertices of the Newton polyhedron of $\Delta'=${$T_{I,j}(x):x\in S$}.
 - `terminal states`: a state $S$ is terminal if it consists a point $(x_1,\ldots, x_n)$ such that 
 $\sum\limits_{i=1}^n x_i \le 1$. 
 
@@ -309,8 +309,8 @@ long-standing question in enumerative geometry.
 - `states`: A pair (S,w), where: S is a finite set of points $S \subset \mathbf{N}^n$, such that $S$ is the set of 
 vertices of the positive convex hull $\Delta=\{S+\mathbf{R}^n_+\}$; $w=(w_1,\ldots, w_n)\in \mathbf{N}^n$ is a weight 
 vector associating a nonnegative integer weight to all coordinates.
-- `move`: The host chooses a subset $I\subset \{1,2,\cdots, n\}$ such that $|I|\geq 2$ and 
-\sum\limits_{i\in I}x_i\ge 1$ for all $(x_1,\ldots, x_n)\in S$.
+- `move`: The host chooses a subset $I\subset ${$1,2,\cdots, n$} such that $|I|\geq 2$ and 
+$\sum\limits_{i\in I}x_i\ge 1$ for all $(x_1,\ldots, x_n)\in S$.
 The agent chooses an $i\in I$ such that $w_i$ is minimal in $\{w_j: j\in I\}$.
 - `state change`: Given the pair (I,i) chosen by the host, for $x=(x_1,\cdots,x_n)\in \mathbb Z^n$ we define
 $T_{I,i}(x)=(x_1',\ldots, x_n')$ where
@@ -332,19 +332,12 @@ $$w'_j=\begin{cases}w_j, &\qquad\text{if } j=i \quad\text{or}\quad j\notin I \ne
 
 In 2020 Abramovich-Tempkin-Vlodarczyk introduced a new resolution algorithm, based on weighted blow-ups. It significantly 
 simplifies the resolution process and uses intrinstic invariants of singularities which improve
-after each blow-up. 
+after each blow-up. One goal of the our Hironaka project is to reformulate this algorithm as a game, and use RL to 
+study its performance.
 
-# Applications and open questions
-The goal in each version of the game is to find better (i.e shorter) blow-up trees. This question has more precise formulation in specific problems. Here is a list of applications we are interested in.
-
-- **Application in Enumerative Geometry 1**: Original motivation for the first author is his recent work [3] which reduces a classical topological enumerative question (calculation of Thom polynomials for Morin singularities) to the modified Hironaka game. This paper presents the Thom polynomial as an iterated residue of a sum of rational forms, where the terms correspond to the leaves of (any) solution of the Hironaka game for a specific Morin monomial map. Hence the exact form of the formula depends on the blow-up tree, but the iterated residue of the sum si the same for any solution of the Hironaka game. We would like to see/estimate the number of leaves in these trees. 
-    
-  A very interesting further direction is the proof of the positivity conjecture on Thom polynomials: this asserts that all coefficients of the residue formula after expansion on a specific contour is positive.
-  For this we need to understand the blow-up trees.
-- **Application in Enumerative Geometry 2**: The iterated residue formula with special parameters give us tautological integrals over Hilbert scheme of points on surfaces. Understanding the blow-up trees would be a new approach to understand the Segre-Verline duality of Lothar Gottsche/Pandharipande/Voisin/Lehn. 
-- Computational aspects of the Hironaka game: optimal solution, estimates of depth, width of tree etc
-- Unsolved problems on resolution of maps, see Levine's paper. 
-- Unsolved problem: when does Hironaka's hard polyhedra game has a winning strategy?
+# Mathematical applications and open questions
+The goal in each version of the game is to find better (i.e smaller) blow-up trees. This question has more precise 
+formulation in specific problems. Here is a list of mathematical applications we are interested in.
 
 ## Hilbert scheme of points on manifolds
 
@@ -352,14 +345,19 @@ Let $X$ be a smooth projective variety and $n$ a positive integer. Assume that w
 which can freely move around on $X$. If we want to compactify this phase space, we must let the points collide in 
 a geometrically meaningful way. The Hilbert scheme of $n$ points on $X$, denoted by $\mathrm{Hilb}^n(X)$, is 
 a compactification of this parameter space which plays a central role in enumerative geometry. 
-Many classical problems can be transformed into integration of tautological forms on (geoemtric subsets) of $\mathrm{Hilb}^n(X)$:
+Many classical problems can be transformed into integration of tautological forms on (geometric subsets) of $\mathrm{Hilb}^n(X)$:
+
 -Counting hypersurfaces (curves) with given singularities in linear systems 
+
 -Counting maps between manifolds with given set of singularities 
+
 -Determining cohomological locus of a given singularity for maps between manififolds (Thom polynomials)
+
 -Cohomological locus of multisingularity locus of maps 
+
 -The Segre-Verline duality conjecture in higher dimensions
 
-In \cite{berczitau} we develop a new integral formula for tautological integrals over Hilbert scheme of points. The 
+In [4] we develop a new integral formula for tautological integrals over Hilbert scheme of points. The 
 formula involves a blow-up tree generated by the Thom game: it is the sum of certain rational expressions over a certain
 set of leaves of the tree. Hence the complexity of the formula is determined by the complexity of the Thom tree. 
 
@@ -368,9 +366,9 @@ set of leaves of the tree. Hence the complexity of the formula is determined by 
 Global singularity theory is a classical subject which classifies singularities of maps between manifolds, and 
 describes topological reasons for their appearance. Let $f:M \to N$ be a generic map between complex manifolds $M$ and $N$.
 and let $T$ be a singularity type, determined by its local algebra $A(T)$. The Thom polynomial of $A$ is the cohomology class 
-$[\Sigma_A]$ dual to the locus in $M$ where the local algebra of $f# is isomorphic to $A(T)$.
+$[\Sigma_A]$ dual to the locus in $M$ where the local algebra of $f$ is isomorphic to $A(T)$.
 
-In \cite{bsz} we develop a formula for Thom polynomials, which is in \cite{berczi} reduced to toric geoemtry and a sum over 
+In [5] we develop a formula for Thom polynomials, which is in [2] reduced to toric geometry and a sum over 
 leaves of the blow-up tree obtained by the Thom game on a special ideal.  
 
 ## The Chern Positivity Conjecture for singularities
@@ -382,14 +380,13 @@ Stanley e-positivity conjecture for chromatic polynomials on graphs.
 Training a deep network these coefficients for Thom trees corresponding to monomial ideals might help us in understanding these 
 nonnegative coefficients. 
 
-There are further listed problems in Hauser's paper. 
-
 ## The Monomialisation Conjecture of morphisms
 
-Monomialization conjecture is a relative formulation of the resolution problem. It asserts that any morphism of varieties 
-over a field of characteristic zero can be transformed via blowups of source and target into a monomial morphism, 
+Monomialization conjecture is a massive classical conjecture, which is a relative formulation of the resolution problem.
+It asserts that any morphism of varieties over a field of characteristic zero can be transformed via blowups of source 
+and target into a monomial morphism, 
 i.e., a morphism which can be expressed in suitable local coordinates by monomials.
-There have been important recent advances by Cutkosky and Abramovich, Karu, Matsuki and W􏰀lodarcyzk. 
+There have been important recent advances by Cutkosky and Abramovich, Karu, Matsuki and Wlodarcyzk. 
 In positive characteristic there are simple counterexamples.
 
 ## References
