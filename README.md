@@ -2,8 +2,12 @@
 
 # Hironaka
 
-A utility package for a reinforcement learning study of Hironaka's game of local resolution of singularities and its
-variation problems.
+A utility package for a reinforcement learning study of Hironaka's polyhedra game of local uniformization and its
+variation problems. Hironaka's polyhedra game is the basic model of a family of 2-player games equivalent to a range of algebraic geometry problems related to local uniformization and resolution of singularities. 
+
+***What we aim to do***: 
+
+- TL;DR, a winning strategy of a game is [a resolution of certain singular point](what-is-a-resolution-of-singularity) in a high dimensional space. We want to use reinforcement learning to effectively win the game, thus effectively resolving singularities and solving a certain range of algebraic geometry problems.
 
 # Quick start
 
@@ -61,11 +65,11 @@ For math-oriented viewers or ML experts who are intrigued about the background s
 
 # Rule of the game
 
-## The definition of the game
+## The definition of the (basic) game
 
 All versions of the game consist of 2 players. They operate in a non-symmetric fashion. To emphasize the
-difference, let us call Player A the "host", player B the "agent". For every turn the game has a `state`, the host makes
-a move, and the agents makes a move. Their moves change the `state` and the game goes into the next turn.
+difference, let us call Player A the "host", player B the "agent". For every turn, the game has a `state`, the host makes
+a move, and the agents makes a move. Both moves together change the `state` of the game. Among all the variations of Hironaka games, there is a simplest version underlying all the rest which we introduce below.
 
 ### States
 
@@ -77,10 +81,16 @@ of the game. At each turn,
 
 ### State change
 
-The pair $(I, i)$ defines a state change, which is a simple linear transformation from $S$ to $S'$ according to a 
-certain rule. Player A wins if 
-the `state` becomes `terminal state`, where the set of `terminal states` are defined in each version 
-slightly different ways. 
+$I, i$ together changes the `state` $S$ to the next according to the following linear change of variables:
+
+$$x_j \mapsto \begin{cases}x_j, &\qquad\text{if } i\neq j \newline \sum\limits_{k\in I} x_k, &\qquad\text{if }i=j
+\end{cases},$$
+
+for points $(x_1,\cdots,x_n)\in \mathbb Z^n$. We subsequently apply Newton polytope to the transformed points and only
+keep the vertices.
+
+A `state` is terminal if it consists of one single point. In this case, the game will not continue and the host is declared to be the winner. As
+a result, the host wants to reduce the number of $S$ as quickly as possible. On the other hand, the agent wins if it can stall the game forever (possible!). For a tangible implementation, we can either give the agent rewards for stalling as long as possible, or give the agent penalty for letting the host end the game (the latter is used in our implementation).
 
 ## Rewards and metrics
 
@@ -90,7 +100,7 @@ Defining the reward function is an open-ended question. But our goal is:
 - The agent needs to maximize the game length.
 
 Therefore, the most straightforward reward function for a host is `1 if game.ended else 0`. For agent, we switch around
-to `1 if not game.ended else 0`. There are more (e.g., step reward:=number of points killed for host). But experiments
+to `1 if not game.ended else 0`. There are more versions of reward functions (e.g., step rewards being the number of points in the state eliminated). But experiments
 have been telling us to focus on the original one.
 
 ### An interesting metric: $\rho$
@@ -218,7 +228,7 @@ formulas over Hilbert scheme of points on manifolds.
 
 ## The basic version of the game
 
-This project started out with [this basic version of the game](#the-definition-of-the-game) (see the link for the rules). 
+This project started out with [this basic version of the game](#the-definition-of-the-basic-game) (see the link for the rules). 
 It is a simplified version of [Hironaka's original polyhedra game](#hironakas-polyhedra-game).
 
 ## Hauser game 
