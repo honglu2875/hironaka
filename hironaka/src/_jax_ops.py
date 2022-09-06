@@ -5,9 +5,10 @@ from jax import vmap, jit, lax
 
 mul_2_1 = vmap(lax.mul, (0, None), 0)  # (m, d) * (d,) -> (m, d)
 mul_kronecker = vmap(vmap(lax.mul, (None, 0), 0), (0, None), 0)  # (m,) * (n,) -> (m, n) Kronecker product
+and_kronecker = vmap(vmap(jnp.logical_and, (None, 0), 0), (0, None), 0)  # (m,) * (n,) -> (m, n) Kronecker bool
 mul_3_2 = vmap(vmap(lax.mul, (1, None), 1), (0, 0), 0)  # (b, m, d) * (b, m) -> (b, m, d)
 add_3_2 = vmap(vmap(lax.add, (1, None), 1), (0, 0), 0)  # (b, m, d) + (b, m) -> (b, m, d)
-
+sub_2_2 = vmap(jnp.subtract, (None, 0), 1)  # (m, d) - (n, d) -> (m, n, d)
 
 @jit
 def get_equal(x, y):
@@ -46,16 +47,13 @@ def get_interior(points_slice: jnp.ndarray) -> jnp.ndarray:
     Return:
         a 1-dim boolean jax.numpy array indicating whether the point (row) is in the closure of interior.
     """
-    res = []
     max_num_points = points_slice.shape[0]
     # Find all available points that are not removed (not marked by `padding_value`)
-    available = jnp.any(points_slice >= 0, axis=1)
-    for j in range(max_num_points):
-        # Subtract all points by the vector j
-        diff = vmap(partial(jnp.subtract, x2=points_slice[j, :]), 0, 0)(points_slice)
-        # Get those each of whose coordinates are smaller but non-negative
-        res.append(~(jnp.any(jnp.all(diff <= 0, axis=1) & available & (jnp.arange(max_num_points) != j))))
-    return jnp.array(res)
+    available = jnp.all(points_slice >= 0, axis=1)
+    available_mask = and_kronecker(available, available)
+    diff = sub_2_2(points_slice, points_slice)  # (max_num_points, max_num_points, dimension)
+    res = ~jnp.any(jnp.all(diff >= 0, axis=2) & (~jnp.diag(jnp.ones(max_num_points, dtype=bool))) & available_mask, axis=1)
+    return res
 
 
 @jit
@@ -68,7 +66,6 @@ def get_newton_polytope_approx_jax(points: jnp.ndarray, padding_value: float = -
     dtype = points.dtype
     get_interior_batch = vmap(get_interior, 0, 0)
     mask = get_interior_batch(points)
-
     return add_3_2(mul_3_2(points, mask.astype(dtype)), ((~mask) * padding_value).astype(dtype))
 
 

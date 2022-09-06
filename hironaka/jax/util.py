@@ -14,3 +14,8 @@ def make_agent_obs(pts: jnp.ndarray, coords: jnp.ndarray) -> jnp.ndarray:
         coords: jax multi-binary array of shape (batch_size, dimension)
     """
     return jnp.concatenate([flatten(pts), coords], axis=1)
+
+
+@jit
+def get_dones(pts: jnp.ndarray) -> jnp.ndarray:
+    return jnp.sum((pts[:, :, 0] >= 0), axis=1) < 2

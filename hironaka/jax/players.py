@@ -141,7 +141,7 @@ def char_vector(v1: jnp.ndarray, v2: jnp.ndarray) -> jnp.ndarray:
     Return:
         the characteristic vector (L, S) corresponding to the difference v1 - v2.
             L: max coordinate - min coordinate
-            S: num of max coordinate + num of min coordinate
+            S: num of max coordinates + num of min coordinates (no repeating counts)
     """
     diff = v1 - v2
     maximal = jnp.max(diff)
@@ -167,12 +167,14 @@ def zeillinger_fn_slice(pts: jnp.ndarray) -> jnp.ndarray:
     """
     n, d = pts.shape  # (n, d)
     char_vec = char_vector_of_pts(pts, pts)  # (n, n, 2)
-    # Bump up the diagonal entries so that they do not show up when finding minimal.
+    # Bump up the diagonal entries (only place that can have 0 entries)
+    #   so that they do not show up when finding minimal.
     maximal = jnp.max(char_vec)
     diag = jnp.stack([jnp.diag(jnp.full((n,), maximal)),
                       jnp.diag(jnp.full((n,), maximal))],
                      axis=2)
     bumped_char_vec = (char_vec + diag).reshape(-1, 2)
+
     min_index = jnp.lexsort((bumped_char_vec[:, 1], bumped_char_vec[:, 0]))[0]
     diff = sub_2_2(pts, pts).reshape(-1, d)  # (n, n, d) -> (n*n, d)
     minimal_diff_vector = diff[min_index, :]
