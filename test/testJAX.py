@@ -256,10 +256,13 @@ class TestJAX(unittest.TestCase):
         key = jax.random.PRNGKey(42)
         batch_size, max_num_points, dimension = 2, 4, 3
         spec = (max_num_points, dimension)
+        points = rescale_jax(get_newton_polytope_jax(
+            jax.random.randint(key, (batch_size, max_num_points, dimension), 0, 20).astype(jnp.float32)))\
+            .reshape(batch_size, -1)
         root = mctx.RootFnOutput(
             prior_logits=jnp.array([[0] * (2 ** dimension - dimension - 1)] * batch_size, dtype=jnp.float32),
             value=jnp.array([0] * batch_size, dtype=jnp.float32),
-            embedding=jax.random.randint(key, (batch_size, max_num_points * dimension), 0, 20))
+            embedding=points)
         nnet = DResNet18(4 + 1)
         host_wrapper = PolicyWrapper(jax.random.PRNGKey(0), (batch_size, spec[0] * spec[1]), nnet)
         host_policy = host_wrapper.get_policy()
