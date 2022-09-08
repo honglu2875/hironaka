@@ -1,5 +1,6 @@
 import unittest
 
+import mctx
 import torch
 import jax
 import jax.numpy as jnp
@@ -18,7 +19,7 @@ from hironaka.src import get_newton_polytope_torch, shift_torch, reposition_torc
 from hironaka.src._jax_ops import get_newton_polytope_jax, shift_jax, rescale_jax, reposition_jax
 
 
-class testJAX(unittest.TestCase):
+class TestJAX(unittest.TestCase):
     r = jnp.array([[[1., 2., 3., 4.],
                     [-1., -1., -1., -1.],
                     [4., 1., 2., 3.],
@@ -250,6 +251,34 @@ class testJAX(unittest.TestCase):
         recurrent_fn = get_recurrent_fn_for_role('agent', agent_policy, zeillinger_fn_flatten, reward_fn,
                                                  spec, dtype=jnp.float32)
         print(recurrent_fn(None, None, agent_actions, agent_obs))
+
+    def test_mcts_search(self):
+        key = jax.random.PRNGKey(42)
+        batch_size, max_num_points, dimension = 2, 4, 3
+        spec = (max_num_points, dimension)
+        root = mctx.RootFnOutput(
+            prior_logits=jnp.array([[0] * (2 ** dimension - dimension - 1)] * batch_size, dtype=jnp.float32),
+            value=jnp.array([0] * batch_size, dtype=jnp.float32),
+            embedding=jax.random.randint(key, (batch_size, max_num_points * dimension), 0, 20))
+        nnet = DResNet18(4 + 1)
+        host_wrapper = PolicyWrapper(jax.random.PRNGKey(0), (batch_size, spec[0] * spec[1]), nnet)
+        host_policy = host_wrapper.get_policy()
+        reward_fn = get_reward_fn('host')
+        recurrent_fn = get_recurrent_fn_for_role('host', host_policy, choose_first_agent_fn, reward_fn,
+                                                 spec, dtype=jnp.float32)
+
+        policy_output = mctx.gumbel_muzero_policy(
+            params=(),
+            rng_key=key,
+            root=root,
+            recurrent_fn=recurrent_fn,
+            num_simulations=10,
+            max_depth=20,
+            max_num_considered_actions=10,
+            invalid_actions=(jnp.array([jnp.arange(4) != 3] * batch_size)).astype(jnp.int32)
+        )
+
+        print(policy_output)
 
     def test_jax_util(self):
         obs = jnp.ones((32, 60), dtype=jnp.float32)

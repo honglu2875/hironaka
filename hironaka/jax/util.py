@@ -141,15 +141,6 @@ def extra_features(role: str, observations: jnp.ndarray) -> jnp.ndarray:
     return None
 
 
-"""
-# TODO
-root = mctx.RootFnOutput(
-        prior_logits=jnp.array([[0] * (2 ** dimension - dimension - 1)] * batch_size, dtype=jnp.float32),
-        value=jnp.array([0] * batch_size, dtype=jnp.float32),
-        embedding=jax.random.randint(key, (batch_size, max_num_points, dimension), 0, 20).astype(jnp.float32))
-"""
-
-
 # ---------- Encode/decode host actions ---------- #
 
 

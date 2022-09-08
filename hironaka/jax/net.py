@@ -110,7 +110,7 @@ class PolicyWrapper:
             def policy_fn(x: jnp.ndarray, spec: Any) -> Tuple[jnp.ndarray, jnp.ndarray]:
                 output = self.model.apply(self.parameters, x)
                 policy_logits = lax.dynamic_slice(output, (0, 0), (batch_size, logit_length - 1))
-                value_logits = lax.dynamic_slice(output, (0, logit_length - 1), (batch_size, 1))
+                value_logits = jnp.ravel(lax.dynamic_slice(output, (0, logit_length - 1), (batch_size, 1)))
                 return policy_logits, value_logits
 
         return policy_fn
