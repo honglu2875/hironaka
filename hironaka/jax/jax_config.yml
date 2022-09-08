@@ -1,0 +1,48 @@
+use_tensorboard: true
+layerwise_logging: true
+use_cuda: false
+scale_observation: true
+version_string: 'mcts'
+
+dimension: 3
+max_num_points: 20
+max_value: 20
+max_grad_norm: 1
+
+host:
+  batch_size: 256
+  c_puct: 0.5,
+  max_depth: 20,
+  MSE_coefficient: 1.0,
+  optim:
+    name: 'adam'
+    args: # Pass optimizer parameters here
+      lr: 0.00000001
+    lr_schedule: # (OPTIONAL) Use a scheduler on the learning rate
+      mode: 'exponential'
+      initial_lr: 0.001
+      rate: 0.996
+  #net_arch: [ 128, 'b', { repeat: 20, net_arch: [ 256, 'b' ] }, 128, 'b' ]
+
+
+agent:
+  batch_size: 256
+  initial_rollout_size: 100
+  steps_before_rollout: 10
+  steps_before_update_target: 100
+  rollout_size: 20
+  max_rollout_step: 10
+  optim:
+    name: 'adam'
+    args:
+      lr: 0.00000001
+    lr_schedule:
+      mode: 'exponential'
+      initial_lr: 0.001
+      rate: 0.996
+  #net_arch: [ 128, 'b', { repeat: 20, net_arch: [ 256, 'b' ] }, 128, 'b' ]
+  gamma: 0.99
+  tau: 0.9
+
+
+

@@ -10,6 +10,7 @@ mul_3_2 = vmap(vmap(lax.mul, (1, None), 1), (0, 0), 0)  # (b, m, d) * (b, m) -> 
 add_3_2 = vmap(vmap(lax.add, (1, None), 1), (0, 0), 0)  # (b, m, d) + (b, m) -> (b, m, d)
 sub_2_2 = vmap(jnp.subtract, (None, 0), 1)  # (m, d) - (n, d) -> (m, n, d)
 
+
 @jit
 def get_equal(x, y):
     """
@@ -23,7 +24,7 @@ def get_equal(x, y):
 @jit
 def is_repeated(x):
     """
-    (m, d) -> (m) whether there exists the same row whose index is less
+    (m, d) -> (m) whether there exists the same row whose index is smaller.
     """
     n = x.shape[0]
     return jnp.any(get_equal(x, x) & ~jnp.triu(jnp.ones((n, n)).astype(bool), k=0), axis=1)
@@ -31,7 +32,10 @@ def is_repeated(x):
 
 @jit
 def remove_repeated_jax(points: jnp.ndarray, padding_value: float = -1.0) -> jnp.ndarray:
-    batch_size, max_num_points, dimension = points.shape
+    """
+    (b, m, d) -> (b, m, d)
+    Remove the repeating rows (per item in the batch) and leave only the one with the smallest index.
+    """
     dtype = points.dtype
 
     mask = ~vmap(is_repeated, 0, 0)(points)
@@ -52,7 +56,8 @@ def get_interior(points_slice: jnp.ndarray) -> jnp.ndarray:
     available = jnp.all(points_slice >= 0, axis=1)
     available_mask = and_kronecker(available, available)
     diff = sub_2_2(points_slice, points_slice)  # (max_num_points, max_num_points, dimension)
-    res = ~jnp.any(jnp.all(diff >= 0, axis=2) & (~jnp.diag(jnp.ones(max_num_points, dtype=bool))) & available_mask, axis=1)
+    res = ~jnp.any(
+        jnp.all(diff >= 0, axis=2) & (~jnp.diag(jnp.ones(max_num_points, dtype=bool))) & available_mask, axis=1)
     return res
 
 
@@ -91,14 +96,15 @@ def shift_jax(points: jnp.ndarray, coord: jnp.ndarray, axis: jnp.ndarray, paddin
     return add_3_2(mul_3_2(shift_batch, available.astype(dtype)), ((~available) * padding_value).astype(dtype))
 
 
+@jit
 def calculate_rescale(points: jnp.ndarray) -> jnp.array:
     maximum = jnp.max(points)  # (m, d)
     # Use eps to stay away from division by zero (or very small).
     # But ideally, maximum should always be larger than 1 if the batch points keep rescaling.
     eps = 1e-8
-    return lax.cond(maximum <= eps,
-                    lambda: points,
-                    lambda: points / maximum)
+    return jnp.where(maximum <= eps,
+                     points,
+                     points / maximum)
 
 
 @jit
@@ -121,9 +127,9 @@ def subtract_min(vector: jnp.ndarray, padding_value: float = -1.0) -> jnp.array:
     dtype = vector.dtype
     modified = vector * available + (~available * jnp.max(vector)).astype(dtype)
     minimal = jnp.min(modified)
-    return lax.cond(minimal <= 0.0,
-                    lambda: vector,
-                    lambda: (vector - minimal) * available + (~available * padding_value).astype(dtype))
+    return jnp.where(minimal <= 0.0,
+                     vector,
+                     (vector - minimal) * available + (~available * padding_value).astype(dtype))
 
 
 @jit

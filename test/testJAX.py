@@ -1,20 +1,24 @@
 import unittest
 
 import torch
-
+import jax
 import jax.numpy as jnp
-from hironaka.core import TensorPoints, JAXPoints
-from hironaka.jax.players import decode_table, batch_encode, batch_encode_one_hot, all_coord_host_fn, random_host_fn, \
-    char_vector_of_pts, zeillinger_fn_slice, zeillinger_fn, random_agent_fn, decode, batch_decode, \
-    choose_first_agent_fn, choose_last_agent_fn
-from hironaka.jax.util import flatten, make_agent_obs
 
-from hironaka.trainer.MCTSJAXTrainer.MCTSJAXTrainer import JAXObs
+from hironaka.core import TensorPoints, JAXPoints
+from hironaka.jax.net import DResNet18, PolicyWrapper
+from hironaka.jax.players import all_coord_host_fn, random_host_fn, \
+    char_vector_of_pts, zeillinger_fn_slice, zeillinger_fn, random_agent_fn, choose_first_agent_fn, choose_last_agent_fn
+from hironaka.jax.recurrent_fn import get_recurrent_fn_for_role
+from hironaka.jax.util import flatten, make_agent_obs, get_take_actions, get_reward_fn, decode_table, \
+    decode_from_one_hot, \
+    batch_encode, batch_encode_one_hot, get_batch_decode_from_one_hot, \
+    get_batch_decode, get_preprocess_fns
+
 from hironaka.src import get_newton_polytope_torch, shift_torch, reposition_torch, remove_repeated
 from hironaka.src._jax_ops import get_newton_polytope_jax, shift_jax, rescale_jax, reposition_jax
 
 
-class testTorchPoints(unittest.TestCase):
+class testJAX(unittest.TestCase):
     r = jnp.array([[[1., 2., 3., 4.],
                     [-1., -1., -1., -1.],
                     [4., 1., 2., 3.],
@@ -112,6 +116,7 @@ class testTorchPoints(unittest.TestCase):
         pts.rescale()
         assert jnp.all(jnp.isclose(pts.points, self.rs))
 
+    """
     def test_jax_obs(self):
         host_obs = jnp.array([
             [[1, 2, 3], [2, 3, 4], [0, 1, 0], [-1, -1, -1]],
@@ -139,6 +144,7 @@ class testTorchPoints(unittest.TestCase):
             a_o = JAXObs('agent', host_obs)
         with self.assertRaises(Exception) as context:
             a_o = JAXObs('agent', host_obs, dimension=7)
+    """
 
     def test_encode_decode(self):
         decode_3 = jnp.array([
@@ -154,10 +160,15 @@ class testTorchPoints(unittest.TestCase):
         encode_one_hot_out = jnp.array([
             [0, 1, 0, 0], [0, 0, 0, 1], [0, 0, 1, 0]
         ])
+
+        # Construct dimension-3 batch decoders
+        batch_decode_from_one_hot = get_batch_decode_from_one_hot(3)
+        batch_decode = get_batch_decode(3)
+
         assert jnp.all(batch_encode(encode_in) == jnp.array(encode_out))
         assert jnp.all(batch_encode_one_hot(encode_in) == jnp.array(encode_one_hot_out))
-        assert jnp.all(decode(jnp.array([0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0])) == jnp.array([0, 1, 1, 0]))
-        assert jnp.all(batch_decode(encode_one_hot_out) == encode_in)
+        assert jnp.all(batch_decode_from_one_hot(encode_one_hot_out) == encode_in)
+        assert jnp.all(batch_decode(encode_out) == encode_in)
 
     def test_hosts(self):
         obs = jnp.array([
@@ -206,5 +217,69 @@ class testTorchPoints(unittest.TestCase):
         random_agent_fn(make_agent_obs(obs, coords), (2, 3))
         assert jnp.all(choose_first_agent_fn(make_agent_obs(obs, coords), (2, 3)) == jnp.array([[1, 0, 0], [0, 1, 0]]))
         assert jnp.all(choose_last_agent_fn(make_agent_obs(obs, coords), (2, 3)) == jnp.array([[0, 1, 0], [0, 0, 1]]))
+
+    def test_recurrent_fn(self):
+        spec = (4, 3)
+        host_obs = jnp.array([
+            [[1, 2, 3], [2, 3, 4], [0, 9, 0], [-1, -1, -1]],
+            [[4, 2, 2], [-1, -1, -1], [0, 0, 1], [-1, -1, -1]]
+        ]).reshape(-1, spec[0] * spec[1]).astype(jnp.float32)
+        host_actions = jnp.array([3, 4])
+        batch_decode = get_batch_decode(spec[1])
+        agent_obs = make_agent_obs(host_obs, batch_decode(host_actions))
+        agent_actions = jnp.array([1, 0], dtype=jnp.float32)
+        # For `recurrent_fn`, it takes
+        #   params, key, actions: jnp.ndarray, observations: jnp.ndarray
+        #   (warning: observations is already flattened)
+
+        # Test host `recurrent_fn`
+        nnet = DResNet18(4 + 1)
+        host_wrapper = PolicyWrapper(jax.random.PRNGKey(0), (2, spec[0] * spec[1]), nnet)
+        host_policy = host_wrapper.get_policy()
+        reward_fn = get_reward_fn('host')
+        recurrent_fn = get_recurrent_fn_for_role('host', host_policy, choose_first_agent_fn, reward_fn,
+                                                 spec, dtype=jnp.float32)
+        print(recurrent_fn(None, None, host_actions, host_obs))
+        # Test agent `recurrent_fn`
+        obs_preprocess, coords_preprocess = get_preprocess_fns('host', spec)
+        nnet = DResNet18(3 + 1)
+        agent_wrapper = PolicyWrapper(jax.random.PRNGKey(0), (2, spec[0] * spec[1]), nnet)
+        agent_policy = agent_wrapper.get_policy()
+        reward_fn = get_reward_fn('agent')
+        def zeillinger_fn_flatten(obs): return zeillinger_fn(obs_preprocess(obs))
+        recurrent_fn = get_recurrent_fn_for_role('agent', agent_policy, zeillinger_fn_flatten, reward_fn,
+                                                 spec, dtype=jnp.float32)
+        print(recurrent_fn(None, None, agent_actions, agent_obs))
+
+    def test_jax_util(self):
+        obs = jnp.ones((32, 60), dtype=jnp.float32)
+        action = jnp.ones((32, 3), dtype=jnp.float32)
+        out = make_agent_obs(obs, action)
+        assert out.shape == (32, 63)
+
+        host_obs = jnp.array([
+            [[1, 2, 3], [2, 3, 4], [0, 9, 0], [-1, -1, -1]],
+            [[4, 2, 2], [-1, -1, -1], [0, 0, 1], [-1, -1, -1]]
+        ]).astype(jnp.float32)
+        agent_obs = {'points': jnp.copy(host_obs),
+                     'coords': jnp.array([[0, 1, 1], [1, 1, 1]])}
+        combined = jnp.concatenate([agent_obs['points'].reshape(2, -1), agent_obs['coords']], axis=1)
+        take_actions = get_take_actions('host', (4, 3), rescale_points=True)
+        # For host, `take_actions` directly receives *(obs, coords, axis)
+        out = take_actions(host_obs.reshape(2, -1), agent_obs['coords'], jnp.ones(2, dtype=jnp.float32))
+        assert jnp.all(
+            flatten(
+                rescale_jax(
+                    get_newton_polytope_jax(
+                        shift_jax(host_obs, agent_obs['coords'], jnp.ones(2, dtype=jnp.float32))))) == out)
+        # For agent, `take_actions` receives *(combined, axis, axis)
+        take_actions = get_take_actions('agent', (4, 3), rescale_points=False)
+        out = take_actions(combined, jnp.ones(2, dtype=jnp.float32), jnp.ones(2, dtype=jnp.float32))
+        assert jnp.all(
+            flatten(
+                get_newton_polytope_jax(
+                    shift_jax(host_obs, agent_obs['coords'], jnp.ones(2, dtype=jnp.float32)))) == out)
+
+
 
 
