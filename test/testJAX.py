@@ -280,7 +280,7 @@ class TestJAX(unittest.TestCase):
         # Test agent `recurrent_fn`
         obs_preprocess, coords_preprocess = get_preprocess_fns('host', spec)
         nnet = DResNet18(3 + 1)
-        agent_wrapper = PolicyWrapper(jax.random.PRNGKey(0), (2, spec[0] * spec[1]), nnet)
+        agent_wrapper = PolicyWrapper(jax.random.PRNGKey(0), (2, spec[0] * spec[1] + spec[1]), nnet)
         agent_policy = agent_wrapper.get_policy()
         reward_fn = get_reward_fn('agent')
 

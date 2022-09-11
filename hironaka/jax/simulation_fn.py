@@ -88,6 +88,7 @@ def get_single_thread_simulation(starting_key: jnp.ndarray, evaluation_loop: Cal
     if rollout_size % eval_batch_size != 0:
         warnings.warn(f"rollout_size cannot be divided by eval_batch_size. "
                       f"Output batch size may be different than rollout_size.")
+
     # Warm up and get the action numbers
     out = evaluation_loop(jax.random.PRNGKey(0), jnp.zeros((eval_batch_size, max_num_points * dimension)))
     action_num = out.action_weights.shape[1]
