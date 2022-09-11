@@ -104,10 +104,10 @@ class PolicyWrapper:
         """
         batch_size, logit_length = self.output_shape
         if self.separate_policy_value_models:
-            def policy_fn(x: jnp.ndarray, spec: Any) -> Tuple[jnp.ndarray, jnp.ndarray]:
+            def policy_fn(x: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
                 return self.model.apply(self.parameters, x), self.value_model.apply(self.value_parameters, x)
         else:
-            def policy_fn(x: jnp.ndarray, spec: Any) -> Tuple[jnp.ndarray, jnp.ndarray]:
+            def policy_fn(x: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
                 output = self.model.apply(self.parameters, x)
                 policy_logits = lax.dynamic_slice(output, (0, 0), (batch_size, logit_length - 1))
                 value_logits = jnp.ravel(lax.dynamic_slice(output, (0, logit_length - 1), (batch_size, 1)))

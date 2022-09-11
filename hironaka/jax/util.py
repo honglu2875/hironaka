@@ -30,19 +30,6 @@ def get_dones(pts: jnp.ndarray) -> jnp.ndarray:
     return jnp.sum((pts[:, :, 0] >= 0), axis=1) < 2
 
 
-'''
-@partial(jit, static_argnames=['enemy_role'])
-def make_obs(enemy_role: str, observations: jnp.ndarray, enemy_actions: jnp.ndarray) -> jnp.ndarray:
-    """
-    Create the correct format of observations when the *ENEMY* is `role`.
-    It is a helper function for `get_recurrent_fn_for_role`.
-    """
-    return jnp.where(enemy_role == 'host',
-                     make_agent_obs(observations, enemy_actions),
-                     observations)
-'''
-
-
 def get_preprocess_fns(role: str, spec: Tuple[int, int]) -> Tuple[Callable, Callable]:
     """
     Parameters:
@@ -140,6 +127,18 @@ def extra_features(role: str, observations: jnp.ndarray) -> jnp.ndarray:
     """
     return None
 
+
+def apply_agent_action_mask(agent_policy: Callable, dimension: int) -> Callable:
+    """
+    Apply a masked agent policy wrapper on top of an `agent_policy` function.
+    """
+    def masked_agent_policy(x: jnp.ndarray) -> Tuple:
+        batch_size, feature_num = x.shape
+        mask = lax.dynamic_slice(x, (0, feature_num - dimension), (batch_size, dimension)) > 0.5
+        policy_prior, value_prior = agent_policy(x)
+        return policy_prior * mask - jnp.inf * (~mask), value_prior
+
+    return masked_agent_policy
 
 # ---------- Encode/decode host actions ---------- #
 

@@ -7,6 +7,8 @@ List of hosts:
     zeillinger_fn(pts, dtype=jnp.float32)
 List of agents:
     random_agent_fn(pts, spec, key=0, dtype=jnp.float32)
+    choose_first_agent_fn(pts, spec, dtype=jnp.float32)
+    choose_last_agent_fn(pts, spec, dtype=jnp.float32)
 """
 import time
 from functools import partial
@@ -70,8 +72,10 @@ def char_vector(v1: jnp.ndarray, v2: jnp.ndarray) -> jnp.ndarray:
     minimal = jnp.min(diff)
     max_count = jnp.sum(diff == maximal)
     min_count = jnp.sum(diff == minimal)
-    return jnp.array(
-        [maximal - minimal, lax.cond(maximal == minimal, lambda: max_count, lambda: max_count + min_count)])
+    return jnp.where(jnp.any(v1 < 0) | jnp.any(v2 < 0) | jnp.isclose(maximal, minimal),
+                     jnp.array([jnp.inf, jnp.inf]),
+                     jnp.array(
+                         [maximal - minimal, jnp.where(maximal == minimal, max_count, max_count + min_count)]))
 
 
 # (n, d) - (m, d) -> (n, m, 2) characteristic vector of each pair
@@ -88,25 +92,21 @@ def zeillinger_fn_slice(pts: jnp.ndarray) -> jnp.ndarray:
         host action as one-hot array.
     """
     n, d = pts.shape  # (n, d)
-    char_vec = char_vector_of_pts(pts, pts)  # (n, n, 2)
+    char_vec = char_vector_of_pts(pts, pts).reshape(-1, 2)  # (n, n, 2)
     # Bump up the diagonal entries (only place that can have 0 entries)
     #   so that they do not show up when finding minimal.
-    maximal = jnp.max(char_vec)
-    diag = jnp.stack([jnp.diag(jnp.full((n,), maximal)),
-                      jnp.diag(jnp.full((n,), maximal))],
-                     axis=2)
-    bumped_char_vec = (char_vec + diag).reshape(-1, 2)
 
-    min_index = jnp.lexsort((bumped_char_vec[:, 1], bumped_char_vec[:, 0]))[0]
+    min_index = jnp.lexsort((char_vec[:, 1], char_vec[:, 0]))[0]
     diff = sub_2_2(pts, pts).reshape(-1, d)  # (n, n, d) -> (n*n, d)
     minimal_diff_vector = diff[min_index, :]
     # (min, max) of the minimal_diff_vector is the Zeillinger's choice
     argmin = jnp.argmin(minimal_diff_vector)
     argmax = jnp.argmax(minimal_diff_vector)
     multi_bin = (jnp.arange(d) == argmin) | (jnp.arange(d) == argmax)
-    return lax.cond(argmin != argmax,
-                    lambda: encode_one_hot(multi_bin.astype(jnp.float32)),
-                    lambda: jax.nn.one_hot(0, 2 ** d - d - 1))
+
+    return jnp.where(argmin != argmax,
+                     encode_one_hot(multi_bin),
+                     jax.nn.one_hot(0, 2 ** d - d - 1))
 
 
 def zeillinger_fn(pts: jnp.ndarray, dtype=jnp.float32) -> jnp.ndarray:
@@ -115,7 +115,7 @@ def zeillinger_fn(pts: jnp.ndarray, dtype=jnp.float32) -> jnp.ndarray:
 
 # ---------- Agent functions ---------- #
 
-
+@partial(jit, static_argnames=['spec', 'dtype'])
 def random_agent_fn(pts: jnp.ndarray, spec: Tuple, key=0, dtype=jnp.float32) -> jnp.ndarray:
     """
     Parameters:
@@ -127,14 +127,13 @@ def random_agent_fn(pts: jnp.ndarray, spec: Tuple, key=0, dtype=jnp.float32) -> 
         agent action as one-hot array.
     """
     (max_num_points, dimension), batch_size = spec, pts.shape[0]
-    key = lax.cond(key == 0,
-                   lambda: jax.random.PRNGKey(time.time_ns()),
-                   lambda: jax.random.PRNGKey(key))
+    key = jnp.where(key == 0,
+                    jax.random.PRNGKey(time.time_ns()),
+                    jax.random.PRNGKey(key))
 
     return jax.nn.one_hot(jax.random.randint(key, (batch_size,), 0, dimension), dimension, dtype=dtype)
 
 
-@partial(jit, static_argnames=['spec'])
 def choose_first_agent_fn_slice(pts: jnp.ndarray, spec: Tuple) -> jnp.ndarray:
     """
     Choose the first action in the set of host coordinates:
@@ -152,6 +151,7 @@ def choose_first_agent_fn_slice(pts: jnp.ndarray, spec: Tuple) -> jnp.ndarray:
     return (jnp.arange(dimension) == first_host_action).astype(jnp.float32)
 
 
+@partial(jit, static_argnames=['spec', 'dtype'])
 def choose_first_agent_fn(pts: jnp.ndarray, spec: Tuple, dtype=jnp.float32) -> jnp.ndarray:
     """
     Parameters:
@@ -164,7 +164,6 @@ def choose_first_agent_fn(pts: jnp.ndarray, spec: Tuple, dtype=jnp.float32) -> j
     return vmap(partial(choose_first_agent_fn_slice, spec=spec), 0, 0)(pts).astype(dtype)
 
 
-@partial(jit, static_argnames=['spec'])
 def choose_last_agent_fn_slice(pts: jnp.ndarray, spec: Tuple) -> jnp.ndarray:
     """
     Choose the last action in the set of host coordinates:
@@ -183,6 +182,7 @@ def choose_last_agent_fn_slice(pts: jnp.ndarray, spec: Tuple) -> jnp.ndarray:
     return (jnp.arange(dimension) == last_host_action).astype(jnp.float32)
 
 
+@partial(jit, static_argnames=['spec', 'dtype'])
 def choose_last_agent_fn(pts: jnp.ndarray, spec: Tuple, dtype=jnp.float32) -> jnp.ndarray:
     """
     Parameters:

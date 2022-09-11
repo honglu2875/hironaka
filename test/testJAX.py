@@ -1,4 +1,5 @@
 import unittest
+from functools import partial
 
 import mctx
 import torch
@@ -6,14 +7,15 @@ import jax
 import jax.numpy as jnp
 
 from hironaka.core import TensorPoints, JAXPoints
-from hironaka.jax.net import DResNet18, PolicyWrapper
+from hironaka.jax.net import DResNet18, PolicyWrapper, DResNetMini
 from hironaka.jax.players import all_coord_host_fn, random_host_fn, \
     char_vector_of_pts, zeillinger_fn_slice, zeillinger_fn, random_agent_fn, choose_first_agent_fn, choose_last_agent_fn
 from hironaka.jax.recurrent_fn import get_recurrent_fn_for_role
+from hironaka.jax.simulation_fn import get_evaluation_loop, get_single_thread_simulation
 from hironaka.jax.util import flatten, make_agent_obs, get_take_actions, get_reward_fn, decode_table, \
     decode_from_one_hot, \
     batch_encode, batch_encode_one_hot, get_batch_decode_from_one_hot, \
-    get_batch_decode, get_preprocess_fns
+    get_batch_decode, get_preprocess_fns, apply_agent_action_mask
 
 from hironaka.src import get_newton_polytope_torch, shift_torch, reposition_torch, remove_repeated
 from hironaka.src._jax_ops import get_newton_polytope_jax, shift_jax, rescale_jax, reposition_jax
@@ -97,6 +99,27 @@ class TestJAX(unittest.TestCase):
         assert jnp.all(get_newton_polytope_jax(p) == self.r2)
         assert jnp.all(rescale_jax(s) == sr)
         assert jnp.all(reposition_jax(get_newton_polytope_jax(p)) == self.r3)
+        s = jnp.array([
+            [
+                [0.10526316, 0.2631579, 0.],
+                [0., 0.8947368, 0.15789473],
+                [-1., - 1., - 1.],
+                [0.10526316, 0.21052632, 1.],
+                [-1., - 1., - 1.],
+                [0.84210527, 0.05263158, 0.47368422]]
+        ]
+        )
+        sr = jnp.array([
+            [
+                [0.10526316, 0.2631579, 0.],
+                [0., 1.0526316, 0.15789473],
+                [-1., - 1., - 1.],
+                [0.10526316, 1.2105263, 1.],
+                [-1., - 1., - 1.],
+                [0.84210527, 0.5263158, 0.47368422]]
+        ]
+        )
+        assert jnp.all(shift_jax(s, jnp.array([[0, 1, 1]]), jnp.array([1])) == sr)
 
     def test_points_jax(self):
         p = jnp.array(
@@ -205,6 +228,19 @@ class TestJAX(unittest.TestCase):
                            [0, 19, 19, 14]]], dtype=jnp.float32)
         r = batch_encode_one_hot(jnp.array([[0, 1, 0, 1], [1, 0, 1, 0], [1, 0, 1, 0]]))
         assert jnp.all(zeillinger_fn(obs2) == r)
+        pts = jnp.array([[[-1., -1., -1.],
+                          [-1., -1., -1.],
+                          [259., 5., 5.],
+                          [-1., -1., -1.],
+                          [841., 17., 0.],
+                          [-1., -1., -1.],
+                          [-1., -1., -1.],
+                          [-1., -1., -1.],
+                          [-1., -1., -1.],
+                          [147., 3., 12.]]])
+
+        r = jnp.array([0, 1, 0, 0])
+        assert jnp.all(jnp.isclose(zeillinger_fn(pts), r))
 
     def test_agent(self):
         obs = jnp.array([
@@ -238,8 +274,8 @@ class TestJAX(unittest.TestCase):
         host_wrapper = PolicyWrapper(jax.random.PRNGKey(0), (2, spec[0] * spec[1]), nnet)
         host_policy = host_wrapper.get_policy()
         reward_fn = get_reward_fn('host')
-        recurrent_fn = get_recurrent_fn_for_role('host', host_policy, choose_first_agent_fn, reward_fn,
-                                                 spec, dtype=jnp.float32)
+        recurrent_fn = get_recurrent_fn_for_role('host', host_policy, partial(choose_first_agent_fn, spec=spec),
+                                                 reward_fn, spec, dtype=jnp.float32)
         print(recurrent_fn(None, None, host_actions, host_obs))
         # Test agent `recurrent_fn`
         obs_preprocess, coords_preprocess = get_preprocess_fns('host', spec)
@@ -247,41 +283,102 @@ class TestJAX(unittest.TestCase):
         agent_wrapper = PolicyWrapper(jax.random.PRNGKey(0), (2, spec[0] * spec[1]), nnet)
         agent_policy = agent_wrapper.get_policy()
         reward_fn = get_reward_fn('agent')
+
         def zeillinger_fn_flatten(obs): return zeillinger_fn(obs_preprocess(obs))
+
         recurrent_fn = get_recurrent_fn_for_role('agent', agent_policy, zeillinger_fn_flatten, reward_fn,
                                                  spec, dtype=jnp.float32)
         print(recurrent_fn(None, None, agent_actions, agent_obs))
 
     def test_mcts_search(self):
         key = jax.random.PRNGKey(42)
+        seed = 4242
         batch_size, max_num_points, dimension = 2, 4, 3
         spec = (max_num_points, dimension)
         points = rescale_jax(get_newton_polytope_jax(
-            jax.random.randint(key, (batch_size, max_num_points, dimension), 0, 20).astype(jnp.float32)))\
-            .reshape(batch_size, -1)
-        root = mctx.RootFnOutput(
-            prior_logits=jnp.array([[0] * (2 ** dimension - dimension - 1)] * batch_size, dtype=jnp.float32),
-            value=jnp.array([0] * batch_size, dtype=jnp.float32),
-            embedding=points)
-        nnet = DResNet18(4 + 1)
-        host_wrapper = PolicyWrapper(jax.random.PRNGKey(0), (batch_size, spec[0] * spec[1]), nnet)
-        host_policy = host_wrapper.get_policy()
-        reward_fn = get_reward_fn('host')
-        recurrent_fn = get_recurrent_fn_for_role('host', host_policy, choose_first_agent_fn, reward_fn,
-                                                 spec, dtype=jnp.float32)
+            jax.random.randint(key, (batch_size, max_num_points, dimension), 0, 20).astype(jnp.float32)))
 
-        policy_output = mctx.gumbel_muzero_policy(
-            params=(),
+        # host
+        action_dim = 2 ** dimension - dimension - 1
+        nnet = DResNetMini(action_dim + 1)
+        host_wrapper = PolicyWrapper(jax.random.PRNGKey(seed), (batch_size, spec[0] * spec[1]), nnet)
+        host_policy = jax.jit(host_wrapper.get_policy())
+        reward_fn = get_reward_fn('host')
+        recurrent_fn = get_recurrent_fn_for_role('host', host_policy, partial(choose_first_agent_fn, spec=spec),
+                                                 reward_fn, spec, dtype=jnp.float32)
+        state = flatten(points)
+        muzero = jax.jit(partial(mctx.gumbel_muzero_policy, params=(), recurrent_fn=recurrent_fn, num_simulations=100,
+                                 max_depth=200, max_num_considered_actions=10))
+        root = mctx.RootFnOutput(
+            prior_logits=jnp.array([[0] * (action_dim)] * batch_size, dtype=jnp.float32),
+            value=jnp.array([0] * batch_size, dtype=jnp.float32),
+            embedding=state)
+        policy_output = muzero(
             rng_key=key,
             root=root,
-            recurrent_fn=recurrent_fn,
-            num_simulations=10,
-            max_depth=20,
-            max_num_considered_actions=10,
-            invalid_actions=(jnp.array([jnp.arange(4) != 3] * batch_size)).astype(jnp.int32)
         )
 
         print(policy_output)
+
+        # agent
+        action_dim = dimension
+        del nnet
+        nnet = DResNetMini(action_dim + 1)
+        agent_wrapper = PolicyWrapper(jax.random.PRNGKey(seed), (batch_size, spec[0] * spec[1] + spec[1]), nnet)
+        agent_policy = jax.jit(apply_agent_action_mask(agent_wrapper.get_policy(), dimension))
+        obs_preprocess, coords_preprocess = get_preprocess_fns('host', spec)
+        reward_fn = get_reward_fn('agent')
+
+        def zeillinger_fn_flatten(obs): return zeillinger_fn(obs_preprocess(obs))
+
+        recurrent_fn = get_recurrent_fn_for_role('agent', agent_policy, zeillinger_fn_flatten, reward_fn, spec,
+                                                 dtype=jnp.float32)
+        batch_decode_from_one_hot = get_batch_decode_from_one_hot(3)
+        state = make_agent_obs(flatten(points), batch_decode_from_one_hot(zeillinger_fn(points)))
+        muzero = jax.jit(partial(mctx.gumbel_muzero_policy, params=(), recurrent_fn=recurrent_fn, num_simulations=10,
+                                 max_depth=200, max_num_considered_actions=10))
+        root = mctx.RootFnOutput(
+            prior_logits=jnp.array([[0] * (action_dim)] * batch_size, dtype=jnp.float32),
+            value=jnp.array([0] * batch_size, dtype=jnp.float32),
+            embedding=state)
+        policy_output = muzero(
+            rng_key=key,
+            root=root,
+        )
+
+        print(policy_output)
+
+        # test agent action mask
+        tree = policy_output.search_tree
+        # Make sure those that are visited do not have -jnp.inf policy prior
+        assert jnp.all(~jnp.isneginf(tree.children_prior_logits) | (tree.children_visits == 0))
+
+    def test_simulation(self):
+        # simulation functions and evaluation loop functions are just wrappers of expanding/simulating process
+        batch_size, max_num_points, dimension = 10, 10, 3
+        spec = (max_num_points, dimension)
+
+        key = jax.random.PRNGKey(42)
+        key, policy_key = jax.random.split(key)
+
+        config = {'eval_batch_size': batch_size,
+                  'max_num_points': max_num_points,
+                  'dimension': dimension,
+                  'max_value': 20,
+                  'scale_observation': True}
+
+        action_dim = 2 ** dimension - dimension - 1
+        nnet = DResNetMini(action_dim + 1)
+        host_wrapper = PolicyWrapper(policy_key, (batch_size, spec[0] * spec[1]), nnet)
+        host_policy = jax.jit(host_wrapper.get_policy())
+        reward_fn = get_reward_fn('host')
+
+        eval_loop = get_evaluation_loop('host', host_policy, partial(choose_first_agent_fn, spec=spec), reward_fn,
+                                        spec=spec, num_simulations=10, max_depth=10, max_num_considered_actions=10)
+
+        sim = get_single_thread_simulation(key, eval_loop, rollout_size=100, config=config, dtype=jnp.float32)
+
+        print(sim())
 
     def test_jax_util(self):
         obs = jnp.ones((32, 60), dtype=jnp.float32)
@@ -311,7 +408,3 @@ class TestJAX(unittest.TestCase):
             flatten(
                 get_newton_polytope_jax(
                     shift_jax(host_obs, agent_obs['coords'], jnp.ones(2, dtype=jnp.float32)))) == out)
-
-
-
-

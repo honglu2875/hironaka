@@ -1,3 +1,4 @@
+from contextlib import suppress
 from functools import partial
 from typing import Callable, Tuple
 
@@ -5,6 +6,8 @@ import chex
 import mctx
 import jax
 import jax.numpy as jnp
+from jax import jit
+import time
 
 from hironaka.jax.util import make_agent_obs, get_dones, get_take_actions, get_preprocess_fns, get_batch_decode, \
     get_batch_decode_from_one_hot
@@ -12,7 +15,7 @@ from hironaka.src import rescale_jax, get_newton_polytope_jax, shift_jax
 
 
 def get_recurrent_fn_for_role(role: str, role_fn: Callable, opponent_action_fn: Callable, reward_fn: Callable,
-                              spec: Tuple[int, int], dtype=jnp.float32, rescale_points=True):
+                              spec: Tuple[int, int], discount=0.99, dtype=jnp.float32, rescale_points=True) -> Callable:
     """
     The factory function for the recurrent_fn corresponding to a role (host or agent).
     Parameters:
@@ -20,13 +23,11 @@ def get_recurrent_fn_for_role(role: str, role_fn: Callable, opponent_action_fn: 
         role_fn: the Callable that produces policy and value corresponding to the player under evaluation.
          - parameters:
             observations: jnp.ndarray
-            spec: (max_num_points, dimension)
-         - returns: Tuple of policy_prior, policy_value
+         - returns: Tuple of policy_prior, value_prior
         opponent_action_fn: A fixed Callable represents the enemy. It takes an action in response to the `role_fn`,
             but no policy prior and value are generated.
          - parameters:
             observations: jnp.ndarray
-            spec: (max_num_points, dimension)
          - returns: a batch of one-hot vectors of host/agent actions
         reward_fn: A fixed Callable returning the rewards according to whether the game has ended.
          - parameters:
@@ -34,18 +35,13 @@ def get_recurrent_fn_for_role(role: str, role_fn: Callable, opponent_action_fn: 
             prev_dones, jnp.ndarray
          - returns: a batch of rewards
         spec: (max_num_points, dimension)
+        discount: (Optional) The discount value.
         dtype: (Optional) data type.
         rescale_points: (Optional) whether rescaling the points after shifting.
     Returns:
         the `recurrent_fn` under the given spec.
     """
     obs_preprocess, coords_preprocess = get_preprocess_fns(role, spec)
-
-    # Make `spec` argument static if exists.
-    if 'spec' in role_fn.__code__.co_varnames:
-        role_fn = partial(role_fn, spec=spec)
-    if 'spec' in opponent_action_fn.__code__.co_varnames:
-        opponent_action_fn = partial(opponent_action_fn, spec=spec)
 
     if role == 'host':
         def first_obs_update(x, y, z): return x
@@ -87,12 +83,14 @@ def get_recurrent_fn_for_role(role: str, role_fn: Callable, opponent_action_fn: 
 
         dones = get_dones(obs_preprocess(next_observations))
         rewards = reward_fn(dones, prev_dones)
-        policy_prior, policy_value = role_fn(obs_preprocess(next_observations))
+
+        policy_prior, value_prior = role_fn(next_observations)
+
         recurrent_fn_output = mctx.RecurrentFnOutput(
             reward=rewards,
-            discount=jnp.array([1.0] * batch_size, dtype=dtype),
+            discount=jnp.array([discount] * batch_size, dtype=dtype),
             prior_logits=policy_prior,
-            value=policy_value)
+            value=value_prior)
         return recurrent_fn_output, next_observations
 
     return recurrent_fn
