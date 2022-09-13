@@ -5,7 +5,6 @@ We break down component into (factory) functions included in:
  - [.players](players.py)
  - [.recurrent_fn](recurrent_fn.py)
  - [.simulation_fn](simulation_fn.py)
- - [.training_loop](training_loop.py)
  - [.util](util.py)
 
 and package the whole process in the class [`JAXTrainer`](JAXTrainer.py). But feel free to use the functions for fine-grained modifications. 
@@ -41,9 +40,6 @@ As one might notice, the first two are provided by the policy network (in neural
 
 ## .simulation_fn
 This provides functions to simulate from the root and generate roll-outs.
-
-## .training_loop
-This provides functions to collect roll-outs and improve our neural networks.
 
 ## .JAXTrainer
 This is a package of all the above by initialize based on a config file (like `jax_config.yml` as an example), spawn evaluation workers, simulation workers and training workers to complete the whole process.

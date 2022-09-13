@@ -18,7 +18,7 @@ from hironaka.jax.util import flatten, make_agent_obs, get_take_actions, get_rew
     get_batch_decode, get_preprocess_fns, apply_agent_action_mask
 
 from hironaka.src import get_newton_polytope_torch, shift_torch, reposition_torch, remove_repeated
-from hironaka.src._jax_ops import get_newton_polytope_jax, shift_jax, rescale_jax, reposition_jax
+from hironaka.src import get_newton_polytope_jax, shift_jax, rescale_jax, reposition_jax
 
 
 class TestJAX(unittest.TestCase):
@@ -140,6 +140,7 @@ class TestJAX(unittest.TestCase):
         pts.rescale()
         assert jnp.all(jnp.isclose(pts.points, self.rs))
 
+    # JAXObs class was deprecated. It was used to hold both host and agent observations.
     """
     def test_jax_obs(self):
         host_obs = jnp.array([
@@ -272,23 +273,23 @@ class TestJAX(unittest.TestCase):
         # Test host `recurrent_fn`
         nnet = DResNet18(4 + 1)
         host_wrapper = PolicyWrapper(jax.random.PRNGKey(0), (2, spec[0] * spec[1]), nnet)
-        host_policy = host_wrapper.get_policy()
+        host_policy = host_wrapper.get_apply_fn()
         reward_fn = get_reward_fn('host')
         recurrent_fn = get_recurrent_fn_for_role('host', host_policy, partial(choose_first_agent_fn, spec=spec),
                                                  reward_fn, spec, dtype=jnp.float32)
-        print(recurrent_fn(None, None, host_actions, host_obs))
+        print(recurrent_fn(((host_wrapper.parameters,), ()), None, host_actions, host_obs))
         # Test agent `recurrent_fn`
         obs_preprocess, coords_preprocess = get_preprocess_fns('host', spec)
         nnet = DResNet18(3 + 1)
         agent_wrapper = PolicyWrapper(jax.random.PRNGKey(0), (2, spec[0] * spec[1] + spec[1]), nnet)
-        agent_policy = agent_wrapper.get_policy()
+        agent_policy = agent_wrapper.get_apply_fn()
         reward_fn = get_reward_fn('agent')
 
         def zeillinger_fn_flatten(obs): return zeillinger_fn(obs_preprocess(obs))
 
         recurrent_fn = get_recurrent_fn_for_role('agent', agent_policy, zeillinger_fn_flatten, reward_fn,
                                                  spec, dtype=jnp.float32)
-        print(recurrent_fn(None, None, agent_actions, agent_obs))
+        print(recurrent_fn(((agent_wrapper.parameters,), ()), None, agent_actions, agent_obs))
 
     def test_mcts_search(self):
         key = jax.random.PRNGKey(42)
@@ -302,18 +303,19 @@ class TestJAX(unittest.TestCase):
         action_dim = 2 ** dimension - dimension - 1
         nnet = DResNetMini(action_dim + 1)
         host_wrapper = PolicyWrapper(jax.random.PRNGKey(seed), (batch_size, spec[0] * spec[1]), nnet)
-        host_policy = jax.jit(host_wrapper.get_policy())
+        host_policy = jax.jit(host_wrapper.get_apply_fn())
         reward_fn = get_reward_fn('host')
         recurrent_fn = get_recurrent_fn_for_role('host', host_policy, partial(choose_first_agent_fn, spec=spec),
                                                  reward_fn, spec, dtype=jnp.float32)
         state = flatten(points)
-        muzero = jax.jit(partial(mctx.gumbel_muzero_policy, params=(), recurrent_fn=recurrent_fn, num_simulations=100,
+        muzero = jax.jit(partial(mctx.gumbel_muzero_policy, recurrent_fn=recurrent_fn, num_simulations=100,
                                  max_depth=200, max_num_considered_actions=10))
         root = mctx.RootFnOutput(
             prior_logits=jnp.array([[0] * (action_dim)] * batch_size, dtype=jnp.float32),
             value=jnp.array([0] * batch_size, dtype=jnp.float32),
             embedding=state)
         policy_output = muzero(
+            params=((host_wrapper.parameters,), ()),
             rng_key=key,
             root=root,
         )
@@ -325,7 +327,7 @@ class TestJAX(unittest.TestCase):
         del nnet
         nnet = DResNetMini(action_dim + 1)
         agent_wrapper = PolicyWrapper(jax.random.PRNGKey(seed), (batch_size, spec[0] * spec[1] + spec[1]), nnet)
-        agent_policy = jax.jit(apply_agent_action_mask(agent_wrapper.get_policy(), dimension))
+        agent_policy = jax.jit(apply_agent_action_mask(agent_wrapper.get_apply_fn(), dimension))
         obs_preprocess, coords_preprocess = get_preprocess_fns('host', spec)
         reward_fn = get_reward_fn('agent')
 
@@ -335,13 +337,14 @@ class TestJAX(unittest.TestCase):
                                                  dtype=jnp.float32)
         batch_decode_from_one_hot = get_batch_decode_from_one_hot(3)
         state = make_agent_obs(flatten(points), batch_decode_from_one_hot(zeillinger_fn(points)))
-        muzero = jax.jit(partial(mctx.gumbel_muzero_policy, params=(), recurrent_fn=recurrent_fn, num_simulations=10,
+        muzero = jax.jit(partial(mctx.gumbel_muzero_policy, recurrent_fn=recurrent_fn, num_simulations=10,
                                  max_depth=200, max_num_considered_actions=10))
         root = mctx.RootFnOutput(
             prior_logits=jnp.array([[0] * (action_dim)] * batch_size, dtype=jnp.float32),
             value=jnp.array([0] * batch_size, dtype=jnp.float32),
             embedding=state)
         policy_output = muzero(
+            params=((agent_wrapper.parameters,), ()),
             rng_key=key,
             root=root,
         )
@@ -370,15 +373,15 @@ class TestJAX(unittest.TestCase):
         action_dim = 2 ** dimension - dimension - 1
         nnet = DResNetMini(action_dim + 1)
         host_wrapper = PolicyWrapper(policy_key, (batch_size, spec[0] * spec[1]), nnet)
-        host_policy = jax.jit(host_wrapper.get_policy())
+        host_policy = jax.jit(host_wrapper.get_apply_fn())
         reward_fn = get_reward_fn('host')
 
         eval_loop = get_evaluation_loop('host', host_policy, partial(choose_first_agent_fn, spec=spec), reward_fn,
-                                        spec=spec, num_simulations=10, max_depth=10, max_num_considered_actions=10)
+                                        spec=spec, num_evaluations=10, max_depth=10, max_num_considered_actions=10,
+                                        rescale_points=True)
 
-        sim = get_single_thread_simulation(key, eval_loop, rollout_size=100, config=config, dtype=jnp.float32)
-
-        print(sim())
+        sim = get_single_thread_simulation('host', eval_loop, rollout_size=100, config=config, dtype=jnp.float32)
+        sim(key, role_fn_args=(host_wrapper.parameters,), opponent_fn_args=())
 
     def test_jax_util(self):
         obs = jnp.ones((32, 60), dtype=jnp.float32)

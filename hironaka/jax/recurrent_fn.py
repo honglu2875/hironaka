@@ -1,4 +1,3 @@
-from contextlib import suppress
 from functools import partial
 from typing import Callable, Tuple
 
@@ -23,11 +22,13 @@ def get_recurrent_fn_for_role(role: str, role_fn: Callable, opponent_action_fn: 
         role_fn: the Callable that produces policy and value corresponding to the player under evaluation.
          - parameters:
             observations: jnp.ndarray
+            *args: any other arguments
          - returns: Tuple of policy_prior, value_prior
         opponent_action_fn: A fixed Callable represents the enemy. It takes an action in response to the `role_fn`,
             but no policy prior and value are generated.
          - parameters:
             observations: jnp.ndarray
+            *args: any other arguments
          - returns: a batch of one-hot vectors of host/agent actions
         reward_fn: A fixed Callable returning the rewards according to whether the game has ended.
          - parameters:
@@ -59,7 +60,9 @@ def get_recurrent_fn_for_role(role: str, role_fn: Callable, opponent_action_fn: 
         raise ValueError(f"role must be either 'host' or 'agent'. Got {role}.")
 
     def recurrent_fn(params, key, actions: jnp.ndarray, observations: jnp.ndarray):
-        del params, key
+        del key
+        role_fn_args, opponent_fn_args = params
+
         batch_size = observations.shape[0]
         # If the role is host, discrete actions must be converted to multi-binary arrays.
         # E.g., dimension=3, [2, 3] -> [[0, 1, 1], [1, 1, 1]]
@@ -75,16 +78,15 @@ def get_recurrent_fn_for_role(role: str, role_fn: Callable, opponent_action_fn: 
 
         # The enemy observes the `updated_obs` and `actions`, and makes a decision on its actions
         opponent_actions = opponent_action_preprocess(
-            opponent_action_fn(make_opponent_obs(updated_obs, actions).astype(dtype)))
+            opponent_action_fn(make_opponent_obs(updated_obs, actions).astype(dtype)), *opponent_fn_args)
 
         # If host, `second_obs_update` takes an action (shift->newton polytope->rescale) and returns flattened obs
         # If agent, `second_obs_update` concatenates `updated_obs` and `opponent_actions` and returns flattened obs
         next_observations = second_obs_update(updated_obs, actions, opponent_actions).astype(dtype)
-
         dones = get_dones(obs_preprocess(next_observations))
         rewards = reward_fn(dones, prev_dones)
 
-        policy_prior, value_prior = role_fn(next_observations)
+        policy_prior, value_prior = role_fn(next_observations, *role_fn_args)
 
         recurrent_fn_output = mctx.RecurrentFnOutput(
             reward=rewards,
