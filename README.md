@@ -2,12 +2,23 @@
 
 # Hironaka
 
-A utility package for a reinforcement learning study of Hironaka's polyhedra game of local uniformization and its
-variation problems. Hironaka's polyhedra game is the basic model of a family of 2-player games equivalent to a range of algebraic geometry problems related to local uniformization and resolution of singularities. 
+A utility package for a reinforcement learning study of singularities in algebraic geometry.  Resolution of singularities is a central problem in mathematics: it helps us to reduce questions to smooth objects, whose points behave better.
+
+In 1964 Hironaka proved that it was possible to resolve singularities of varieties over fields of characteristic 0 by repeatedly blowing up along non-singular subvarieties, using a very complicated argument by induction on the dimension. Simplified versions of his formidable proof were given by several people, including Bierstone, Milman & 1991-97, Villamayor (1992), Encinas & Villamayor (1998), Encinas & Hauser (2002), Wlodarczyk (2005), Kollár (2007) and Abramovich & Tempkin & Wlodarchyk (2019). 
+
+Any resolution provides a blow-up graph, which is a rooted tree labelled by clusters of variables. This tree is not unique; its size and complexity highly depend on some choices. Our knowledge about this complexity is very limited.
 
 ***What we aim to do***: 
 
 - TL;DR, a winning strategy of a game is [a resolution of certain singular point](what-is-a-resolution-of-singularity) in a high dimensional space. We want to use reinforcement learning to effectively win the game, thus effectively resolving singularities and solving a certain range of algebraic geometry problems.
+
+
+The ultimate goal of our Hironaka project is to
+Study the complexity of resolution trees, and find optimal resolutions using RL
+Calculate invariants of singularities from their resolution trees
+Attack the Classification Problem: compare singularities and understand their hierarchy based on their resolution trees.
+Apply this in classical conjectures in enumerative geometry: Thom polynomials, Hilbert scheme of points (see details below).
+This project grew up from an attempt to understand the resolution trees in \cite{}. Any such tree gives a formula for Thom polynomials and answers a classical question by Thom from 1960.
 
 # Quick start
 
