@@ -10,15 +10,14 @@ Any resolution provides a blow-up graph, which is a rooted tree labelled by clus
 
 ***What we aim to do***: 
 
-- TL;DR, a winning strategy of a game is [a resolution of certain singular point](what-is-a-resolution-of-singularity) in a high dimensional space. We want to use reinforcement learning to effectively win the game, thus effectively resolving singularities and solving a certain range of algebraic geometry problems.
+- TL;DR, a winning strategy of a game is [a resolution of certain singular point](what-is-a-resolution-of-singularity) in a high dimensional space. Use reinforcement learning to win the game => resolving singularities and solving a range of algebraic geometry problems.
 
 
 The ultimate goal of our Hironaka project is to
-Study the complexity of resolution trees, and find optimal resolutions using RL
-Calculate invariants of singularities from their resolution trees
-Attack the Classification Problem: compare singularities and understand their hierarchy based on their resolution trees.
-Apply this in classical conjectures in enumerative geometry: Thom polynomials, Hilbert scheme of points (see details below).
-This project grew up from an attempt to understand the resolution trees in \cite{}. Any such tree gives a formula for Thom polynomials and answers a classical question by Thom from 1960.
+study the complexity of resolution trees, and find optimal resolutions using Reinforcement Learning. We
+calculate invariants of singularities from their resolution trees and attack the classification problem by comparing singularities and understanding their hierarchies based on their resolution trees.
+We hope to apply this to classical conjectures of enumerative geometry: Thom polynomials, Hilbert scheme of points (see details below).
+This project grew out of an attempt to understand the resolution trees in [2]. Any such tree gives a formula for Thom polynomials and answers a classical question by Thom from 1960.
 
 # Quick start
 
