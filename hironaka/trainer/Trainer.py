@@ -391,15 +391,23 @@ class Trainer(abc.ABC):
             setattr(self, key, saved[key])
 
     @classmethod
-    def load(cls, path: str, device_num: int = 0, use_cuda_ids: List[int] = None):
+    def load(cls, path: str, **kwargs):
         """
         Load from the model-config dict and reconstruct the Trainer object.
         """
         saved = torch.load(path)
-        new_trainer = cls(saved['config'], device_num=device_num,
-                          host_net=saved['host_net'], agent_net=saved['agent_net'],
-                          reward_func=saved.get('reward_func'), point_cls=saved.get('point_cls', TensorPoints),
-                          dtype=saved.get('dtype', torch.float32), use_cuda_ids=use_cuda_ids)
+        param = {'device_num': 0,
+                 'host_net': saved['host_net'],
+                 'agent_net': saved['agent_net'],
+                 'reward_func': saved.get('reward_func'),
+                 'point_cls': saved.get('point_cls', TensorPoints),
+                 'dtype': saved.get('dtype', torch.float32),
+                 'use_cuda_ids': None}
+        # Override the parameter if specified
+        for key in param:
+            if key in kwargs:
+                param[key] = kwargs[key]
+        new_trainer = cls(saved['config'], **param)
         return new_trainer
 
     @abc.abstractmethod
@@ -485,7 +493,7 @@ class Trainer(abc.ABC):
             head = head_cls(input_dim)
             input_dim = head.feature_dim
 
-            if len(self.use_cuda_ids) > 1:
+            if len(self.use_cuda_ids) > 1 and not isinstance(pretrained_net, DummyModule):
                 net = DataParallel(self._create_network(head, net_arch, input_dim, output_dim),
                                    self.use_cuda_ids)
             else:
