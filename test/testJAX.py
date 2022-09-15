@@ -378,7 +378,7 @@ class TestJAX(unittest.TestCase):
 
         eval_loop = get_evaluation_loop('host', host_policy, partial(choose_first_agent_fn, spec=spec), reward_fn,
                                         spec=spec, num_evaluations=10, max_depth=10, max_num_considered_actions=10,
-                                        rescale_points=True)
+                                        discount=0.99, rescale_points=True)
 
         sim = get_single_thread_simulation('host', eval_loop, rollout_size=100, config=config, dtype=jnp.float32)
         sim(key, role_fn_args=(host_wrapper.parameters,), opponent_fn_args=())

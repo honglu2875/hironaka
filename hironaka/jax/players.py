@@ -25,7 +25,8 @@ sub_2_2 = vmap(vmap(jnp.subtract, (None, 0), 0), (0, None), 0)  # (n, d) - (m, d
 # ---------- Host functions ---------- #
 
 
-def random_host_fn(pts: jnp.ndarray, key=jnp.array([0, 0]), dtype=jnp.float32, **kwargs) -> jnp.ndarray:
+def random_host_fn(pts: jnp.ndarray, key=jnp.array([0, 0], dtype=jnp.uint32),
+                   dtype=jnp.float32, **kwargs) -> jnp.ndarray:
     """
     Parameters:
         pts: points (batch_size, max_num_points, dimension)
@@ -120,7 +121,8 @@ def get_host_with_flattened_obs(spec, func, dtype=jnp.float32) -> Callable:
 # ---------- Agent functions ---------- #
 
 @partial(jit, static_argnames=['spec', 'dtype'])
-def random_agent_fn(pts: jnp.ndarray, spec: Tuple, key=jnp.array([0, 0]), dtype=jnp.float32, **kwargs) -> jnp.ndarray:
+def random_agent_fn(pts: jnp.ndarray, spec: Tuple, key=jnp.array([0, 0], dtype=jnp.uint32),
+                    dtype=jnp.float32, **kwargs) -> jnp.ndarray:
     """
     Parameters:
         pts: flattened and concatenated points (batch_size, max_num_points * dimension + dimension)
