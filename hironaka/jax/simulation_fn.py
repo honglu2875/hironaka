@@ -15,7 +15,8 @@ from .util import flatten
 
 def get_evaluation_loop(role: str, policy_fn: Callable, opponent_fn: Callable, reward_fn: Callable,
                         spec: Tuple, num_evaluations: int, max_depth: int,
-                        max_num_considered_actions: int, rescale_points: bool, dtype=jnp.float32) -> Callable:
+                        max_num_considered_actions: int, discount: float, rescale_points: bool,
+                        dtype=jnp.float32) -> Callable:
     """
     The factory function of `evaluation_loop` which creates a new node and do one single (batched) MCTS search using
         Gumbel MuZero policy.
@@ -34,6 +35,7 @@ def get_evaluation_loop(role: str, policy_fn: Callable, opponent_fn: Callable, r
          - returns: a batch of rewards
         spec: (max_num_points, dimension)
         num_evaluations: number of evaluations to run in a tree search.
+        discount: the discount factor.
         max_depth: maximal depth of the MCTS tree.
         max_num_considered_actions: The maximum number of actions expanded at the root.
         rescale_points: Whether to rescale the point.
@@ -46,7 +48,7 @@ def get_evaluation_loop(role: str, policy_fn: Callable, opponent_fn: Callable, r
     """
     # Create the `recurrent_fn`
     recurrent_fn = get_recurrent_fn_for_role(role, policy_fn, opponent_fn, reward_fn, spec,
-                                             rescale_points=rescale_points, dtype=dtype)
+                                             discount=discount, rescale_points=rescale_points, dtype=dtype)
     # Compile the Gumbel MuZero policy function with parameters
     muzero = jax.jit(partial(mctx.gumbel_muzero_policy, recurrent_fn=recurrent_fn,
                              num_simulations=num_evaluations, max_depth=max_depth,
@@ -114,9 +116,14 @@ def get_single_thread_simulation(role: str, evaluation_loop: Callable, rollout_s
                                             role_fn_args=role_fn_args, opponent_fn_args=opponent_fn_args)
 
             obs, policy, value = rollouts
-            obs = lax.dynamic_update_slice(obs, state, (i * eval_batch_size, 0))
-            policy = lax.dynamic_update_slice(policy, policy_output.action_weights, (i * eval_batch_size, 0))
-            value = lax.dynamic_update_slice(value, policy_output.search_tree.node_values[:, 0], (i * eval_batch_size,))
+            current_obs, current_policy, current_value = \
+                state.reshape(eval_batch_size, 1, input_dim), \
+                policy_output.action_weights.reshape(eval_batch_size, 1, action_num), \
+                policy_output.search_tree.node_values[:, 0].reshape(eval_batch_size, 1)
+
+            obs = lax.dynamic_update_slice(obs, current_obs, (0, i, 0))
+            policy = lax.dynamic_update_slice(policy, current_policy, (0, i, 0))
+            value = lax.dynamic_update_slice(value, current_value, (0, i))
 
             action_idx = jnp.take_along_axis(policy_output.search_tree.children_index[:, 0, :],
                                              policy_output.action[:, None], axis=1)
@@ -128,23 +135,16 @@ def get_single_thread_simulation(role: str, evaluation_loop: Callable, rollout_s
         num_loops = ((rollout_size + eval_batch_size - 1) // eval_batch_size)
 
         # `fori_loop` must return tracers of exactly the same shape
-        rollout_obs_init = jnp.zeros((eval_batch_size * num_loops, input_dim))
-        rollout_policy_init = jnp.zeros((eval_batch_size * num_loops, action_num))
-        rollout_value_init = jnp.zeros((eval_batch_size * num_loops,))
+        rollout_obs_init = jnp.zeros((eval_batch_size, num_loops, input_dim))
+        rollout_policy_init = jnp.zeros((eval_batch_size, num_loops, action_num))
+        rollout_value_init = jnp.zeros((eval_batch_size, num_loops,))
 
-        _, experiences, _ = lax.fori_loop(0, num_loops, body_fn,
+        _, rollouts, _ = lax.fori_loop(0, num_loops, body_fn,
                                           (starting_keys, (rollout_obs_init,
                                                            rollout_policy_init,
                                                            rollout_value_init), root_state))
-        """
-        keys_and_state = (starting_keys, (rollout_obs_init, rollout_policy_init, rollout_value_init), root_state)
-        for i in range(num_loops):
-            #print(keys_and_state)
-            keys_and_state = body_fn(i, keys_and_state)
-        _, rollouts, _ = keys_and_state
-        """
-        rollout_obs, rollout_policy_prior, rollout_value_prior = experiences
-        return jnp.array(rollout_obs), jnp.array(rollout_policy_prior), jnp.array(rollout_value_prior)
+
+        return rollouts
 
     return single_thread_simulation
 

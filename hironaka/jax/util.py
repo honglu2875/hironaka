@@ -81,6 +81,7 @@ def get_take_actions(role: str, spec: Tuple[int, int], rescale_points: bool = Tr
         role == 'host',
             points = observations
             coords = actions
+            axis = axis
         role == 'agent',
             jnp.concatenate((points, coords), axis=1) is the observation (need to slice it up)
             (actions is not used but the best practice is to keep actions==axis)
@@ -124,7 +125,7 @@ def get_reward_fn(role: str) -> Callable:
 @jit
 def extra_features(role: str, observations: jnp.ndarray) -> jnp.ndarray:
     """
-    Given a role and an observation, return an extra array of shape (batch_size, *) as an extra set of features.
+    TODO: Given a role and an observation, return an extra array of shape (batch_size, *) as an extra set of features.
     """
     return None
 
@@ -133,26 +134,35 @@ def apply_agent_action_mask(agent_policy: Callable, dimension: int) -> Callable:
     """
     Apply a masked agent policy wrapper on top of an `agent_policy` function.
     """
-    def masked_agent_policy(x: jnp.ndarray, *args) -> Tuple:
+    def masked_agent_policy(x: jnp.ndarray, *args, **kwargs) -> Tuple:
         batch_size, feature_num = x.shape
         mask = lax.dynamic_slice(x, (0, feature_num - dimension), (batch_size, dimension)) > 0.5
-        policy_prior, value_prior = agent_policy(x, *args)
+        policy_prior, value_prior = agent_policy(x, *args, **kwargs)
         return policy_prior * mask - jnp.inf * (~mask), value_prior
-
+    setattr(masked_agent_policy, '__name__', get_name(agent_policy))
     return masked_agent_policy
 
 
-def action_wrapper(policy_value_fn: Callable, dimension) -> Callable:
+def action_wrapper(policy_value_fn: Callable, dimension: int) -> Callable:
     """
-    Turns a policy function (returning (policy_logits, value)) into an function that returns one-hot actions.
+    Turns a policy function (returning (policy_logits, value)) into a function that returns one-hot actions.
     """
     masked_action = policy_value_fn if dimension is None else apply_agent_action_mask(policy_value_fn, dimension)
 
-    def wrapped_action_fn(x: jnp.ndarray) -> jnp.ndarray:
-        out, _ = masked_action(x)
+    def wrapped_action_fn(x: jnp.ndarray, *args, **kwargs) -> jnp.ndarray:
+        out, _ = masked_action(x, *args, **kwargs)
         action_dim = out.shape[1]
         return jax.nn.one_hot(jnp.argmax(out, axis=1), action_dim)
+    setattr(wrapped_action_fn, '__name__', get_name(policy_value_fn))
     return wrapped_action_fn
+
+
+def get_name(obj):
+    if hasattr(obj, '__name__'):
+        return obj.__name__
+    elif hasattr(obj, 'func'):  # wrapped by `partial`
+        return get_name(obj.func)
+
 
 # ---------- Encode/decode host actions ---------- #
 
@@ -259,7 +269,7 @@ batch_encode_one_hot = vmap(encode_one_hot, 0, 0)
 
 def compute_loss(params, apply_fn, sample, loss_fn) -> jnp.ndarray:
     obs, target_policy_logits, target_value = sample
-    policy_logits, value = apply_fn(params, obs)
+    policy_logits, value = apply_fn(obs, params)
     return loss_fn(policy_logits, value, target_policy_logits, target_value)
 
 
@@ -268,7 +278,7 @@ def policy_value_loss(policy_logit: jnp.ndarray, value: jnp.ndarray,
     # Shapes:
     # policy_logit, target_policy: (B, action)
     # value_logit, target_value: (B,)
-    policy_loss = jnp.sum(-target_policy * jax.nn.log_softmax(policy_logit, axis=-1), axis=1)
+    policy_loss = jnp.sum(-jax.nn.softmax(target_policy, axis=-1) * jax.nn.log_softmax(policy_logit, axis=-1), axis=1)
     value_loss = jnp.square(value - target_value)
     return jnp.mean(policy_loss + value_loss)
 

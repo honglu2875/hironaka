@@ -78,7 +78,7 @@ def get_recurrent_fn_for_role(role: str, role_fn: Callable, opponent_action_fn: 
 
         # The enemy observes the `updated_obs` and `actions`, and makes a decision on its actions
         opponent_actions = opponent_action_preprocess(
-            opponent_action_fn(make_opponent_obs(updated_obs, actions).astype(dtype)), *opponent_fn_args)
+            opponent_action_fn(make_opponent_obs(updated_obs, actions).astype(dtype), *opponent_fn_args))
 
         # If host, `second_obs_update` takes an action (shift->newton polytope->rescale) and returns flattened obs
         # If agent, `second_obs_update` concatenates `updated_obs` and `opponent_actions` and returns flattened obs

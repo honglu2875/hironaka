@@ -97,6 +97,7 @@ class PolicyWrapper:
         if self.separate_policy_value_models:
             self.value_parameters = self.value_model.init(value_key, jnp.ones(self.input_shape))
 
+    '''
     def get_policy(self, new_batch_size=None) -> Callable:
         """
         Return a policy function that evaluates the input array using `self.parameters`.
@@ -113,6 +114,7 @@ class PolicyWrapper:
                 return apply_fn(self.parameters, x)
 
         return policy_fn
+    '''
 
     def get_apply_fn(self, new_batch_size=None) -> Callable:
         batch_size = new_batch_size if new_batch_size is not None else self.input_shape[0]
@@ -121,7 +123,7 @@ class PolicyWrapper:
         if self.separate_policy_value_models:
             raise NotImplementedError()
         else:
-            def apply_fn(x: jnp.ndarray, params) -> Tuple[jnp.ndarray, jnp.ndarray]:
+            def apply_fn(x: jnp.ndarray, params, **kwargs) -> Tuple[jnp.ndarray, jnp.ndarray]:
                 output = self.model.apply(params, x)
                 policy_logits = lax.dynamic_slice(output, (0, 0), (batch_size, logit_length - 1))
                 value_logits = jnp.ravel(lax.dynamic_slice(output, (0, logit_length - 1), (batch_size, 1)))

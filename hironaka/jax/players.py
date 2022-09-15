@@ -2,30 +2,30 @@
 Fixed Host and Agent policies are implemented as functions here.
 Most of them can be jitted once dtype is fixed using `partial` from functools.
 List of hosts:
-    random_host_fn(pts, key=0, dtype=jnp.float32)
-    all_coord_host_fn(pts, dtype=jnp.float32)
-    zeillinger_fn(pts, dtype=jnp.float32)
+    random_host_fn(pts, dtype=jnp.float32, key=jnp.array([0, 0]))
+    all_coord_host_fn(pts, dtype=jnp.float32, **kwargs)
+    zeillinger_fn(pts, dtype=jnp.float32, **kwargs)
 List of agents:
-    random_agent_fn(pts, spec, key=0, dtype=jnp.float32)
-    choose_first_agent_fn(pts, spec, dtype=jnp.float32)
-    choose_last_agent_fn(pts, spec, dtype=jnp.float32)
+    random_agent_fn(pts, spec, dtype=jnp.float32, key=jnp.array([0, 0]))
+    choose_first_agent_fn(pts, spec, dtype=jnp.float32, **kwargs)
+    choose_last_agent_fn(pts, spec, dtype=jnp.float32, **kwargs)
 """
 import time
 from functools import partial
-from typing import Tuple
+from typing import Tuple, Callable
 
 import jax
 from jax import vmap, lax, jit
 import jax.numpy as jnp
 
-from hironaka.jax.util import decode_table, _MAX_DIM, dec_table, encode_one_hot
+from hironaka.jax.util import decode_table, _MAX_DIM, dec_table, encode_one_hot, get_name
 
 sub_2_2 = vmap(vmap(jnp.subtract, (None, 0), 0), (0, None), 0)  # (n, d) - (m, d) -> (n, m, d) subtract each vector
 
 # ---------- Host functions ---------- #
 
 
-def random_host_fn(pts: jnp.ndarray, key=0, dtype=jnp.float32) -> jnp.ndarray:
+def random_host_fn(pts: jnp.ndarray, key=jnp.array([0, 0]), dtype=jnp.float32, **kwargs) -> jnp.ndarray:
     """
     Parameters:
         pts: points (batch_size, max_num_points, dimension)
@@ -35,14 +35,11 @@ def random_host_fn(pts: jnp.ndarray, key=0, dtype=jnp.float32) -> jnp.ndarray:
         host action as one-hot array.
     """
     batch_size, max_num_points, dimension = pts.shape
-    key = lax.cond(key == 0,
-                   lambda: jax.random.PRNGKey(time.time_ns()),
-                   lambda: jax.random.PRNGKey(key))
     cls_num = 2 ** dimension - dimension - 1
     return jax.nn.one_hot(jax.random.randint(key, (batch_size,), 0, cls_num), cls_num, dtype=dtype)
 
 
-def all_coord_host_fn(pts: jnp.ndarray, dtype=jnp.float32) -> jnp.ndarray:
+def all_coord_host_fn(pts: jnp.ndarray, dtype=jnp.float32, **kwargs) -> jnp.ndarray:
     """
     Parameters:
         pts: points (batch_size, max_num_points, dimension)
@@ -109,14 +106,21 @@ def zeillinger_fn_slice(pts: jnp.ndarray) -> jnp.ndarray:
                      jax.nn.one_hot(0, 2 ** d - d - 1))
 
 
-def zeillinger_fn(pts: jnp.ndarray, dtype=jnp.float32) -> jnp.ndarray:
+def zeillinger_fn(pts: jnp.ndarray, dtype=jnp.float32, **kwargs) -> jnp.ndarray:
     return vmap(zeillinger_fn_slice, 0, 0)(pts).astype(dtype)
+
+
+def get_host_with_flattened_obs(spec, func, dtype=jnp.float32) -> Callable:
+    def func_flatten(pts, dtype=dtype, **kwargs):
+        return func(pts.reshape(-1, *spec), dtype=dtype, **kwargs)
+    setattr(func_flatten, '__name__', get_name(func))
+    return func_flatten
 
 
 # ---------- Agent functions ---------- #
 
 @partial(jit, static_argnames=['spec', 'dtype'])
-def random_agent_fn(pts: jnp.ndarray, spec: Tuple, key=0, dtype=jnp.float32) -> jnp.ndarray:
+def random_agent_fn(pts: jnp.ndarray, spec: Tuple, key=jnp.array([0, 0]), dtype=jnp.float32, **kwargs) -> jnp.ndarray:
     """
     Parameters:
         pts: flattened and concatenated points (batch_size, max_num_points * dimension + dimension)
@@ -127,10 +131,6 @@ def random_agent_fn(pts: jnp.ndarray, spec: Tuple, key=0, dtype=jnp.float32) -> 
         agent action as one-hot array.
     """
     (max_num_points, dimension), batch_size = spec, pts.shape[0]
-    key = jnp.where(key == 0,
-                    jax.random.PRNGKey(time.time_ns()),
-                    jax.random.PRNGKey(key))
-
     return jax.nn.one_hot(jax.random.randint(key, (batch_size,), 0, dimension), dimension, dtype=dtype)
 
 
@@ -152,7 +152,7 @@ def choose_first_agent_fn_slice(pts: jnp.ndarray, spec: Tuple) -> jnp.ndarray:
 
 
 @partial(jit, static_argnames=['spec', 'dtype'])
-def choose_first_agent_fn(pts: jnp.ndarray, spec: Tuple, dtype=jnp.float32) -> jnp.ndarray:
+def choose_first_agent_fn(pts: jnp.ndarray, spec: Tuple, dtype=jnp.float32, **kwargs) -> jnp.ndarray:
     """
     Parameters:
         pts: flattened and concatenated points (batch_size, max_num_points * dimension + dimension)
@@ -183,7 +183,7 @@ def choose_last_agent_fn_slice(pts: jnp.ndarray, spec: Tuple) -> jnp.ndarray:
 
 
 @partial(jit, static_argnames=['spec', 'dtype'])
-def choose_last_agent_fn(pts: jnp.ndarray, spec: Tuple, dtype=jnp.float32) -> jnp.ndarray:
+def choose_last_agent_fn(pts: jnp.ndarray, spec: Tuple, dtype=jnp.float32, **kwargs) -> jnp.ndarray:
     """
     Parameters:
         pts: flattened and concatenated points (batch_size, max_num_points * dimension + dimension)
