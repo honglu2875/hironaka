@@ -97,7 +97,8 @@ def get_take_actions(role: str, spec: Tuple[int, int], rescale_points: bool = Tr
         points = obs_preprocess(observations)
         coords = coords_preprocess(observations, actions)
         shifted_pts = get_newton_polytope_jax(shift_jax(points, coords, axis))
-        return jnp.where(rescale_points, rescale_jax(shifted_pts), shifted_pts).reshape((-1, spec[0]*spec[1]))
+        maybe_rescaled = jnp.where(rescale_points, rescale_jax(shifted_pts), shifted_pts).reshape((-1, spec[0]*spec[1]))
+        return maybe_rescaled
     return take_actions
 
 
@@ -122,13 +123,17 @@ def get_reward_fn(role: str) -> Callable:
     return reward_fn
 
 
-@jit
-def extra_features(role: str, observations: jnp.ndarray) -> jnp.ndarray:
+def get_feature_fn(spec: Tuple) -> Callable:
     """
-    TODO: Given a role and an observation, return an extra array of shape (batch_size, *) as an extra set of features.
+    Get the feature function on (possibly flattened) observations.
     """
-    return None
-
+    @jit
+    def feature_fn(observations: jnp.ndarray) -> jnp.ndarray:
+        """
+        Given an observation, it does feature engineer and format it in the way that a model is ready to learn from.
+        """
+        return -flatten(vmap(partial(jnp.sort, axis=0), 0, 0)(-observations.reshape(-1, *spec)))
+    return feature_fn
 
 def apply_agent_action_mask(agent_policy: Callable, dimension: int) -> Callable:
     """

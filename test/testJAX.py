@@ -15,7 +15,7 @@ from hironaka.jax.simulation_fn import get_evaluation_loop, get_single_thread_si
 from hironaka.jax.util import flatten, make_agent_obs, get_take_actions, get_reward_fn, decode_table, \
     decode_from_one_hot, \
     batch_encode, batch_encode_one_hot, get_batch_decode_from_one_hot, \
-    get_batch_decode, get_preprocess_fns, apply_agent_action_mask
+    get_batch_decode, get_preprocess_fns, apply_agent_action_mask, get_feature_fn
 
 from hironaka.src import get_newton_polytope_torch, shift_torch, reposition_torch, remove_repeated
 from hironaka.src import get_newton_polytope_jax, shift_jax, rescale_jax, reposition_jax
@@ -109,6 +109,12 @@ class TestJAX(unittest.TestCase):
                 [0.84210527, 0.05263158, 0.47368422]]
         ]
         )
+        s_sorted = jnp.array([[0.84210527, 0.8947368, 1., 0.10526316, 0.2631579, 0.47368422,
+                               0.10526316, 0.21052632, 0.15789473, 0., 0.05263158, 0.,
+                               -1., -1., -1., -1., -1., -1.]]
+                             )
+        feature_fn = get_feature_fn((6, 3))
+        assert jnp.all(feature_fn(s) == s_sorted)
         sr = jnp.array([
             [
                 [0.10526316, 0.2631579, 0.],
@@ -368,6 +374,7 @@ class TestJAX(unittest.TestCase):
                   'max_num_points': max_num_points,
                   'dimension': dimension,
                   'max_value': 20,
+                  'max_length_game': 20,
                   'scale_observation': True}
 
         action_dim = 2 ** dimension - dimension - 1
@@ -380,7 +387,7 @@ class TestJAX(unittest.TestCase):
                                         spec=spec, num_evaluations=10, max_depth=10, max_num_considered_actions=10,
                                         discount=0.99, rescale_points=True)
 
-        sim = get_single_thread_simulation('host', eval_loop, rollout_size=100, config=config, dtype=jnp.float32)
+        sim = get_single_thread_simulation('host', eval_loop, config=config, dtype=jnp.float32)
         sim(key, role_fn_args=(host_wrapper.parameters,), opponent_fn_args=())
 
     def test_jax_util(self):

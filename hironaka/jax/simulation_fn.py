@@ -78,8 +78,7 @@ def get_evaluation_loop(role: str, policy_fn: Callable, opponent_fn: Callable, r
     return evaluation_loop
 
 
-def get_single_thread_simulation(role: str, evaluation_loop: Callable, rollout_size: int,
-                                 config: dict, dtype=jnp.float32):
+def get_single_thread_simulation(role: str, evaluation_loop: Callable, config: dict, dtype=jnp.float32):
     """
     A simulation process goes roughly as follows:
         0. Set up initial specs, generate a batch of random points.
@@ -88,21 +87,19 @@ def get_single_thread_simulation(role: str, evaluation_loop: Callable, rollout_s
             collection of roll-outs.
         3. Repeat 0 until enough roll-outs are collected.
     """
-    eval_batch_size, max_num_points, dimension = \
-        config['eval_batch_size'], config['max_num_points'], config['dimension']
+    eval_batch_size, max_num_points, dimension, max_length_game = \
+        config['eval_batch_size'], config['max_num_points'], config['dimension'], config['max_length_game']
     max_value = config['max_value']
 
     input_dim = max_num_points * dimension if role == 'host' else (max_num_points + 1) * dimension
     action_num = 2 ** dimension - dimension - 1 if role == 'host' else dimension
 
     rescale_fn = rescale_jax if config['scale_observation'] else (lambda x: x)
-    if rollout_size % eval_batch_size != 0:
-        warnings.warn(f"rollout_size cannot be divided by eval_batch_size. "
-                      f"Output batch size may be different than rollout_size.")
 
     def single_thread_simulation(key: jnp.ndarray, role_fn_args=(), opponent_fn_args=()) -> Tuple:
         """
-        Returns a tuple (obs, policy_prior, value_prior). All batch sizes are `rollout_size`.
+        Returns a tuple (obs, policy_prior, value_prior).
+        The returning sample size is `eval_batch_size * max_length_game`.
         """
         starting_keys = jax.random.split(key, num=3)
 
@@ -132,7 +129,7 @@ def get_single_thread_simulation(role: str, evaluation_loop: Callable, rollout_s
 
             return jax.random.split(key, num=3), (obs, policy, value), state
 
-        num_loops = ((rollout_size + eval_batch_size - 1) // eval_batch_size)
+        num_loops = max_length_game
 
         # `fori_loop` must return tracers of exactly the same shape
         rollout_obs_init = jnp.zeros((eval_batch_size, num_loops, input_dim))

@@ -48,7 +48,7 @@ class JAXTrainer:
 
         config_keys = ['eval_batch_size', 'max_num_points', 'dimension', 'max_length_game', 'max_value',
                        'scale_observation', 'use_tensorboard', 'layerwise_logging', 'use_cuda', 'version_string',
-                       'num_evaluations', 'max_num_considered_actions', 'rollout_size', 'discount']
+                       'num_evaluations', 'max_num_considered_actions', 'discount']
         for config_key in config_keys:
             setattr(self, config_key, self.config[config_key])
 
@@ -227,19 +227,17 @@ class JAXTrainer:
         spec = (max_num_points, dimension)
 
         take_action = get_take_actions(role='host', spec=spec, rescale_points=self.scale_observation)
-
         batch_decode = get_batch_decode_from_one_hot(dimension)
 
         details = [0] * max_length
         for _ in range(num_of_loops):
             key, host_key, agent_key = jax.random.split(key, num=3)
 
-            pts = jax.random.randint(host_key,
-                                     (batch_size, max_num_points, dimension), 0, self.max_value).astype(self.dtype)
-            pts = rescale_jax(get_newton_polytope_jax(pts)) if self.scale_observation else get_newton_polytope_jax(pts)
+            pts = self.generate_pts(host_key, (batch_size, max_num_points, dimension), self.max_value, dtype=self.dtype,
+                                    rescale=self.scale_observation)
+            pts = flatten(pts)
 
             prev_done, done = 0, jnp.sum(get_dones(pts))  # Calculate the finished games
-            pts = flatten(pts)
             for step in range(max_length - 1):
                 key, host_key, agent_key = jax.random.split(key, num=3)
 
@@ -317,6 +315,7 @@ class JAXTrainer:
         simulation_config = {'eval_batch_size': self.eval_batch_size,
                              'max_num_points': self.max_num_points,
                              'dimension': self.dimension,
+                             'max_length_game': self.max_length_game,
                              'max_value': self.max_value,
                              'scale_observation': self.scale_observation}
 
@@ -327,8 +326,7 @@ class JAXTrainer:
                                         num_evaluations=self.num_evaluations, max_depth=self.max_length_game,
                                         max_num_considered_actions=self.max_num_considered_actions,
                                         discount=self.discount, rescale_points=self.scale_observation, dtype=self.dtype)
-        sim_fn = maybe_jit(get_single_thread_simulation(role, eval_loop, rollout_size=self.rollout_size,
-                                                        config=simulation_config, dtype=self.dtype))
+        sim_fn = maybe_jit(get_single_thread_simulation(role, eval_loop, config=simulation_config, dtype=self.dtype))
         if return_function:
             return eval_loop, sim_fn
         else:
@@ -363,3 +361,8 @@ class JAXTrainer:
         else:
             raise ValueError(f"role must be either host or agent. Got {role}.")
 
+    @staticmethod
+    def generate_pts(key: jnp.ndarray, shape: Tuple, max_value: int, dtype=jnp.float32, rescale=True) -> jnp.ndarray:
+        pts = jax.random.randint(key, shape, 0, max_value).astype(dtype)
+        pts = rescale_jax(get_newton_polytope_jax(pts)) if rescale else get_newton_polytope_jax(pts)
+        return pts

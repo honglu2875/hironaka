@@ -7,6 +7,7 @@ import jax
 from jax import vmap, numpy as jnp, jit, lax
 from flax import linen as nn
 
+from hironaka.jax.util import get_feature_fn
 
 ModuleDef = Any
 
@@ -119,12 +120,13 @@ class PolicyWrapper:
     def get_apply_fn(self, new_batch_size=None) -> Callable:
         batch_size = new_batch_size if new_batch_size is not None else self.input_shape[0]
         _, logit_length = self.output_shape
+        feature_fn = get_feature_fn(self.input_shape[1:])
 
         if self.separate_policy_value_models:
             raise NotImplementedError()
         else:
             def apply_fn(x: jnp.ndarray, params, **kwargs) -> Tuple[jnp.ndarray, jnp.ndarray]:
-                output = self.model.apply(params, x)
+                output = self.model.apply(params, feature_fn(x))
                 policy_logits = lax.dynamic_slice(output, (0, 0), (batch_size, logit_length - 1))
                 value_logits = jnp.ravel(lax.dynamic_slice(output, (0, logit_length - 1), (batch_size, 1)))
                 return policy_logits, value_logits
