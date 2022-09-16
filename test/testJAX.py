@@ -7,6 +7,7 @@ import jax
 import jax.numpy as jnp
 
 from hironaka.core import TensorPoints, JAXPoints
+from hironaka.jax import JAXTrainer
 from hironaka.jax.net import DResNet18, PolicyWrapper, DResNetMini
 from hironaka.jax.players import all_coord_host_fn, random_host_fn, \
     char_vector_of_pts, zeillinger_fn_slice, zeillinger_fn, random_agent_fn, choose_first_agent_fn, choose_last_agent_fn
