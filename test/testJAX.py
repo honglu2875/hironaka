@@ -386,9 +386,9 @@ class TestJAX(unittest.TestCase):
         eval_loop = get_evaluation_loop('host', host_policy, partial(choose_first_agent_fn, spec=spec), reward_fn,
                                         spec=spec, num_evaluations=10, max_depth=10, max_num_considered_actions=10,
                                         discount=0.99, rescale_points=True)
-
+        root_state = JAXTrainer.generate_pts(key, (batch_size, max_num_points, dimension), config['max_value'])
         sim = get_single_thread_simulation('host', eval_loop, config=config, dtype=jnp.float32)
-        sim(key, role_fn_args=(host_wrapper.parameters,), opponent_fn_args=())
+        sim(key, flatten(root_state), role_fn_args=(host_wrapper.parameters,), opponent_fn_args=())
 
     def test_jax_util(self):
         obs = jnp.ones((32, 60), dtype=jnp.float32)

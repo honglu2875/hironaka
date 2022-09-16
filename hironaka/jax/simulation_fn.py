@@ -96,16 +96,12 @@ def get_single_thread_simulation(role: str, evaluation_loop: Callable, config: d
 
     rescale_fn = rescale_jax if config['scale_observation'] else (lambda x: x)
 
-    def single_thread_simulation(key: jnp.ndarray, role_fn_args=(), opponent_fn_args=()) -> Tuple:
+    def single_thread_simulation(key: jnp.ndarray, root_state, role_fn_args=(), opponent_fn_args=()) -> Tuple:
         """
         Returns a tuple (obs, policy_prior, value_prior).
         The returning sample size is `eval_batch_size * max_length_game`.
         """
         starting_keys = jax.random.split(key, num=3)
-
-        root_state = flatten(rescale_fn(get_newton_polytope_jax(
-            jax.random.randint(starting_keys[1], (eval_batch_size, max_num_points, dimension),
-                               0, max_value).astype(dtype))))
 
         def body_fn(i, keys_and_state):
             (key, subkey, loop_key), rollouts, state = keys_and_state

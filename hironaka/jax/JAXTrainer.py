@@ -97,13 +97,26 @@ class JAXTrainer:
         Returns:
             obs, target_policy, target_value
         """
-        sim_fn = getattr(self, f"{role}_sim_fn")
+        sim_fn = self.get_sim_fn(role)
         policy_wrapper = getattr(self, f"{role}_policy")
         opponent = self._get_opponent(role)
         opp_policy_wrapper = getattr(self, f"{opponent}_policy")
 
+        # Generate root state
+        root_state = self.generate_pts(key, (self.eval_batch_size, self.max_num_points, self.dimension),
+                                       self.max_value, self.dtype)
+        if role == 'agent':
+            coords, _ = self.get_eval_policy_fn('host')(root_state, self.host_policy.parameters)
+            batch_decode_from_one_hot = get_batch_decode_from_one_hot(self.dimension)
+            root_state = jnp.concatenate([flatten(root_state), batch_decode_from_one_hot(coords)], axis=-1)
+        elif role == 'host':
+            root_state = flatten(root_state)
+        else:
+            raise ValueError(f"role must be either host or agent. Got {role}.")
+
         return self.rollout_postprocess(role,
-            sim_fn(key, role_fn_args=(policy_wrapper.parameters,), opponent_fn_args=(opp_policy_wrapper.parameters,)))
+            sim_fn(key, root_state, role_fn_args=(policy_wrapper.parameters,),
+                   opponent_fn_args=(opp_policy_wrapper.parameters,)))
 
     def train(self, key: jnp.ndarray, role: str, gradient_steps: int, rollouts: jnp.ndarray, random_sampling=False):
         """
@@ -122,7 +135,7 @@ class JAXTrainer:
 
         state = getattr(self, f"{role}_state", None)
         policy_wrapper = getattr(self, f"{role}_policy")
-        train_fn = getattr(self, f"{role}_train_fn")
+        train_fn = self.get_train_fn(role)
 
         sample_size = rollouts[0].shape[0]
         batch_size = self.config[role]['batch_size']
@@ -135,10 +148,6 @@ class JAXTrainer:
                 apply_fn=apply_fn,
                 params=policy_wrapper.parameters,
                 tx=optim)
-
-        if train_fn is None:
-            self.update_train_fn(role)
-            train_fn = getattr(self, f"{role}_train_fn")
 
         for i in range(gradient_steps):
             key, subkey = jax.random.PRNGKey(key)
@@ -168,7 +177,7 @@ class JAXTrainer:
                  num_of_loops=10, max_length=None, key=None) -> Tuple[List, List]:
         key = jax.random.PRNGKey(time.time_ns()) if key is None else key
         max_length = self.max_length_game if max_length is None else max_length
-        eval_fn = self.get_rho if eval_fn is None else eval_fn
+        eval_fn = self.compute_rho if eval_fn is None else eval_fn
 
         spec = (self.max_num_points, self.dimension)
 
@@ -205,8 +214,8 @@ class JAXTrainer:
 
         return rhos, details
 
-    def get_rho(self, host: Callable, agent: Callable, batch_size=10,
-                num_of_loops=10, max_length=20, key=None) -> Tuple[float, List]:
+    def compute_rho(self, host: Callable, agent: Callable, batch_size=10,
+                    num_of_loops=10, max_length=20, key=None) -> Tuple[float, List]:
         """
         Calculate the rho number between the host and agent.
         Parameters:
@@ -285,6 +294,26 @@ class JAXTrainer:
 
         return obs, policy, value
 
+    # ---------- Below are getter functions for training-related functions ---------- #
+    def get_fns(self, role:str, name: str) -> Callable:
+        if not hasattr(self, f"{role}_{name}") or getattr(self, f"{role}_{name}") is None:
+            self.update_eval_policy_fn(role)
+            self.update_sim_loop(role)
+            self.update_train_fn(role)
+        return getattr(self, f"{role}_{name}")
+
+    def get_eval_policy_fn(self, role: str):
+        return self.get_fns(role, 'eval_policy_fn')
+
+    def get_eval_loop(self, role: str):
+        return self.get_fns(role, 'eval_loop')
+
+    def get_sim_fn(self, role: str):
+        return self.get_fns(role, 'sim_fn')
+
+    def get_train_fn(self, role: str):
+        return self.get_fns(role, 'train_fn')
+
     # ---------- Below are either static methods or methods that set its members ---------- #
 
     def set_optim(self, role: str, optim_config: dict):
@@ -318,8 +347,8 @@ class JAXTrainer:
                              'scale_observation': self.scale_observation}
 
         eval_loop = get_evaluation_loop(role,
-                                        getattr(self, f"{role}_eval_policy_fn"),
-                                        action_wrapper(getattr(self, f"{opponent}_eval_policy_fn"), dim),
+                                        self.get_eval_policy_fn(role),
+                                        action_wrapper(self.get_eval_policy_fn(opponent), dim),
                                         getattr(self, f"{role}_reward_fn"), spec=(self.max_num_points, self.dimension),
                                         num_evaluations=self.num_evaluations, max_depth=self.max_length_game,
                                         max_num_considered_actions=self.max_num_considered_actions,

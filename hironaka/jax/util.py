@@ -66,7 +66,7 @@ def get_take_actions(role: str, spec: Tuple[int, int], rescale_points: bool = Tr
     Factory function that returns a `take_actions` function to perform observation update depending on the current role.
     Parameters:
         role: 'host' or 'agent'
-        spec: (max_num_points)
+        spec: (max_num_points, dimension)
         rescale_points: whether to do an L0-rescale at the end.
     Returns:
         the `take_actions` function.
@@ -130,18 +130,12 @@ def get_feature_fn(role: str, spec: Tuple) -> Callable:
     if role == 'host':
         @jit
         def feature_fn(observations: jnp.ndarray) -> jnp.ndarray:
-            """
-            Given an observation, it does feature engineer and format it in the way that a model is ready to learn from.
-            """
             return -flatten(vmap(partial(jnp.sort, axis=0), 0, 0)(-observations.reshape(-1, *spec)))
     elif role == 'agent':
         obs_preprocess, coords_preprocess = get_preprocess_fns('agent', spec)
 
         @jit
         def feature_fn(observations: jnp.ndarray) -> jnp.ndarray:
-            """
-            Given an observation, it does feature engineer and format it in the way that a model is ready to learn from.
-            """
             points = -flatten(vmap(partial(jnp.sort, axis=0), 0, 0)(-obs_preprocess(observations)))
             coords = coords_preprocess(observations, None)
             return make_agent_obs(points, coords)
