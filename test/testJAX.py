@@ -113,7 +113,7 @@ class TestJAX(unittest.TestCase):
                                0.10526316, 0.21052632, 0.15789473, 0., 0.05263158, 0.,
                                -1., -1., -1., -1., -1., -1.]]
                              )
-        feature_fn = get_feature_fn((6, 3))
+        feature_fn = get_feature_fn('host',(6, 3))
         assert jnp.all(feature_fn(s) == s_sorted)
         sr = jnp.array([
             [
@@ -278,7 +278,7 @@ class TestJAX(unittest.TestCase):
 
         # Test host `recurrent_fn`
         nnet = DResNet18(4 + 1)
-        host_wrapper = PolicyWrapper(jax.random.PRNGKey(0), (2, spec[0] * spec[1]), nnet)
+        host_wrapper = PolicyWrapper(jax.random.PRNGKey(0), 'host', (2, *spec), nnet)
         host_policy = host_wrapper.get_apply_fn()
         reward_fn = get_reward_fn('host')
         recurrent_fn = get_recurrent_fn_for_role('host', host_policy, partial(choose_first_agent_fn, spec=spec),
@@ -287,7 +287,7 @@ class TestJAX(unittest.TestCase):
         # Test agent `recurrent_fn`
         obs_preprocess, coords_preprocess = get_preprocess_fns('host', spec)
         nnet = DResNet18(3 + 1)
-        agent_wrapper = PolicyWrapper(jax.random.PRNGKey(0), (2, spec[0] * spec[1] + spec[1]), nnet)
+        agent_wrapper = PolicyWrapper(jax.random.PRNGKey(0), 'agent', (2, *spec), nnet)
         agent_policy = agent_wrapper.get_apply_fn()
         reward_fn = get_reward_fn('agent')
 
@@ -308,7 +308,7 @@ class TestJAX(unittest.TestCase):
         # host
         action_dim = 2 ** dimension - dimension - 1
         nnet = DResNetMini(action_dim + 1)
-        host_wrapper = PolicyWrapper(jax.random.PRNGKey(seed), (batch_size, spec[0] * spec[1]), nnet)
+        host_wrapper = PolicyWrapper(jax.random.PRNGKey(seed), 'host', (batch_size, *spec), nnet)
         host_policy = jax.jit(host_wrapper.get_apply_fn())
         reward_fn = get_reward_fn('host')
         recurrent_fn = get_recurrent_fn_for_role('host', host_policy, partial(choose_first_agent_fn, spec=spec),
@@ -332,7 +332,7 @@ class TestJAX(unittest.TestCase):
         action_dim = dimension
         del nnet
         nnet = DResNetMini(action_dim + 1)
-        agent_wrapper = PolicyWrapper(jax.random.PRNGKey(seed), (batch_size, spec[0] * spec[1] + spec[1]), nnet)
+        agent_wrapper = PolicyWrapper(jax.random.PRNGKey(seed), 'agent', (batch_size, *spec), nnet)
         agent_policy = jax.jit(apply_agent_action_mask(agent_wrapper.get_apply_fn(), dimension))
         obs_preprocess, coords_preprocess = get_preprocess_fns('host', spec)
         reward_fn = get_reward_fn('agent')
@@ -379,7 +379,7 @@ class TestJAX(unittest.TestCase):
 
         action_dim = 2 ** dimension - dimension - 1
         nnet = DResNetMini(action_dim + 1)
-        host_wrapper = PolicyWrapper(policy_key, (batch_size, spec[0] * spec[1]), nnet)
+        host_wrapper = PolicyWrapper(policy_key, 'host', (batch_size, *spec), nnet)
         host_policy = jax.jit(host_wrapper.get_apply_fn())
         reward_fn = get_reward_fn('host')
 

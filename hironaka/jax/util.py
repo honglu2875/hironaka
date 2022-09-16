@@ -123,17 +123,33 @@ def get_reward_fn(role: str) -> Callable:
     return reward_fn
 
 
-def get_feature_fn(spec: Tuple) -> Callable:
+def get_feature_fn(role: str, spec: Tuple) -> Callable:
     """
     Get the feature function on (possibly flattened) observations.
     """
-    @jit
-    def feature_fn(observations: jnp.ndarray) -> jnp.ndarray:
-        """
-        Given an observation, it does feature engineer and format it in the way that a model is ready to learn from.
-        """
-        return -flatten(vmap(partial(jnp.sort, axis=0), 0, 0)(-observations.reshape(-1, *spec)))
+    if role == 'host':
+        @jit
+        def feature_fn(observations: jnp.ndarray) -> jnp.ndarray:
+            """
+            Given an observation, it does feature engineer and format it in the way that a model is ready to learn from.
+            """
+            return -flatten(vmap(partial(jnp.sort, axis=0), 0, 0)(-observations.reshape(-1, *spec)))
+    elif role == 'agent':
+        obs_preprocess, coords_preprocess = get_preprocess_fns('agent', spec)
+
+        @jit
+        def feature_fn(observations: jnp.ndarray) -> jnp.ndarray:
+            """
+            Given an observation, it does feature engineer and format it in the way that a model is ready to learn from.
+            """
+            points = -flatten(vmap(partial(jnp.sort, axis=0), 0, 0)(-obs_preprocess(observations)))
+            coords = coords_preprocess(observations, None)
+            return make_agent_obs(points, coords)
+    else:
+        raise ValueError(f"role must be either host or agent. Got {role}.")
+
     return feature_fn
+
 
 def apply_agent_action_mask(agent_policy: Callable, dimension: int) -> Callable:
     """

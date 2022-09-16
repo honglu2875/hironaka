@@ -58,8 +58,6 @@ class JAXTrainer:
             jax.config.update('jax_platform_name', 'cpu')
 
         eval_batch_size, max_num_points, dimension = self.eval_batch_size, self.max_num_points, self.dimension
-        self.input_dim = {'host': max_num_points * dimension,
-                          'agent': max_num_points * dimension + dimension}
         self.output_dim = {'host': 2 ** dimension - dimension - 1,
                            'agent': dimension}
         policy_keys = {}
@@ -72,7 +70,7 @@ class JAXTrainer:
                 continue
             net = DenseResNet(self.output_dim[role] + 1, net_arch=self.config[role]['net_arch'])
             setattr(self, f"{role}_policy",
-                    PolicyWrapper(policy_keys[role], (eval_batch_size, self.input_dim[role]), net))
+                    PolicyWrapper(policy_keys[role], role, (eval_batch_size, max_num_points, dimension), net))
             self.set_optim(role, self.config[role]['optim'])
 
             # Set up policy functions (policy and evaluation have different batch sizes)
@@ -235,9 +233,9 @@ class JAXTrainer:
 
             pts = self.generate_pts(host_key, (batch_size, max_num_points, dimension), self.max_value, dtype=self.dtype,
                                     rescale=self.scale_observation)
+            prev_done, done = 0, jnp.sum(get_dones(pts))  # Calculate the finished games
             pts = flatten(pts)
 
-            prev_done, done = 0, jnp.sum(get_dones(pts))  # Calculate the finished games
             for step in range(max_length - 1):
                 key, host_key, agent_key = jax.random.split(key, num=3)
 

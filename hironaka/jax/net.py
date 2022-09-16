@@ -59,17 +59,20 @@ DResNet18 = partial(DenseResNet, net_arch=[256] * 18)
 
 
 class PolicyWrapper:
-    def __init__(self, key: jnp.ndarray, input_shape: Tuple, model: flax.linen.Module,
+    def __init__(self, key: jnp.ndarray, role: str, batch_spec: Tuple, model: flax.linen.Module,
                  value_model: flax.linen.Module = None, separate_policy_value_models: bool = False):
         """
         Parameters:
             key: the PRNG random key.
-            input_shape: specify the input shape including the batch size: (batch_size, ...).
+            role: 'host' or 'agent'.
+            batch_spec: specify the point properties including the batch size: (batch_size, max_num_points, dimension).
             model: the policy model. If `separate_policy_value_models` is False, the last logit of the model output
                 is assumed to be the value.
             value_model: if `separate_policy_value_models` is True, it is the separate value model.
             separate_policy_value_models: use separate policy model and value model.
         """
+        self.role = role
+        self.batch_spec = batch_spec
         self.model = model
         self.separate_policy_value_models = separate_policy_value_models
         if self.separate_policy_value_models:
@@ -80,9 +83,9 @@ class PolicyWrapper:
         self.init_key, self.input_shape, self.output_shape = None, None, None
         self.parameters, self.value_parameters = None, None
 
-        self.init(key, input_shape)
+        self.init(key, batch_spec)
 
-    def init(self, key: jnp.ndarray, input_shape: Tuple):
+    def init(self, key: jnp.ndarray, batch_spec: Tuple):
         """
         (Re-)initialize the model.
         """
@@ -92,7 +95,8 @@ class PolicyWrapper:
             key, value_key = key, None
 
         self.init_key = key
-        self.input_shape = input_shape
+        self.input_shape = (batch_spec[0], batch_spec[1] * batch_spec[2]) if self.role == 'host' else \
+            (batch_spec[0], batch_spec[1] * batch_spec[2] + batch_spec[2])
         self.parameters = self.model.init(key, jnp.ones(self.input_shape))
         self.output_shape = self.model.apply(self.parameters, jnp.ones(self.input_shape)).shape
         if self.separate_policy_value_models:
@@ -120,7 +124,7 @@ class PolicyWrapper:
     def get_apply_fn(self, new_batch_size=None) -> Callable:
         batch_size = new_batch_size if new_batch_size is not None else self.input_shape[0]
         _, logit_length = self.output_shape
-        feature_fn = get_feature_fn(self.input_shape[1:])
+        feature_fn = get_feature_fn(self.role, self.batch_spec[1:])
 
         if self.separate_policy_value_models:
             raise NotImplementedError()
