@@ -124,7 +124,7 @@ class JAXTrainer:
             raise ValueError(f"role must be either host or agent. Got {role}.")
 
         simulate_output = sim_fn(key, root_state, role_fn_args=(policy_wrapper.parameters,),
-                                               opponent_fn_args=(opp_policy_wrapper.parameters,))
+                                 opponent_fn_args=(opp_policy_wrapper.parameters,))
         return self.rollout_postprocess(role, simulate_output)
 
     def train(self, key: jnp.ndarray, role: str, gradient_steps: int, rollouts: jnp.ndarray, random_sampling=False,
@@ -169,7 +169,7 @@ class JAXTrainer:
 
                 self.tensorboard_log_scalar(f"{role}/loss", loss, state.step)
                 self.summary_writer.add_histogram(
-                    f"{role}/gradient", self.layerwise_average(grads['params']), state.step, [])
+                    f"{role}/gradient", np.array(self.layerwise_average(grads['params'], [])), state.step)
 
                 if self.config['tensorboard']['layerwise_logging']:
                     self.tensorboard_log_layers(role, state.params['params'], state.step)
