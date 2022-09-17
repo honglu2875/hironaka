@@ -5,7 +5,7 @@ import torch
 
 from hironaka.core import TensorPoints
 from hironaka.src import HostActionEncoder
-from hironaka.trainer.Timer import Timer
+from hironaka.trainer.timer import Timer
 
 
 class FusedGame:
@@ -16,13 +16,13 @@ class FusedGame:
     """
 
     def __init__(
-        self,
-        host_net: torch.nn.Module,
-        agent_net: torch.nn.Module,
-        device: Optional[Union[str, torch.device]] = "cpu",
-        log_time: Optional[bool] = True,
-        reward_func: Optional[Callable] = None,
-        dtype: Optional[Union[Type, torch.dtype]] = torch.float32,
+            self,
+            host_net: torch.nn.Module,
+            agent_net: torch.nn.Module,
+            device: Optional[Union[str, torch.device]] = "cpu",
+            log_time: Optional[bool] = True,
+            reward_func: Optional[Callable] = None,
+            dtype: Optional[Union[Type, torch.dtype]] = torch.float32,
     ):
         """
         host_net: a nn.Module where
@@ -71,7 +71,8 @@ class FusedGame:
         e_r = exploration_rate if sample_for == "agent" else 0.0
         with Timer("step-agent_move", self.time_log, active=self.log_time, use_cuda=self.use_cuda):
             agent_move = self.agent_move(
-                points, host_move, masked=masked, scale_observation=scale_observation, inplace=True, exploration_rate=e_r
+                points, host_move, masked=masked, scale_observation=scale_observation, inplace=True,
+                exploration_rate=e_r
             )
 
         next_done = points.ended_batch_in_tensor
@@ -90,7 +91,8 @@ class FusedGame:
             with Timer("step-agent_postprocess_exps", self.time_log, active=self.log_time, use_cuda=self.use_cuda):
                 output_obs = {"points": observations[~done].clone(), "coords": host_move[~done].clone()}
                 output_actions = agent_move[~done].clone()
-                next_observations = {"points": next_observations[~done].clone(), "coords": next_host_move[~done].clone()}
+                next_observations = {"points": next_observations[~done].clone(),
+                                     "coords": next_host_move[~done].clone()}
         next_done = next_done[~done].clone()
 
         return (
@@ -122,13 +124,13 @@ class FusedGame:
         return host_move_binary, chosen_actions
 
     def agent_move(
-        self,
-        points: TensorPoints,
-        host_moves: torch.Tensor,
-        masked: Optional[bool] = True,
-        scale_observation: Optional[bool] = True,
-        inplace: Optional[bool] = True,
-        exploration_rate: Optional[float] = 0.0,
+            self,
+            points: TensorPoints,
+            host_moves: torch.Tensor,
+            masked: Optional[bool] = True,
+            scale_observation: Optional[bool] = True,
+            inplace: Optional[bool] = True,
+            exploration_rate: Optional[float] = 0.0,
     ) -> torch.Tensor:
         with Timer("agent_move-agent_net_inference", self.time_log, active=self.log_time, use_cuda=self.use_cuda):
             with torch.inference_mode():
@@ -154,7 +156,8 @@ class FusedGame:
                 with Timer("agent_move-pt_ops_shift", self.time_log, active=self.log_time, use_cuda=self.use_cuda):
                     points.shift(host_moves.type(_TYPE).to(_PT_DEVICE), actions.type(_TYPE).to(_PT_DEVICE))
                 with Timer(
-                    "agent_move-pt_ops_get_newton_polytope", self.time_log, active=self.log_time, use_cuda=self.use_cuda
+                        "agent_move-pt_ops_get_newton_polytope", self.time_log, active=self.log_time,
+                        use_cuda=self.use_cuda
                 ):
                     points.get_newton_polytope()
                 with Timer("agent_move-pt_ops_rescale", self.time_log, active=self.log_time, use_cuda=self.use_cuda):
@@ -174,7 +177,8 @@ class FusedGame:
 
     @staticmethod
     def _default_reward(
-        sample_for: str, obs: Union[torch.Tensor, dict], next_obs: Union[torch.Tensor, dict], next_done: torch.Tensor
+            sample_for: str, obs: Union[torch.Tensor, dict], next_obs: Union[torch.Tensor, dict],
+            next_done: torch.Tensor
     ) -> torch.Tensor:
         if sample_for == "host":
             return next_done.type(torch.float32).clone()

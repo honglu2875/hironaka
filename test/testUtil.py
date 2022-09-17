@@ -18,7 +18,8 @@ from hironaka.trainer.nets import create_mlp, expand_net_list
 class TestUtil(unittest.TestCase):
     def test_batch_padded_array(self):
         pt = [[[1, 2, 3], [2, 3, 4]], [[1, 1, 1], [4, 4, 4], [9, 8, 7]]]
-        r = np.array([[[1, 2, 3], [2, 3, 4], [-1, -1, -1], [-1, -1, -1]], [[1, 1, 1], [4, 4, 4], [9, 8, 7], [-1, -1, -1]]])
+        r = np.array(
+            [[[1, 2, 3], [2, 3, 4], [-1, -1, -1], [-1, -1, -1]], [[1, 1, 1], [4, 4, 4], [9, 8, 7], [-1, -1, -1]]])
         r2 = get_batched_padded_array(pt, 4, constant_value=-1)
         print(r)
         print(r2)
@@ -145,7 +146,8 @@ class TestUtil(unittest.TestCase):
     def test_merge_exp(self):
         exps = []
         for i in range(5):
-            obs = {"a": torch.full((2, 10), 4 * i, dtype=torch.float), "b": torch.full((2, 5), 4 * i + 1, dtype=torch.float)}
+            obs = {"a": torch.full((2, 10), 4 * i, dtype=torch.float),
+                   "b": torch.full((2, 5), 4 * i + 1, dtype=torch.float)}
             next_obs = {
                 "a": torch.full((2, 10), 4 * i + 2, dtype=torch.float),
                 "b": torch.full((2, 5), 4 * i + 3, dtype=torch.float),

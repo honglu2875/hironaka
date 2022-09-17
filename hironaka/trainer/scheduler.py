@@ -22,9 +22,8 @@ class Scheduler(abc.ABC):
         self.kwargs = kwargs
 
         for key in self.mandatory_keys:
-            assert (
-                key in self.kwargs
-            ), f"'{key}' must be in {self.key_name if self.key_name is not None else 'the config'}. Got {self.kwargs}."
+            assert (key in self.kwargs), \
+                f"'{key}' must be in {self.key_name if self.key_name is not None else 'the config'}. Got {self.kwargs}."
 
     def __call__(self, steps: int, **kwargs):
         return self.get_value(steps)
@@ -46,7 +45,7 @@ class ExponentialLRScheduler(Scheduler):
     def get_value(self, steps: int) -> Union[float, int]:
         initial_lr = self.kwargs["initial_lr"]
         rate = self.kwargs["rate"]
-        return initial_lr * (rate**steps) + self.value * (1 - rate**steps)
+        return initial_lr * (rate ** steps) + self.value * (1 - rate ** steps)
 
 
 class InverseLRScheduler(Scheduler):
@@ -66,4 +65,4 @@ class ExponentialERScheduler(Scheduler):
     def get_value(self, steps: int) -> Union[float, int]:
         initial_er = self.kwargs["initial_er"]
         rate = self.kwargs["rate"]
-        return initial_er * (rate**steps) + self.value * (1 - rate**steps)
+        return initial_er * (rate ** steps) + self.value * (1 - rate ** steps)

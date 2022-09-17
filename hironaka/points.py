@@ -1,4 +1,4 @@
-from hironaka.core import ListPoints
+from .core import ListPoints
 
 
 class Points:

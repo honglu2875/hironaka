@@ -6,14 +6,14 @@ import torch
 from hironaka.core import TensorPoints
 from hironaka.src import merge_experiences
 from hironaka.trainer import DQNTrainer
-from hironaka.trainer.FusedGame import FusedGame
-from hironaka.trainer.ReplayBuffer import ReplayBuffer
+from hironaka.trainer.fused_game import FusedGame
 from hironaka.trainer.player_modules import (
     AllCoordHostModule,
     ChooseFirstAgentModule,
     ChooseLastAgentModule,
     RandomAgentModule,
 )
+from hironaka.trainer.replay_buffer import ReplayBuffer
 
 
 class TestTrainer(unittest.TestCase):

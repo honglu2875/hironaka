@@ -1,7 +1,7 @@
 import abc
 import logging
 from copy import deepcopy
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, List, Optional, Tuple
 
 
 class PointsBase(abc.ABC):
@@ -78,7 +78,7 @@ class PointsBase(abc.ABC):
         Copy the object.
         """
         points_input = self._points_copy(self.points) if points is None else points
-        new_points = self.__class__(points_input, **self.config)
+        new_points = self.__class__(points_input, **self.config)  # pytype: disable=not-instantiable
 
         for key in self.running_attributes:
             if hasattr(self, key):
@@ -87,13 +87,13 @@ class PointsBase(abc.ABC):
                 raise Exception(f"Attribute {key} is not initialized.")
         return new_points
 
-    def shift(self, coords: List[List[int]], axis: List[int], inplace=True, **kwargs) -> Union["PointsBase", None]:
+    def shift(self, coords: List[List[int]], axis: List[int], inplace=True, **kwargs) -> "PointsBase":
         """
         Shift each batch according to the list of coords and axis.
         """
         r = self._shift(self.points, coords, axis, inplace=inplace, **kwargs)
         if inplace:
-            return None
+            return self
         else:
             return self.copy(points=r)
 
@@ -107,39 +107,39 @@ class PointsBase(abc.ABC):
         # self.ended_each_batch represents the game status of each batch
         return self._get_batch_ended(self.points)
 
-    def reposition(self, inplace=True, **kwargs):
+    def reposition(self, inplace=True, **kwargs) -> "PointsBase":
         """
         Reposition batches of points so that each batch touches all the coordinate planes.
         """
         r = self._reposition(self.points, inplace=inplace, **kwargs)
         if inplace:
-            return None
+            return self
         else:
             return self.copy(points=r)
 
-    def get_newton_polytope(self, inplace=True, **kwargs):
+    def get_newton_polytope(self, inplace=True, **kwargs) -> "PointsBase":
         """
         Get the Newton Polytope for points in each batch.
         """
         r = self._get_newton_polytope(self.points, inplace=inplace, **kwargs)
 
         if inplace:
-            return None
+            return self
         else:
             new_points = self.copy(points=r)
             return new_points
 
-    def rescale(self, inplace=True, **kwargs):
+    def rescale(self, inplace=True, **kwargs) -> "PointsBase":
         """
         Rescale each batch.
         """
         r = self._rescale(self.points, inplace=inplace, **kwargs)
         if inplace:
-            return None
+            return self
         else:
             return self.copy(points=r)
 
-    def get_features(self):
+    def get_features(self) -> "PointsBase":
         """
         An alias of getting the points.
         Feel free to override if you want to make some transformations and do feature engineering.

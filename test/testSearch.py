@@ -34,7 +34,8 @@ class TestSearch(unittest.TestCase):
 
     def test_search_special_char_vec(self):
         points = ListPoints(
-            [[[3, 5, 8], [5, 2, 6], [1, 3, 6], [3, 5, 3], [7, 3, 3], [1, 6, 3], [1, 0, 6], [5, 1, 6], [7, 3, 0], [6, 7, 7]]]
+            [[[3, 5, 8], [5, 2, 6], [1, 3, 6], [3, 5, 3], [7, 3, 3], [1, 6, 3], [1, 0, 6], [5, 1, 6], [7, 3, 0],
+              [6, 7, 7]]]
         )
         r = search_depth(points, Zeillinger())
         print(r)

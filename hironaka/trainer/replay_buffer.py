@@ -18,13 +18,13 @@ class ReplayBuffer:
     """
 
     def __init__(
-        self,
-        input_shape: Union[Dict, Tuple],
-        output_dim: int,
-        buffer_size: int,
-        device: torch.device,
-        dtype: Union[Type, torch.dtype] = torch.float32,
-        **kwargs,
+            self,
+            input_shape: Union[Dict, Tuple],
+            output_dim: int,
+            buffer_size: int,
+            device: torch.device,
+            dtype: Union[Type, torch.dtype] = torch.float32,
+            **kwargs,
     ):
         """
         Parameters:
@@ -51,7 +51,8 @@ class ReplayBuffer:
                 )
         else:
             self.observations = torch.zeros((self.buffer_size, *self.input_shape), device=self.device, dtype=self.dtype)
-            self.next_observations = torch.zeros((self.buffer_size, *self.input_shape), device=self.device, dtype=self.dtype)
+            self.next_observations = torch.zeros((self.buffer_size, *self.input_shape), device=self.device,
+                                                 dtype=self.dtype)
 
         self.actions = torch.zeros((self.buffer_size, 1), device=self.device, dtype=torch.int32)
         self.rewards = torch.zeros((self.buffer_size, 1), device=self.device, dtype=torch.float32)
@@ -61,13 +62,13 @@ class ReplayBuffer:
         self.full = False
 
     def add(
-        self,
-        obs: Union[torch.Tensor, Dict],
-        action: torch.Tensor,
-        reward: torch.Tensor,
-        done: torch.Tensor,
-        next_obs: Union[torch.Tensor, Dict],
-        clone=True,
+            self,
+            obs: Union[torch.Tensor, Dict],
+            action: torch.Tensor,
+            reward: torch.Tensor,
+            done: torch.Tensor,
+            next_obs: Union[torch.Tensor, Dict],
+            clone=True,
     ):
         """
         Add a batch of experiences.
@@ -96,8 +97,8 @@ class ReplayBuffer:
         self._make_types([obs, action, reward, done, next_obs])
 
         for storage, data in zip(
-            [self.observations, self.actions, self.rewards, self.dones, self.next_observations],
-            [obs, action, reward, done, next_obs],
+                [self.observations, self.actions, self.rewards, self.dones, self.next_observations],
+                [obs, action, reward, done, next_obs],
         ):
             # The members are potentially dicts. In this case, one needs to update each Tensor inside.
             # Tensor is mutable. We copy them by reference and update them inline.
@@ -114,13 +115,13 @@ class ReplayBuffer:
             # Update each Tensor
             for target, source in zip(each_storage, each_data):
                 if self.pos + length < self.buffer_size:
-                    target[self.pos : self.pos + length] = self.set_value(source, clone=clone, device=self.device)
+                    target[self.pos: self.pos + length] = self.set_value(source, clone=clone, device=self.device)
                 else:  # If full, roll back.
-                    target[self.pos : self.buffer_size] = self.set_value(
+                    target[self.pos: self.buffer_size] = self.set_value(
                         source[: self.buffer_size - self.pos], clone=clone, device=self.device
                     )
                     target[: length + self.pos - self.buffer_size] = self.set_value(
-                        source[self.buffer_size - self.pos :], clone=clone, device=self.device
+                        source[self.buffer_size - self.pos:], clone=clone, device=self.device
                     )
 
         self.full = self.full or (length + self.pos) >= self.buffer_size

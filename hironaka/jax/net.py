@@ -1,10 +1,12 @@
 from functools import partial
-from typing import List, Callable, Any, Tuple
+from typing import Any, Callable, List, Tuple
 
 import flax
 import jax
 from flax import linen as nn
-from jax import vmap, numpy as jnp, lax
+from jax import lax
+from jax import numpy as jnp
+from jax import vmap
 
 from hironaka.jax.util import get_feature_fn
 
@@ -18,7 +20,10 @@ class DenseResidueBlock(nn.Module):
     activation: Callable
 
     @nn.compact
-    def __call__(self, x, ):
+    def __call__(
+            self,
+            x,
+    ):
         residual = x
         y = nn.Dense(self.features, dtype=self.dtype)(x)
         y = self.norm()(y)
@@ -27,8 +32,8 @@ class DenseResidueBlock(nn.Module):
         y = self.norm()(y)
 
         if residual.shape != y.shape:
-            residual = nn.Dense(self.features, dtype=self.dtype, name='res_proj')(residual)
-            residual = self.norm(name='norm_proj')(residual)
+            residual = nn.Dense(self.features, dtype=self.dtype, name="res_proj")(residual)
+            residual = self.norm(name="norm_proj")(residual)
 
         return self.activation(residual + y)
 
@@ -44,11 +49,8 @@ class DenseResNet(nn.Module):
     @nn.compact
     def __call__(self, x, train: bool = True):
         x = vmap(jnp.ravel, 0, 0)(x)  # Flatten
-        for i, size in enumerate(self.net_arch):
-            x = self.block_cls(features=size,
-                               dtype=self.dtype,
-                               norm=self.norm,
-                               activation=self.activation)(x)
+        for _, size in enumerate(self.net_arch):
+            x = self.block_cls(features=size, dtype=self.dtype, norm=self.norm, activation=self.activation)(x)
         x = nn.Dense(self.output_size, dtype=self.dtype)(x)
         return self.activation(x)
 
@@ -58,8 +60,15 @@ DResNet18 = partial(DenseResNet, net_arch=[256] * 18)
 
 
 class PolicyWrapper:
-    def __init__(self, key: jnp.ndarray, role: str, batch_spec: Tuple, model: flax.linen.Module,
-                 value_model: flax.linen.Module = None, separate_policy_value_models: bool = False):
+    def __init__(
+            self,
+            key: jnp.ndarray,
+            role: str,
+            batch_spec: Tuple,
+            model: flax.linen.Module,
+            value_model: flax.linen.Module = None,
+            separate_policy_value_models: bool = False,
+    ):
         """
         Parameters:
             key: the PRNG random key.
@@ -76,7 +85,7 @@ class PolicyWrapper:
         self.separate_policy_value_models = separate_policy_value_models
         if self.separate_policy_value_models:
             if value_model is None:
-                raise ValueError(f"If policy and value models are separated, 'value_model' must be set.")
+                raise ValueError("If policy and value models are separated, 'value_model' must be set.")
         self.value_model = value_model
 
         self.init_key, self.input_shape, self.output_shape = None, None, None
@@ -94,8 +103,11 @@ class PolicyWrapper:
             key, value_key = key, None
 
         self.init_key = key
-        self.input_shape = (batch_spec[0], batch_spec[1] * batch_spec[2]) if self.role == 'host' else \
-            (batch_spec[0], batch_spec[1] * batch_spec[2] + batch_spec[2])
+        self.input_shape = (
+            (batch_spec[0], batch_spec[1] * batch_spec[2])
+            if self.role == "host"
+            else (batch_spec[0], batch_spec[1] * batch_spec[2] + batch_spec[2])
+        )
         self.parameters = self.model.init(key, jnp.ones(self.input_shape))
         self.output_shape = self.model.apply(self.parameters, jnp.ones(self.input_shape)).shape
         if self.separate_policy_value_models:
@@ -128,6 +140,7 @@ class PolicyWrapper:
         if self.separate_policy_value_models:
             raise NotImplementedError()
         else:
+
             def apply_fn(x: jnp.ndarray, params, **kwargs) -> Tuple[jnp.ndarray, jnp.ndarray]:
                 output = self.model.apply(params, feature_fn(x))
                 policy_logits = lax.dynamic_slice(output, (0, 0), (batch_size, logit_length - 1))

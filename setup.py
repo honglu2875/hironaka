@@ -5,7 +5,6 @@ from setuptools import find_packages, setup
 with open(os.path.join("hironaka", "version.txt")) as file_handler:
     __version__ = file_handler.read().strip()
 
-
 long_description = """
 
 # Hironaka
@@ -51,7 +50,6 @@ We study this connection and refactor our codes into this repo.
 
 
 """  # noqa:E501
-
 
 setup(
     name="hironaka",
@@ -108,7 +106,7 @@ setup(
     url="https://github.com/honglu2875/hironaka",
     author_email="honglu.math@gmail.com",
     keywords="reinforcement-learning machine-learning pure-mathematics algebraic geometry"
-    "mcts deep-q-learning alphazero python",
+             "mcts deep-q-learning alphazero python",
     license="MIT",
     long_description=long_description,
     long_description_content_type="text/markdown",

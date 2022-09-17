@@ -5,9 +5,9 @@ from typing import Optional, Union
 
 import numpy as np
 
-from hironaka.Points import Points
 from hironaka.core import ListPoints
-from hironaka.policy.Policy import Policy
+from hironaka.points import Points
+from hironaka.policy.policy import Policy
 
 
 class Host(abc.ABC):
@@ -103,7 +103,8 @@ class PolicyHost(Host):
     def _select_coord(self, points: ListPoints):
         features = points.get_features()
 
-        coords = self._policy.predict(features)  # return multi-binary array
+        # calling `predict` to return multi-binary array
+        coords = self._policy.predict(features)
         result = []
         for b in range(coords.shape[0]):
             result.append(np.where(coords[b] == 1)[0].tolist())

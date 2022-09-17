@@ -1,4 +1,4 @@
-from .PointsBase import PointsBase
+from .points_base import PointsBase
 
 
 class NumpyPoints(PointsBase):  # INCOMPLETE

@@ -6,7 +6,7 @@ from hironaka.agent import PolicyAgent
 from hironaka.core import ListPoints
 from hironaka.game import GameHironaka
 from hironaka.host import PolicyHost
-from hironaka.policy.NNPolicy import NNPolicy
+from hironaka.policy.nn_policy import NNPolicy
 from hironaka.src import generate_batch_points
 
 

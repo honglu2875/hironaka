@@ -1,10 +1,12 @@
 from functools import partial
-from typing import Tuple, Callable
+from typing import Callable, Tuple, Union
 
 import jax
-from jax import vmap, jit, lax, numpy as jnp
+from jax import jit, lax
+from jax import numpy as jnp
+from jax import vmap
 
-from hironaka.src import rescale_jax, get_newton_polytope_jax, shift_jax
+from hironaka.src import get_newton_polytope_jax, rescale_jax, shift_jax
 
 flatten = vmap(jnp.ravel, 0, 0)
 
@@ -27,9 +29,9 @@ def get_dones(pts: jnp.ndarray) -> jnp.ndarray:
     return jnp.sum((pts[:, :, 0] >= 0), axis=1) < 2
 
 
-@partial(jit, static_argnames=['role', 'dimension'])
+@partial(jit, static_argnames=["role", "dimension"])
 def get_done_from_flatten(obs: jnp.ndarray, role: str, dimension: int) -> jnp.ndarray:
-    return jnp.sum(obs >= 0, axis=-1) <= dimension + (role == 'agent') * (2 ** dimension - dimension - 1)
+    return jnp.sum(obs >= 0, axis=-1) <= dimension + (role == "agent") * (2 ** dimension - dimension - 1)
 
 
 def get_preprocess_fns(role: str, spec: Tuple[int, int]) -> Tuple[Callable, Callable]:
@@ -45,20 +47,26 @@ def get_preprocess_fns(role: str, spec: Tuple[int, int]) -> Tuple[Callable, Call
             - An agent observation is a host observation concatenated with a (-1, dimension) array
                 of chosen coordinates
     """
-    if role == 'host':
+    if role == "host":
+
         def obs_preprocess(observations):
             return observations.reshape(-1, *spec)
 
         def coords_preprocess(observations, actions):
             return actions
-    elif role == 'agent':
+
+    elif role == "agent":
+
         def obs_preprocess(observations):
             return vmap(partial(lax.dynamic_slice, start_indices=(0,), slice_sizes=(spec[0] * spec[1],)), 0, 0)(
-                observations).reshape(-1, *spec)
+                observations
+            ).reshape(-1, *spec)
 
         def coords_preprocess(observations, actions):
             return vmap(partial(lax.dynamic_slice, start_indices=(spec[0] * spec[1],), slice_sizes=(spec[1],)), 0, 0)(
-                observations)
+                observations
+            )
+
     else:
         raise ValueError(f"role must be either host or agent. Got {role}.")
 
@@ -115,14 +123,18 @@ def get_reward_fn(role: str) -> Callable:
     Returns:
         the corresponding reward function.
     """
-    if role == 'host':
+    if role == "host":
+
         @jit
         def reward_fn(dones: jnp.ndarray, prev_dones: jnp.ndarray) -> jnp.ndarray:
             return (dones & (~prev_dones)).astype(jnp.float32)
-    elif role == 'agent':
+
+    elif role == "agent":
+
         @jit
         def reward_fn(dones: jnp.ndarray, prev_dones: jnp.ndarray) -> jnp.ndarray:
             return -(dones & (~prev_dones)).astype(jnp.float32)
+
     else:
         raise ValueError(f"role must be either host or agent. Got {role}.")
 
@@ -133,27 +145,31 @@ def get_feature_fn(role: str, spec: Tuple) -> Callable:
     """
     Get the feature function on (possibly flattened) observations.
     """
-    if role == 'host':
+    if role == "host":
+
         @jit
         def feature_fn(observations: jnp.ndarray) -> jnp.ndarray:
             return -flatten(vmap(partial(jnp.sort, axis=0), 0, 0)(-observations.reshape(-1, *spec)))
-    elif role == 'agent':
-        obs_preprocess, coords_preprocess = get_preprocess_fns('agent', spec)
+
+    elif role == "agent":
+        obs_preprocess, coords_preprocess = get_preprocess_fns("agent", spec)
 
         @jit
         def feature_fn(observations: jnp.ndarray) -> jnp.ndarray:
             points = -flatten(vmap(partial(jnp.sort, axis=0), 0, 0)(-obs_preprocess(observations)))
             coords = coords_preprocess(observations, None)
             return make_agent_obs(points, coords)
+
     else:
         raise ValueError(f"role must be either host or agent. Got {role}.")
 
     return feature_fn
 
 
-@partial(jit, static_argnames=['max_length_game', 'reward_fn'])
-def calculate_value_using_reward_fn(done: jnp.ndarray, prev_done: jnp.ndarray, discount: float,
-                                    max_length_game: int, reward_fn: Callable) -> jnp.ndarray:
+@partial(jit, static_argnames=["max_length_game", "reward_fn"])
+def calculate_value_using_reward_fn(
+        done: jnp.ndarray, prev_done: jnp.ndarray, discount: float, max_length_game: int, reward_fn: Callable
+) -> jnp.ndarray:
     reward = vmap(reward_fn, (0, 0), 0)(done, prev_done)
     diff = jnp.arange(max_length_game).reshape((1, -1)) - jnp.arange(max_length_game).reshape((-1, 1))
     discount_table = (discount ** diff) * (diff >= 0)
@@ -172,11 +188,11 @@ def apply_agent_action_mask(agent_policy: Callable, dimension: int) -> Callable:
         policy_prior, value_prior = agent_policy(x, *args, **kwargs)
         return policy_prior * mask - jnp.inf * (~mask), value_prior
 
-    setattr(masked_agent_policy, '__name__', get_name(agent_policy))
+    masked_agent_policy.__name__ = get_name(agent_policy)
     return masked_agent_policy
 
 
-def action_wrapper(policy_value_fn: Callable, dimension: int) -> Callable:
+def action_wrapper(policy_value_fn: Callable, dimension: Union[int, None]) -> Callable:
     """
     Turns a policy function (returning (policy_logits, value)) into a function that returns one-hot actions.
     """
@@ -187,14 +203,14 @@ def action_wrapper(policy_value_fn: Callable, dimension: int) -> Callable:
         action_dim = out.shape[1]
         return jax.nn.one_hot(jnp.argmax(out, axis=1), action_dim)
 
-    setattr(wrapped_action_fn, '__name__', get_name(policy_value_fn))
+    wrapped_action_fn.__name__ = get_name(policy_value_fn)
     return wrapped_action_fn
 
 
 def get_name(obj):
-    if hasattr(obj, '__name__'):
+    if hasattr(obj, "__name__"):
         return obj.__name__
-    elif hasattr(obj, 'func'):  # wrapped by `partial`
+    elif hasattr(obj, "func"):  # wrapped by `partial`
         return get_name(obj.func)
 
 
@@ -215,7 +231,7 @@ def decode_table(dimension: int) -> dict:
             if j >= len(binary_str):
                 binary_vector.append(0)
             else:
-                binary_vector.append(int(binary_str[- j - 1]))
+                binary_vector.append(int(binary_str[-j - 1]))
         res.append(jnp.array(binary_vector).astype(jnp.int32))
     return jnp.array(res)
 
@@ -301,14 +317,16 @@ batch_encode_one_hot = vmap(encode_one_hot, 0, 0)
 
 # ---------- Loss functions ---------- #
 
+
 def compute_loss(params, apply_fn, sample, loss_fn) -> jnp.ndarray:
     obs, target_policy_logits, target_value = sample
     policy_logits, value = apply_fn(obs, params)
     return loss_fn(policy_logits, value, target_policy_logits, target_value)
 
 
-def policy_value_loss(policy_logit: jnp.ndarray, value: jnp.ndarray,
-                      target_policy: jnp.ndarray, target_value: jnp.ndarray) -> jnp.ndarray:
+def policy_value_loss(
+        policy_logit: jnp.ndarray, value: jnp.ndarray, target_policy: jnp.ndarray, target_value: jnp.ndarray
+) -> jnp.ndarray:
     # Shapes:
     # policy_logit, target_policy: (B, action)
     # value_logit, target_value: (B,)

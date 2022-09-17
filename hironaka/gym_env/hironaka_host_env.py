@@ -4,7 +4,7 @@ import numpy as np
 from gym import spaces
 
 from hironaka.host import Host
-from .HironakaBase import HironakaBase
+from .hironaka_base import HironakaBase
 
 
 class HironakaHostEnv(HironakaBase):
@@ -14,12 +14,12 @@ class HironakaHostEnv(HironakaBase):
     """
 
     def __init__(
-        self,
-        host: Host,
-        invalid_move_penalty: Optional[int] = -1e-3,
-        stop_after_invalid_move: Optional[bool] = False,
-        config_kwargs: Optional[Dict[str, Any]] = None,
-        **kwargs
+            self,
+            host: Host,
+            invalid_move_penalty: float = -1e-3,
+            stop_after_invalid_move: bool = False,
+            config_kwargs: Optional[Dict[str, Any]] = None,
+            **kwargs
     ):
         config_kwargs = dict() if config_kwargs is None else config_kwargs
         super().__init__(**{**config_kwargs, **kwargs})

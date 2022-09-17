@@ -4,13 +4,13 @@ from typing import Iterable
 import torch
 
 """
-    This file consolidates helper functions directly borrowed from other repos. We consolidate important helper 
-        functions in this file instead of importing to prevent future unexpected changes. Credits are documented 
+    This file consolidates helper functions directly borrowed from other repos. We consolidate important helper
+        functions in this file instead of importing to prevent future unexpected changes. Credits are documented
         and given to the original repos.
 """
 
 """
-    The followings are short snippets directly borrowed from `stable-baselines3` 
+    The followings are short snippets directly borrowed from `stable-baselines3`.
 """
 
 
@@ -23,9 +23,9 @@ def zip_equal(*iterables):
 
 
 def polyak_update(
-    params: Iterable[torch.nn.Parameter],
-    target_params: Iterable[torch.nn.Parameter],
-    tau: float,
+        params: Iterable[torch.nn.Parameter],
+        target_params: Iterable[torch.nn.Parameter],
+        tau: float,
 ) -> None:
     """
     Perform a Polyak average update on ``target_params`` using ``params``:

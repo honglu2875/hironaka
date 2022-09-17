@@ -2,11 +2,11 @@ import logging
 import sys
 import unittest
 
-from hironaka.Points import Points
 from hironaka.agent import ChooseFirstAgent, RandomAgent
 from hironaka.core import ListPoints
 from hironaka.game import GameHironaka
 from hironaka.host import RandomHost, WeakSpivakovsky, Zeillinger
+from hironaka.points import Points
 from hironaka.src import generate_batch_points, generate_points
 
 
@@ -55,7 +55,8 @@ class TestGame(unittest.TestCase):
         random_agent = RandomAgent(ignore_batch_dimension=True)
         random_host = RandomHost(ignore_batch_dimension=True)
         zeillinger = Zeillinger(ignore_batch_dimension=True)
-        choose_first_agent = ChooseFirstAgent(ignore_batch_dimension=True)  # this guy always chooses the first coordinate
+        choose_first_agent = ChooseFirstAgent(
+            ignore_batch_dimension=True)  # this guy always chooses the first coordinate
 
         for host in [random_host, zeillinger]:
             for agent in [random_agent, choose_first_agent]:

@@ -11,7 +11,7 @@ from hironaka.src import (
     scale_points,
     shift_lst,
 )
-from .PointsBase import PointsBase
+from .points_base import PointsBase
 
 PointsAsNestedLists = List[List[List[Any]]]
 
@@ -26,12 +26,12 @@ class ListPoints(PointsBase):
     running_attributes = ["distinguished_points"]
 
     def __init__(
-        self,
-        points: Union[PointsAsNestedLists, List[List[float]], np.ndarray],
-        value_threshold: Optional[float] = 1e8,
-        use_precise_newton_polytope: Optional[bool] = False,
-        distinguished_points: Optional[Union[List[int], None]] = None,
-        **kwargs
+            self,
+            points: Union[PointsAsNestedLists, List[List[float]], np.ndarray],
+            value_threshold: Optional[float] = 1e8,
+            use_precise_newton_polytope: Optional[bool] = False,
+            distinguished_points: Optional[Union[List[int], None]] = None,
+            **kwargs
     ):
         """
         Parameters:
@@ -47,8 +47,8 @@ class ListPoints(PointsBase):
         # Be lenient and (try to) allow numpy array/tensor as input.
         # The input might already be a padded arrays. Thus, we do a thorough check to clean that up.
         # WARNING: padding value must be *STRICTLY* negative for the numpy array!
-        if isinstance(points, np.ndarray) or isinstance(points, torch.Tensor):
-            points = points.tolist()
+        if isinstance(points, (np.ndarray, torch.Tensor)):
+            points = points.tolist()  # pytype: disable=attribute-error
             for p in points:
                 while p[-1][0] < 0:
                     p.pop()
@@ -75,18 +75,19 @@ class ListPoints(PointsBase):
         return [len(batch) for batch in self.points]
 
     def _shift(
-        self, points: PointsAsNestedLists, coords: List[List[int]], axis: List[int], inplace: Optional[bool] = True, **kwargs
-    ) -> Union[PointsAsNestedLists, None]:
+            self, points: PointsAsNestedLists, coords: List[List[int]], axis: List[int],
+            inplace: Optional[bool] = True, **kwargs
+    ) -> PointsAsNestedLists:
         return shift_lst(points, coords, axis, inplace=inplace)
 
     def _reposition(
-        self, points: PointsAsNestedLists, inplace: Optional[bool] = True, **kwargs
-    ) -> Union[PointsAsNestedLists, None]:
+            self, points: PointsAsNestedLists, inplace: Optional[bool] = True, **kwargs
+    ) -> PointsAsNestedLists:
         return reposition_lst(points, inplace=inplace)
 
     def _get_newton_polytope(
-        self, points: PointsAsNestedLists, inplace: Optional[bool] = True, **kwargs
-    ) -> Union[PointsAsNestedLists, None]:
+            self, points: PointsAsNestedLists, inplace: Optional[bool] = True, **kwargs
+    ) -> PointsAsNestedLists:
         # Mark distinguished points
         if self.distinguished_points is not None:
             # Apply marks to the distinguished points before the operation
@@ -98,7 +99,7 @@ class ListPoints(PointsBase):
         if self.use_precise_newton_polytope:
             result = get_newton_polytope_lst(points, inplace=inplace)
         else:
-            result = get_newton_polytope_approx_lst(points, inplace=inplace, get_ended=False)
+            result = get_newton_polytope_approx_lst(points, inplace=inplace)
 
         # Recover the locations of distinguished points
         if self.distinguished_points is not None:
@@ -120,8 +121,8 @@ class ListPoints(PointsBase):
         return get_shape(points)
 
     def _rescale(
-        self, points: PointsAsNestedLists, inplace: Optional[bool] = True, **kwargs
-    ) -> Union[PointsAsNestedLists, None]:
+            self, points: PointsAsNestedLists, inplace: Optional[bool] = True, **kwargs
+    ) -> PointsAsNestedLists:
         return scale_points(points, inplace=inplace)
 
     def _add_batch_axis(self, points: PointsAsNestedLists) -> PointsAsNestedLists:

@@ -16,9 +16,11 @@ class TestPoints(unittest.TestCase):
     def test_operations(self):
         # host = Zeillinger()
         points = ListPoints(
-            make_nested_list([(7, 5, 3, 8), (8, 1, 8, 18), (8, 3, 17, 8), (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)])
+            make_nested_list(
+                [(7, 5, 3, 8), (8, 1, 8, 18), (8, 3, 17, 8), (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)])
         )
-        p2 = ListPoints(make_nested_list([(0, 1, 0, 1), (0, 2, 0, 0), (1, 0, 0, 1), (1, 0, 1, 0), (1, 1, 0, 0), (2, 0, 0, 0)]))
+        p2 = ListPoints(
+            make_nested_list([(0, 1, 0, 1), (0, 2, 0, 0), (1, 0, 0, 1), (1, 0, 1, 0), (1, 1, 0, 0), (2, 0, 0, 0)]))
 
         result = ListPoints(
             make_nested_list(
@@ -34,10 +36,12 @@ class TestPoints(unittest.TestCase):
 
     def test_operations2(self):
         p = ListPoints(
-            make_nested_list([(7, 5, 3, 8), (8, 9, 8, 18), (8, 3, 17, 8), (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)])
+            make_nested_list(
+                [(7, 5, 3, 8), (8, 9, 8, 18), (8, 3, 17, 8), (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)])
         )
         q = ListPoints(
-            make_nested_list([(7, 5, 3, 8), (8, 9, 8, 18), (8, 3, 17, 8), (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)])
+            make_nested_list(
+                [(7, 5, 3, 8), (8, 9, 8, 18), (8, 3, 17, 8), (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)])
         )
         """
         # For numpy Points test
@@ -50,7 +54,8 @@ class TestPoints(unittest.TestCase):
               [-1, -1, -1, -1]]]
         ))
         """
-        r2 = ListPoints(make_nested_list([[[16, 11, 5, 6], [11, 12, 18, 6], [11, 11, 1, 19], [8, 3, 17, 8], [7, 5, 3, 8]]]))
+        r2 = ListPoints(
+            make_nested_list([[[16, 11, 5, 6], [11, 12, 18, 6], [11, 11, 1, 19], [8, 3, 17, 8], [7, 5, 3, 8]]]))
         q.get_newton_polytope()
 
         assert str(q) == str(p.get_newton_polytope(inplace=False))
@@ -77,7 +82,8 @@ class TestPoints(unittest.TestCase):
                 return features
 
         p = CustomListPoints(
-            make_nested_list([(7, 5, 3, 8), (8, 9, 8, 18), (8, 3, 17, 8), (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)])
+            make_nested_list(
+                [(7, 5, 3, 8), (8, 9, 8, 18), (8, 3, 17, 8), (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)])
         )
         r = [
             [
@@ -107,7 +113,8 @@ class TestPoints(unittest.TestCase):
 
     def test_numpy_input_without_use_np(self):
         p = ListPoints(
-            np.array([[[7, 5, 11, 8], [8, 1, 26, 18], [8, 3, 25, 8], [11, 11, 20, 19], [-1, -1, -1, -1], [-1, -1, -1, -1]]])
+            np.array(
+                [[[7, 5, 11, 8], [8, 1, 26, 18], [8, 3, 25, 8], [11, 11, 20, 19], [-1, -1, -1, -1], [-1, -1, -1, -1]]])
         )
 
         r = [[[7, 5, 11, 8], [8, 1, 26, 18], [8, 3, 25, 8], [11, 11, 20, 19]]]
@@ -116,7 +123,8 @@ class TestPoints(unittest.TestCase):
 
     def test_scale(self):
         points = ListPoints(
-            make_nested_list([(7, 5, 3, 8), (8, 1, 8, 18), (8, 3, 17, 8), (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)])
+            make_nested_list(
+                [(7, 5, 3, 8), (8, 1, 8, 18), (8, 3, 17, 8), (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)])
         )
 
         r = [
@@ -141,7 +149,8 @@ class TestPoints(unittest.TestCase):
 
     def test_reposition(self):
         points = ListPoints(
-            make_nested_list([(7, 5, 3, 8), (8, 1, 8, 18), (8, 3, 17, 8), (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)])
+            make_nested_list(
+                [(7, 5, 3, 8), (8, 1, 8, 18), (8, 3, 17, 8), (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)])
         )
         r = ListPoints([[[0, 4, 2, 2], [1, 0, 7, 12], [1, 2, 16, 2], [4, 10, 0, 13], [4, 11, 17, 0], [9, 10, 4, 0]]])
         points.reposition()
@@ -151,7 +160,8 @@ class TestPoints(unittest.TestCase):
 
     def test_distinguished_elements(self):
         points = ListPoints(
-            make_nested_list([(7, 5, 3, 8), (8, 1, 8, 18), (8, 3, 17, 8), (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)]),
+            make_nested_list(
+                [(7, 5, 3, 8), (8, 1, 8, 18), (8, 3, 17, 8), (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)]),
             distinguished_points=[2],
         )
 
@@ -173,7 +183,8 @@ class TestPoints(unittest.TestCase):
 
     def test_true_newton_polytope(self):
         points = ListPoints(
-            make_nested_list([(7, 5, 3, 8), (8, 1, 8, 18), (8, 3, 17, 8), (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)]),
+            make_nested_list(
+                [(7, 5, 3, 8), (8, 1, 8, 18), (8, 3, 17, 8), (11, 11, 1, 19), (11, 12, 18, 6), (16, 11, 5, 6)]),
             use_precise_newton_polytope=True,
         )
 

@@ -56,7 +56,8 @@ def get_interior(points_slice: jnp.ndarray) -> jnp.ndarray:
     available = jnp.all(points_slice >= 0, axis=1)
     available_mask = and_kronecker(available, available)
     diff = sub_2_2(points_slice, points_slice)  # (max_num_points, max_num_points, dimension)
-    res = ~jnp.any(jnp.all(diff >= 0, axis=2) & (~jnp.diag(jnp.ones(max_num_points, dtype=bool))) & available_mask, axis=1)
+    res = ~jnp.any(jnp.all(diff >= 0, axis=2) & (~jnp.diag(jnp.ones(max_num_points, dtype=bool))) & available_mask,
+                   axis=1)
     return res
 
 
@@ -125,7 +126,8 @@ def subtract_min(vector: jnp.ndarray, padding_value: float = -1.0) -> jnp.array:
     dtype = vector.dtype
     modified = vector * available + (~available * jnp.max(vector)).astype(dtype)
     minimal = jnp.min(modified)
-    return jnp.where(minimal <= 0.0, vector, (vector - minimal) * available + (~available * padding_value).astype(dtype))
+    return jnp.where(minimal <= 0.0, vector,
+                     (vector - minimal) * available + (~available * padding_value).astype(dtype))
 
 
 @jit

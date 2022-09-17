@@ -9,7 +9,7 @@ from hironaka.src import batched_coord_list_to_binary, get_batched_padded_array
 
 PointsDataTypes = Union[torch.Tensor, List[List[List[Any]]], np.ndarray]
 CoordsDataTypes = Union[torch.Tensor, List[List[int]], np.ndarray]
-PlayerInputTypes = Tuple[PointsDataTypes, CoordsDataTypes]
+PlayerInputTypes = Union[PointsDataTypes, Tuple[PointsDataTypes, CoordsDataTypes]]
 
 
 class Policy(abc.ABC):
@@ -28,14 +28,14 @@ class Policy(abc.ABC):
 
     @abc.abstractmethod
     def __init__(
-        self,
-        mode: str,
-        max_num_points: int,
-        padding_value: Optional[float] = -1.0,
-        dimension: Optional[int] = 3,
-        device: Optional[Union[str, torch.device]] = "cpu",
-        dtype: Optional[Type] = torch.float32,
-        **kwargs,
+            self,
+            mode: str,
+            max_num_points: int,
+            padding_value: Optional[float] = -1.0,
+            dimension: Optional[int] = 3,
+            device: Optional[Union[str, torch.device]] = "cpu",
+            dtype: Optional[Type] = torch.float32,
+            **kwargs,
     ):
         self.logger = logging.getLogger(__class__.__name__)
 
@@ -49,7 +49,7 @@ class Policy(abc.ABC):
         self.dtype = dtype
 
     @abc.abstractmethod
-    def predict(self, features: PlayerInputTypes, debug: Optional[bool] = False) -> PointsDataTypes:
+    def predict(self, features: PlayerInputTypes, debug: bool = False) -> PointsDataTypes:
         """
         Return the prediction based on the observed features.
 

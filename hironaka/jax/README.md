@@ -10,7 +10,7 @@ We break down component into (factory) functions included in:
 - [.simulation_fn](simulation_fn.py)
 - [.util](util.py)
 
-and package the whole process in the class [`JAXTrainer`](JAXTrainer.py). But feel free to use the functions for
+and package the whole process in the class [`JAXTrainer`](jax_trainer.py). But feel free to use the functions for
 fine-grained modifications.
 JAX is ultimately built under functional programming concepts. It is easier to maintain key parts as individual
 functions than sophisticated hierarchies of classes.
@@ -64,6 +64,7 @@ This provides functions to simulate from the root and generate roll-outs.
 This is a package of all the above and initialize based on a config file (like `jax_config.yml`).
 
 A sample usage:
+
 ```python
 import jax
 from hironaka.jax import JAXTrainer

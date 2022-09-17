@@ -5,7 +5,7 @@ import torch
 
 from hironaka.src import get_batched_padded_array, get_newton_polytope_torch, reposition_torch, rescale_torch, \
     shift_torch
-from .PointsBase import PointsBase
+from .points_base import PointsBase
 
 
 class TensorPoints(PointsBase):
@@ -13,18 +13,18 @@ class TensorPoints(PointsBase):
     running_attributes = ["distinguished_points"]
 
     def __init__(
-        self,
-        points: Union[torch.Tensor, List[List[List[float]]], np.ndarray],
-        value_threshold: Optional[float] = 1e8,
-        device: Optional[Union[str, torch.device]] = "cpu",
-        padding_value: Optional[float] = -1.0,
-        distinguished_points: Optional[List[int]] = None,
-        dtype: Optional[Union[Type, torch.dtype]] = torch.float32,
-        **kwargs,
+            self,
+            points: Union[torch.Tensor, List[List[List[float]]], np.ndarray],
+            value_threshold: Optional[float] = 1e8,
+            device: Optional[Union[str, torch.device]] = "cpu",
+            padding_value: Optional[float] = -1.0,
+            distinguished_points: Optional[List[int]] = None,
+            dtype: Optional[Union[Type, torch.dtype]] = torch.float32,
+            **kwargs,
     ):
         self.value_threshold = value_threshold
 
-        assert padding_value <= 0, f"'padding_value' must be a non-positive number. Got {padding_value} instead."
+        assert padding_value <= 0.0, f"'padding_value' must be a non-positive number. Got {padding_value} instead."
 
         self.dtype = dtype
         self.device = torch.device(device) if isinstance(device, str) else device
@@ -78,20 +78,21 @@ class TensorPoints(PointsBase):
         self.points = self.points.type(t)
 
     def _shift(
-        self,
-        points: torch.Tensor,
-        coords: Union[torch.Tensor, List[List[int]]],
-        axis: Union[torch.Tensor, List[int]],
-        inplace: Optional[bool] = True,
-        ignore_ended_games: Optional[bool] = True,
-        **kwargs,
+            self,
+            points: torch.Tensor,
+            coords: Union[torch.Tensor, List[List[int]]],
+            axis: Union[torch.Tensor, List[int]],
+            inplace: Optional[bool] = True,
+            ignore_ended_games: Optional[bool] = True,
+            **kwargs,
     ) -> Union[torch.Tensor, None]:
         return shift_torch(
-            points, coords, axis, inplace=inplace, padding_value=self.padding_value, ignore_ended_games=ignore_ended_games
+            points, coords, axis, inplace=inplace, padding_value=self.padding_value,
+            ignore_ended_games=ignore_ended_games
         )
 
     def _get_newton_polytope(
-        self, points: torch.Tensor, inplace: Optional[bool] = True, **kwargs
+            self, points: torch.Tensor, inplace: Optional[bool] = True, **kwargs
     ) -> Union[torch.Tensor, None]:
         return get_newton_polytope_torch(points, inplace=inplace, padding_value=self.padding_value)
 
