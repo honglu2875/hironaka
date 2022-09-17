@@ -10,6 +10,7 @@ dimension: 3
 max_num_points: 20
 max_length_game: 20
 max_value: 20
+
 max_grad_norm: 1
 
 eval_batch_size: 10

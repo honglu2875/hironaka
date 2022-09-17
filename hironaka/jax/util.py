@@ -27,6 +27,11 @@ def get_dones(pts: jnp.ndarray) -> jnp.ndarray:
     return jnp.sum((pts[:, :, 0] >= 0), axis=1) < 2
 
 
+@partial(jit, static_argnames=['role', 'dimension'])
+def get_done_from_flatten(obs: jnp.ndarray, role: str, dimension: int) -> jnp.ndarray:
+    return jnp.sum(obs >= 0, axis=-1) <= dimension + (role == 'agent') * (2 ** dimension - dimension - 1)
+
+
 def get_preprocess_fns(role: str, spec: Tuple[int, int]) -> Tuple[Callable, Callable]:
     """
     Parameters:
@@ -144,6 +149,16 @@ def get_feature_fn(role: str, spec: Tuple) -> Callable:
         raise ValueError(f"role must be either host or agent. Got {role}.")
 
     return feature_fn
+
+
+@partial(jit, static_argnames=['max_length_game', 'reward_fn'])
+def calculate_value_using_reward_fn(done: jnp.ndarray, prev_done: jnp.ndarray, discount: float,
+                                    max_length_game: int, reward_fn: Callable) -> jnp.ndarray:
+    reward = vmap(reward_fn, (0, 0), 0)(done, prev_done)
+    diff = jnp.arange(max_length_game).reshape((1, -1)) - jnp.arange(max_length_game).reshape((-1, 1))
+    discount_table = (discount ** diff) * (diff >= 0)
+    discounted_value = vmap(jnp.matmul, (None, 0), 0)(discount_table, reward)
+    return discounted_value
 
 
 def apply_agent_action_mask(agent_policy: Callable, dimension: int) -> Callable:

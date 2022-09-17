@@ -10,6 +10,7 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 import yaml
+from jax import vmap
 # Funny that jax doesn't work with tensorflow and I have to use PyTorch's version of tensorboard...
 from torch.utils.tensorboard import SummaryWriter
 
@@ -18,8 +19,9 @@ from hironaka.jax.net import DenseResNet, PolicyWrapper
 from hironaka.jax.players import random_host_fn, zeillinger_fn, all_coord_host_fn, random_agent_fn, \
     choose_first_agent_fn, choose_last_agent_fn, get_host_with_flattened_obs
 from hironaka.jax.simulation_fn import get_evaluation_loop, get_single_thread_simulation
-from hironaka.jax.util import get_reward_fn, policy_value_loss, compute_loss, action_wrapper, flatten, get_take_actions, \
-    get_batch_decode_from_one_hot, make_agent_obs, get_dones, get_name
+from hironaka.jax.util import get_reward_fn, policy_value_loss, compute_loss, action_wrapper, flatten, \
+    get_take_actions, get_batch_decode_from_one_hot, make_agent_obs, get_dones, get_name, \
+    calculate_value_using_reward_fn, get_done_from_flatten
 from hironaka.src import rescale_jax, get_newton_polytope_jax
 from hironaka.trainer.Scheduler import ConstantScheduler, ExponentialLRScheduler, InverseLRScheduler
 
@@ -97,7 +99,7 @@ class JAXTrainer:
 
     def simulate(self, key: jnp.ndarray, role: str) -> RollOut:
         """
-        A helper function of performing a simulation. Nothing but calling `{role}_sim_fn`
+        A helper function of performing a simulation. The core is nothing but calling `{role}_sim_fn`
         Parameters:
             key: the PRNG key.
             role: host or agent.
@@ -121,14 +123,14 @@ class JAXTrainer:
         else:
             raise ValueError(f"role must be either host or agent. Got {role}.")
 
-        return self.rollout_postprocess(role,
-                                        sim_fn(key, root_state, role_fn_args=(policy_wrapper.parameters,),
-                                               opponent_fn_args=(opp_policy_wrapper.parameters,)))
+        simulate_output = sim_fn(key, root_state, role_fn_args=(policy_wrapper.parameters,),
+                                               opponent_fn_args=(opp_policy_wrapper.parameters,))
+        return self.rollout_postprocess(role, simulate_output)
 
     def train(self, key: jnp.ndarray, role: str, gradient_steps: int, rollouts: jnp.ndarray, random_sampling=False,
               verbose=0):
         """
-        Trains the neural network with a collection of samples ('experiences', supposedly collected from simulation).
+        Trains the neural network with a collection of samples ('rollouts', supposedly collected from simulation).
         Parameters:
             key: the PRNG key.
             role: either host or agent.
@@ -142,21 +144,12 @@ class JAXTrainer:
         if getattr(self, f"{role}_policy") is None:
             raise RuntimeError(f"opponent {opponent} policy function not initialized.")
 
-        state = getattr(self, f"{role}_state", None)
-        policy_wrapper = getattr(self, f"{role}_policy")
+        batch_size = self.config[role]['batch_size']
+        state = self.get_state(role)
         train_fn = self.get_train_fn(role)
 
         sample_size = rollouts[0].shape[0]
-        batch_size = self.config[role]['batch_size']
         gradient_steps = sample_size // batch_size if not random_sampling else gradient_steps
-
-        if state is None:
-            optim = getattr(self, f"{role}_optim")
-            apply_fn = policy_wrapper.get_apply_fn(batch_size)
-            state = TrainState.create(
-                apply_fn=apply_fn,
-                params=policy_wrapper.parameters,
-                tx=optim)
 
         for i in range(gradient_steps):
             key, subkey = jax.random.PRNGKey(key)
@@ -168,25 +161,29 @@ class JAXTrainer:
 
             sample = rollouts[0][sample_idx, :], rollouts[1][sample_idx, :], rollouts[2][sample_idx]
 
-            state, loss = train_fn(state, sample)
+            state, loss, grads = train_fn(state, sample)
 
-            if state.step % 20 == 0:
+            if state.step % 20 == 0:  # Just hard-coded the 20-step interval. Empirically working well for logging.
                 if verbose:
                     self.logger.info(f"Loss: {loss}")
 
-                self.tensorboard_log_scalar('loss', loss, state.step)
+                self.tensorboard_log_scalar(f"{role}/loss", loss, state.step)
+                self.summary_writer.add_histogram(
+                    f"{role}/gradient", self.layerwise_average(grads['params']), state.step)
 
                 if self.config['tensorboard']['layerwise_logging']:
-                    self.tensorboard_log_layers('', state.params['params'], state.step)
+                    self.tensorboard_log_layers(role, state.params['params'], state.step)
 
         # Save the state and parameters
         setattr(self, f"{role}_state", state)
-        policy_wrapper.parameters = state.params
+        getattr(self, f"{role}_policy").parameters = state.params
 
-    def train_step(self, state: jnp.ndarray, sample: jnp.ndarray, loss_fn: Callable) -> Tuple[TrainState, jnp.ndarray]:
+    @staticmethod
+    def train_step(state: jnp.ndarray, sample: jnp.ndarray,
+                   loss_fn: Callable) -> Tuple[TrainState, jnp.ndarray, jnp.ndarray]:
         loss, grads = jax.value_and_grad(partial(compute_loss, loss_fn=loss_fn))(state.params, state.apply_fn, sample)
         state = state.apply_gradients(grads=grads)
-        return state, loss
+        return state, loss, grads
 
     def evaluate(self, eval_fn: Callable = None, verbose=1, batch_size=10,
                  num_of_loops=10, max_length=None, key=None) -> Tuple[List, List]:
@@ -199,7 +196,6 @@ class JAXTrainer:
         host_policy_wrapper = self.host_policy
         agent_policy_wrapper = self.agent_policy
 
-        # jit is forced for policy networks here. Otherwise, it is simply unpractical and too slow.
         host_fn = jax.jit(action_wrapper(partial(
             host_policy_wrapper.get_apply_fn(batch_size), params=host_policy_wrapper.parameters), None))
         agent_fn = jax.jit(action_wrapper(partial(
@@ -211,6 +207,7 @@ class JAXTrainer:
         agents = [agent_fn, partial(random_agent_fn, spec=spec),
                   partial(choose_first_agent_fn, spec=spec), partial(choose_last_agent_fn, spec=spec)]
 
+        # Pit host network against all and agent network against the rest.
         battle_schedule = [(0, i) for i in range(len(agents))] + [(i, 0) for i in range(1, len(hosts))]
 
         rhos = []
@@ -229,21 +226,23 @@ class JAXTrainer:
 
         return rhos, details
 
-    def compute_rho(self, host: Callable, agent: Callable, batch_size=10,
-                    num_of_loops=10, max_length=20, key=None) -> Tuple[float, List]:
+    def compute_rho(self, host: Callable, agent: Callable, batch_size=None,
+                    num_of_loops=10, max_length=None, key=None) -> Tuple[float, List]:
         """
         Calculate the rho number between the host and agent.
         Parameters:
             host: a function that takes in point state and returns the one-hot action vectors.
             agent: a function that takes in point state and returns the one-hot action vectors.
-            batch_size: the batch size.
-            num_of_loops: the number of steps to evaluate.
-            max_length: the maximal length of game.
+            batch_size: (Optional) the batch size. Default to self.eval_batch_size.
+            num_of_loops: (Optional) the number of times to run a batch of points. Default to 10.
+            max_length: (Optional) the maximal length of game. Default is self.max_length_game
             key: (Optional) the PRNG random key (if None, will use time.time_ns() to seed a key)
         Returns:
             the rho number.
         """
         key = jax.random.PRNGKey(time.time_ns()) if key is None else key
+        max_length = self.max_length_game if max_length is None else max_length
+        batch_size = self.eval_batch_size if batch_size is None else batch_size
 
         max_num_points, dimension = self.max_num_points, self.dimension
         spec = (max_num_points, dimension)
@@ -289,20 +288,16 @@ class JAXTrainer:
         # policy (b, max_length_game, dimension)
         # value (b, max_length_game)
         obs, policy, value = rollouts
-        max_length_game = obs.shape[1]
+        batch_size, max_length_game = obs.shape[0], obs.shape[1]
+        value_dtype = value.dtype
 
-        dones = jnp.sum(obs[:, :, :] >= 0, axis=-1) <= self.dimension
-        first_dones = jnp.argmax(dones, axis=-1)
-        steps_before_done = (first_dones.reshape(-1, 1) - jnp.arange(max_length_game).reshape((1, -1)))
-        steps_before_done = steps_before_done * (steps_before_done >= 0)
+        reward_fn = getattr(self, f"{role}_reward_fn")
+        done = get_done_from_flatten(obs, role, self.dimension)  # (b, max_length_game)
+        prev_done = jnp.concatenate([jnp.zeros((batch_size, 1), dtype=bool), done[:, :-1]], axis=1)
+        value = calculate_value_using_reward_fn(done, prev_done, self.discount,
+                                                max_length_game, reward_fn)
 
-        never_ended = jnp.repeat(jnp.all(~dones, axis=-1).reshape((-1, 1)), max_length_game, axis=-1)
-
-        dtype = value.dtype
-        value = self.discount ** steps_before_done - never_ended
-        if role == 'agent':
-            value = -value
-        value = jnp.ravel(value).astype(dtype)
+        value = jnp.ravel(value).astype(value_dtype)
 
         obs = obs.reshape((-1, obs.shape[2]))
         policy = policy.reshape((-1, policy.shape[2]))
@@ -323,6 +318,18 @@ class JAXTrainer:
         else:
             self.summary_writer.add_histogram(name, np.array(params), step)
 
+    @staticmethod
+    def layerwise_average(grads, avg_lst: List) -> List:
+        """
+        Recursively compute the average of each layer, and put them together into a list.
+        """
+        if isinstance(grads, (flax.core.FrozenDict, dict)):
+            for key, item in grads.items():
+                JAXTrainer.layerwise_average(item, avg_lst)
+        else:
+            avg_lst.append(jnp.mean(grads))
+        return avg_lst
+
     # ---------- Below are getter functions for training-related functions ---------- #
     def get_fns(self, role: str, name: str) -> Callable:
         if not hasattr(self, f"{role}_{name}") or getattr(self, f"{role}_{name}") is None:
@@ -331,17 +338,32 @@ class JAXTrainer:
             self.update_train_fn(role)
         return getattr(self, f"{role}_{name}")
 
-    def get_eval_policy_fn(self, role: str):
+    def get_eval_policy_fn(self, role: str) -> Callable:
         return self.get_fns(role, 'eval_policy_fn')
 
-    def get_eval_loop(self, role: str):
+    def get_train_policy_fn(self, role: str) -> Callable:
+        return self.get_fns(role, 'train_policy_fn')
+
+    def get_eval_loop(self, role: str) -> Callable:
         return self.get_fns(role, 'eval_loop')
 
-    def get_sim_fn(self, role: str):
+    def get_sim_fn(self, role: str) -> Callable:
         return self.get_fns(role, 'sim_fn')
 
-    def get_train_fn(self, role: str):
+    def get_train_fn(self, role: str) -> Callable:
         return self.get_fns(role, 'train_fn')
+
+    def get_state(self, role: str) -> TrainState:
+        state = getattr(self, f"{role}_state")
+        if state is None:
+            optim = getattr(self, f"{role}_optim")
+            policy_wrapper = getattr(self, f"{role}_policy")
+            apply_fn = self.get_train_policy_fn(role)
+            state = TrainState.create(
+                apply_fn=apply_fn,
+                params=policy_wrapper.parameters,
+                tx=optim)
+        return state
 
     # ---------- Below are either static methods or methods that set its members ---------- #
 
@@ -395,10 +417,12 @@ class JAXTrainer:
         """
         train_fn = jax.jit(partial(self.train_step, loss_fn=policy_value_loss)) if jitted else \
             partial(self.train_step, loss_fn=policy_value_loss)
+        train_policy_fn = jax.jit(getattr(self, f"{role}_policy").get_apply_fn(self.config[role]['batch_size']))
         if return_function:
-            return train_fn
+            return train_fn, train_policy_fn
         else:
             setattr(self, f"{role}_train_fn", train_fn)
+            setattr(self, f"{role}_train_policy_fn", train_policy_fn)
 
     def purge_state(self, role: str):
         """
