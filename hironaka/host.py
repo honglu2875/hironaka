@@ -16,6 +16,7 @@ class Host(abc.ABC):
     Must implement:
         _select_coord
     """
+
     def __init__(self, ignore_batch_dimension=False, **kwargs):
         self.logger = logging.getLogger(__class__.__name__)
 

@@ -2,9 +2,8 @@ from copy import deepcopy
 from typing import Optional, Tuple, Union, Callable, Type
 
 import torch
-from torch.nn import DataParallel
 
-from hironaka.core import PointsBase, TensorPoints
+from hironaka.core import TensorPoints
 from hironaka.src import HostActionEncoder
 from hironaka.trainer.Timer import Timer
 

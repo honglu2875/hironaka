@@ -14,12 +14,14 @@ def activate_dp(trainer: Trainer, device_ids: List[int]):
 
     trainer.fused_game = ParallelFusedGame(FusedGame(trainer.host_net, trainer.agent_net, device=trainer.device,
                                                      log_time=trainer.log_time, reward_func=trainer.reward_func,
-                                                     dtype=trainer.dtype), device_ids = device_ids)
+                                                     dtype=trainer.dtype), device_ids=device_ids)
+
 
 class ParallelFusedGame:
     """
     A wrapper making FusedGame run on multiple GPU. It only exposes `step` method.
     """
+
     def __init__(self, fused_game: FusedGame, device_ids: List[int]):
         self.fused_game = fused_game
         self.device_ids = device_ids

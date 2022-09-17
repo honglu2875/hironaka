@@ -1,3 +1,4 @@
-from .ListPoints import *
-from .TensorPoints import *
-from .JAXPoints import *
+from .PointsBase import PointsBase
+from .JAXPoints import JAXPoints
+from .ListPoints import ListPoints
+from .TensorPoints import TensorPoints

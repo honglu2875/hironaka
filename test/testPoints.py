@@ -200,5 +200,3 @@ class TestPoints(unittest.TestCase):
 
         points.get_newton_polytope()
         assert str(points.points) == str(r)
-
-

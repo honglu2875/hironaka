@@ -2,13 +2,12 @@ from functools import partial
 from typing import Optional, Tuple, Type, Union, List
 
 import jax
+import jax.numpy as jnp
 import jaxlib
 import numpy as np
-from jax import lax, vmap
+from jax import vmap
 
 from hironaka.core import PointsBase
-import jax.numpy as jnp
-
 from hironaka.src import get_newton_polytope_jax, rescale_jax, reposition_jax, shift_jax, get_batched_padded_array
 
 

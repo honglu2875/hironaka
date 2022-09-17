@@ -12,6 +12,7 @@ class Game(abc.ABC):
     """
     This framework simulates a fully autonomous game without interference from outside.
     """
+
     @abc.abstractmethod
     def __init__(self,
                  state: Union[ListPoints, Points, None],

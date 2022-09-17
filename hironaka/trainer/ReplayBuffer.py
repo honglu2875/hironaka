@@ -145,7 +145,6 @@ class ReplayBuffer:
         exp[3] = self._check_and_fix_dtype(exp[3], torch.bool)  # done
         exp[4] = self._check_and_fix_dtype(exp[4], self.dtype)  # next_observation
 
-
     @staticmethod
     def _check_and_fix_dtype(t: Union[torch.Tensor, dict], dtype: torch.dtype) -> Union[torch.Tensor, dict]:
         if isinstance(t, dict):

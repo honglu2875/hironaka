@@ -1,11 +1,7 @@
 from functools import partial
 from typing import Tuple, Callable
 
-import flax
 import jax
-import jax.numpy as jnp
-from flax.core import FrozenDict
-
 from jax import vmap, jit, lax, numpy as jnp
 
 from hironaka.src import rescale_jax, get_newton_polytope_jax, shift_jax
@@ -45,8 +41,11 @@ def get_preprocess_fns(role: str, spec: Tuple[int, int]) -> Tuple[Callable, Call
                 of chosen coordinates
     """
     if role == 'host':
-        def obs_preprocess(observations): return observations.reshape(-1, *spec)
-        def coords_preprocess(observations, actions): return actions
+        def obs_preprocess(observations):
+            return observations.reshape(-1, *spec)
+
+        def coords_preprocess(observations, actions):
+            return actions
     elif role == 'agent':
         def obs_preprocess(observations):
             return vmap(partial(lax.dynamic_slice, start_indices=(0,), slice_sizes=(spec[0] * spec[1],)), 0, 0)(
@@ -97,8 +96,10 @@ def get_take_actions(role: str, spec: Tuple[int, int], rescale_points: bool = Tr
         points = obs_preprocess(observations)
         coords = coords_preprocess(observations, actions)
         shifted_pts = get_newton_polytope_jax(shift_jax(points, coords, axis))
-        maybe_rescaled = jnp.where(rescale_points, rescale_jax(shifted_pts), shifted_pts).reshape((-1, spec[0]*spec[1]))
+        maybe_rescaled = jnp.where(rescale_points, rescale_jax(shifted_pts), shifted_pts).reshape(
+            (-1, spec[0] * spec[1]))
         return maybe_rescaled
+
     return take_actions
 
 
@@ -149,11 +150,13 @@ def apply_agent_action_mask(agent_policy: Callable, dimension: int) -> Callable:
     """
     Apply a masked agent policy wrapper on top of an `agent_policy` function.
     """
+
     def masked_agent_policy(x: jnp.ndarray, *args, **kwargs) -> Tuple:
         batch_size, feature_num = x.shape
         mask = lax.dynamic_slice(x, (0, feature_num - dimension), (batch_size, dimension)) > 0.5
         policy_prior, value_prior = agent_policy(x, *args, **kwargs)
         return policy_prior * mask - jnp.inf * (~mask), value_prior
+
     setattr(masked_agent_policy, '__name__', get_name(agent_policy))
     return masked_agent_policy
 
@@ -168,6 +171,7 @@ def action_wrapper(policy_value_fn: Callable, dimension: int) -> Callable:
         out, _ = masked_action(x, *args, **kwargs)
         action_dim = out.shape[1]
         return jax.nn.one_hot(jnp.argmax(out, axis=1), action_dim)
+
     setattr(wrapped_action_fn, '__name__', get_name(policy_value_fn))
     return wrapped_action_fn
 
@@ -296,4 +300,3 @@ def policy_value_loss(policy_logit: jnp.ndarray, value: jnp.ndarray,
     policy_loss = jnp.sum(-jax.nn.softmax(target_policy, axis=-1) * jax.nn.log_softmax(policy_logit, axis=-1), axis=1)
     value_loss = jnp.square(value - target_value)
     return jnp.mean(policy_loss + value_loss)
-

@@ -1,4 +1,3 @@
-import logging
 from typing import Optional, Dict, Any
 
 from hironaka.core import ListPoints

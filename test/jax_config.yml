@@ -1,11 +1,13 @@
-use_tensorboard: true
-layerwise_logging: true
+tensorboard:
+  use: true
+  work_dir: runs
+  layerwise_logging: true
 use_cuda: true
 scale_observation: true
 version_string: 'mcts'
 
 dimension: 3
-max_num_points: 20
+max_num_points: 10
 max_length_game: 20
 max_value: 20
 max_grad_norm: 1
@@ -24,7 +26,7 @@ host:
       learning_rate: 0.001
     # Learning rate scheduling is built-in (by schedule function and `chain`), so we do not specify them.
   #net_arch: [256, 256, 256, 256, 256, 256, 256, 256]
-  net_arch: [32, 32]
+  net_arch: [ 32, 32 ]
 
 
 agent:
@@ -35,4 +37,4 @@ agent:
       learning_rate: 0.001
     # Learning rate scheduling is built-in (by schedule function and `chain`), so we do not specify them.
   #net_arch: [256, 256, 256, 256, 256, 256, 256, 256]
-  net_arch: [32, 32]
+  net_arch: [ 32, 32 ]

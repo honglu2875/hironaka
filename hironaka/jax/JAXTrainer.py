@@ -1,16 +1,19 @@
+import logging
 import time
+from datetime import datetime
 from functools import partial
 from typing import Union, Callable, Tuple, Any, List
 
+import flax
 import jax
 import jax.numpy as jnp
+import numpy as np
 import optax
 import yaml
-import logging
-from flax.training import train_state
-#from flax.metrics import tensorboard
-from flax.training.train_state import TrainState
+# Funny that jax doesn't work with tensorflow and I have to use PyTorch's version of tensorboard...
+from torch.utils.tensorboard import SummaryWriter
 
+from flax.training.train_state import TrainState
 from hironaka.jax.net import DenseResNet, PolicyWrapper
 from hironaka.jax.players import random_host_fn, zeillinger_fn, all_coord_host_fn, random_agent_fn, \
     choose_first_agent_fn, choose_last_agent_fn, get_host_with_flattened_obs
@@ -18,8 +21,7 @@ from hironaka.jax.simulation_fn import get_evaluation_loop, get_single_thread_si
 from hironaka.jax.util import get_reward_fn, policy_value_loss, compute_loss, action_wrapper, flatten, get_take_actions, \
     get_batch_decode_from_one_hot, make_agent_obs, get_dones, get_name
 from hironaka.src import rescale_jax, get_newton_polytope_jax
-from hironaka.trainer.Scheduler import ConstantScheduler, ExponentialLRScheduler, InverseLRScheduler, Scheduler
-
+from hironaka.trainer.Scheduler import ConstantScheduler, ExponentialLRScheduler, InverseLRScheduler
 
 RollOut = Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]
 
@@ -47,7 +49,7 @@ class JAXTrainer:
             raise TypeError(f"config must be either a string or a dict. Got {type(config)}.")
 
         config_keys = ['eval_batch_size', 'max_num_points', 'dimension', 'max_length_game', 'max_value',
-                       'scale_observation', 'use_tensorboard', 'layerwise_logging', 'use_cuda', 'version_string',
+                       'scale_observation', 'use_cuda', 'version_string',
                        'num_evaluations', 'max_num_considered_actions', 'discount']
         for config_key in config_keys:
             setattr(self, config_key, self.config[config_key])
@@ -80,6 +82,11 @@ class JAXTrainer:
             setattr(self, f"{role}_reward_fn", get_reward_fn(role))
 
             setattr(self, f"{role}_state", None)
+
+        if self.config['tensorboard']['use']:
+            self.log_string = f"{self.config['version_string']}_{datetime.now().year}_{datetime.now().month}" \
+                              f"_{datetime.now().day}_{time.time_ns()}"
+            self.summary_writer = SummaryWriter(log_dir=f"{self.config['tensorboard']['work_dir']}/{self.log_string}")
 
         for role in ['host', 'agent']:
             self.update_sim_loop(role)
@@ -115,10 +122,11 @@ class JAXTrainer:
             raise ValueError(f"role must be either host or agent. Got {role}.")
 
         return self.rollout_postprocess(role,
-            sim_fn(key, root_state, role_fn_args=(policy_wrapper.parameters,),
-                   opponent_fn_args=(opp_policy_wrapper.parameters,)))
+                                        sim_fn(key, root_state, role_fn_args=(policy_wrapper.parameters,),
+                                               opponent_fn_args=(opp_policy_wrapper.parameters,)))
 
-    def train(self, key: jnp.ndarray, role: str, gradient_steps: int, rollouts: jnp.ndarray, random_sampling=False):
+    def train(self, key: jnp.ndarray, role: str, gradient_steps: int, rollouts: jnp.ndarray, random_sampling=False,
+              verbose=0):
         """
         Trains the neural network with a collection of samples ('experiences', supposedly collected from simulation).
         Parameters:
@@ -127,6 +135,7 @@ class JAXTrainer:
             gradient_steps: number of gradient steps to take.
             rollouts: (batch_size, *input_dim), a batch of simulation samples.
             random_sampling: (Optional) whether to do random sampling in the rollouts.
+            verbose: (Optional) whether to print out the loss
         """
         opponent = self._get_opponent(role)
 
@@ -155,14 +164,20 @@ class JAXTrainer:
             if random_sampling:
                 sample_idx = jax.random.randint(subkey, (batch_size,), 0, sample_size)
             else:
-                sample_idx = jnp.arange(i * batch_size, (i+1) * batch_size)
+                sample_idx = jnp.arange(i * batch_size, (i + 1) * batch_size)
 
             sample = rollouts[0][sample_idx, :], rollouts[1][sample_idx, :], rollouts[2][sample_idx]
 
             state, loss = train_fn(state, sample)
 
-            # temporary logging. TODO: change to tensorboard
-            #self.logger.info(f"Loss: {loss}")
+            if state.step % 20 == 0:
+                if verbose:
+                    self.logger.info(f"Loss: {loss}")
+
+                self.tensorboard_log_scalar('loss', loss, state.step)
+
+                if self.config['tensorboard']['layerwise_logging']:
+                    self.tensorboard_log_layers('', state.params['params'], state.step)
 
         # Save the state and parameters
         setattr(self, f"{role}_state", state)
@@ -294,8 +309,22 @@ class JAXTrainer:
 
         return obs, policy, value
 
+    def tensorboard_log_scalar(self, name: str, number: float, step: int):
+        if hasattr(self, 'summary_writer') and self.summary_writer is not None:
+            self.summary_writer.add_scalar(name, float(number), int(step))
+
+    def tensorboard_log_layers(self, name: str, params, step: int):
+        """
+        Recursively log each layer.
+        """
+        if isinstance(params, (flax.core.FrozenDict, dict)):
+            for key, item in params.items():
+                self.tensorboard_log_layers(f"{name}/{key}", item, step)
+        else:
+            self.summary_writer.add_histogram(name, np.array(params), step)
+
     # ---------- Below are getter functions for training-related functions ---------- #
-    def get_fns(self, role:str, name: str) -> Callable:
+    def get_fns(self, role: str, name: str) -> Callable:
         if not hasattr(self, f"{role}_{name}") or getattr(self, f"{role}_{name}") is None:
             self.update_eval_policy_fn(role)
             self.update_sim_loop(role)

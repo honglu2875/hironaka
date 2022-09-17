@@ -1,16 +1,11 @@
 from functools import partial
 from typing import Callable, Tuple
 
-import chex
-import mctx
-import jax
 import jax.numpy as jnp
-from jax import jit
-import time
+import mctx
 
 from hironaka.jax.util import make_agent_obs, get_dones, get_take_actions, get_preprocess_fns, get_batch_decode, \
     get_batch_decode_from_one_hot
-from hironaka.src import rescale_jax, get_newton_polytope_jax, shift_jax
 
 
 def get_recurrent_fn_for_role(role: str, role_fn: Callable, opponent_action_fn: Callable, reward_fn: Callable,
@@ -45,7 +40,9 @@ def get_recurrent_fn_for_role(role: str, role_fn: Callable, opponent_action_fn: 
     obs_preprocess, coords_preprocess = get_preprocess_fns(role, spec)
 
     if role == 'host':
-        def first_obs_update(x, y, z): return x
+        def first_obs_update(x, y, z):
+            return x
+
         opponent_action_preprocess = partial(jnp.argmax, axis=1)  # one-hot agent actions to discrete indices
         second_obs_update = get_take_actions(role='host', spec=spec, rescale_points=rescale_points)
         make_opponent_obs = make_agent_obs
@@ -53,9 +50,15 @@ def get_recurrent_fn_for_role(role: str, role_fn: Callable, opponent_action_fn: 
     elif role == 'agent':
         first_obs_update = get_take_actions(role='agent', spec=spec, rescale_points=rescale_points)
         opponent_action_preprocess = get_batch_decode_from_one_hot(spec[1])  # one-hot host actions to multi-binary
-        def second_obs_update(x, y, z): return make_agent_obs(x, z)
-        def make_opponent_obs(obs, actions): return obs
-        def batch_decode(x): return x
+
+        def second_obs_update(x, y, z):
+            return make_agent_obs(x, z)
+
+        def make_opponent_obs(obs, actions):
+            return obs
+
+        def batch_decode(x):
+            return x
     else:
         raise ValueError(f"role must be either 'host' or 'agent'. Got {role}.")
 

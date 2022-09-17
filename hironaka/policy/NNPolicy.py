@@ -1,10 +1,10 @@
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 import numpy as np
 import torch
 
 from hironaka.policy.Policy import Policy
-from hironaka.src import batched_coord_list_to_binary, decode_action, mask_encoded_action, HostActionEncoder
+from hironaka.src import batched_coord_list_to_binary, HostActionEncoder
 
 
 class NNPolicy(Policy):

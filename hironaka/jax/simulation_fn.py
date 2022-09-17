@@ -1,16 +1,15 @@
-import warnings
+from functools import partial
 from functools import partial
 from typing import Callable, Tuple
 
 import jax
-import mctx
-from jax import jit, lax
 import jax.numpy as jnp
+import mctx
+from jax import lax
 from mctx import PolicyOutput
 
-from hironaka.src import get_newton_polytope_jax, rescale_jax, shift_jax
+from hironaka.src import rescale_jax
 from .recurrent_fn import get_recurrent_fn_for_role
-from .util import flatten
 
 
 def get_evaluation_loop(role: str, policy_fn: Callable, opponent_fn: Callable, reward_fn: Callable,
@@ -133,12 +132,10 @@ def get_single_thread_simulation(role: str, evaluation_loop: Callable, config: d
         rollout_value_init = jnp.zeros((eval_batch_size, num_loops,))
 
         _, rollouts, _ = lax.fori_loop(0, num_loops, body_fn,
-                                          (starting_keys, (rollout_obs_init,
-                                                           rollout_policy_init,
-                                                           rollout_value_init), root_state))
+                                       (starting_keys, (rollout_obs_init,
+                                                        rollout_policy_init,
+                                                        rollout_value_init), root_state))
 
         return rollouts
 
     return single_thread_simulation
-
-
