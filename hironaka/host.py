@@ -16,6 +16,7 @@ class Host(abc.ABC):
     Must implement:
         _select_coord
     """
+
     def __init__(self, ignore_batch_dimension=False, **kwargs):
         self.logger = logging.getLogger(__class__.__name__)
 
@@ -61,8 +62,7 @@ class Zeillinger(Host):
         mx = max(vt)
         mn = min(vt)
         L = mx - mn
-        S = sum([vt[i] == mx for i in range(len(vt))]) + \
-            sum([vt[i] == mn for i in range(len(vt))])
+        S = sum([vt[i] == mx for i in range(len(vt))]) + sum([vt[i] == mn for i in range(len(vt))])
         return L, S
 
     def _select_coord(self, points: ListPoints):
@@ -94,12 +94,9 @@ class Zeillinger(Host):
 
 
 class PolicyHost(Host):
-    def __init__(self,
-                 policy: Policy,
-                 use_discrete_actions_for_host: Optional[bool] = False,
-                 **kwargs):
+    def __init__(self, policy: Policy, use_discrete_actions_for_host: Optional[bool] = False, **kwargs):
         self._policy = policy
-        self.use_discrete_actions_for_host = kwargs.get('use_discrete_actions_for_host', use_discrete_actions_for_host)
+        self.use_discrete_actions_for_host = kwargs.get("use_discrete_actions_for_host", use_discrete_actions_for_host)
 
         super().__init__(**kwargs)
 
@@ -143,7 +140,7 @@ class WeakSpivakovsky(Host):
             for i in range(2, len(U) + 1):
                 combs = combinations(U, i)
                 for c in combs:
-                    if all(set(c) & l for l in subsets):
+                    if all(set(c) & coord for coord in subsets):
                         result.append(list(c))
                         break
                 if len(result) > b:  # Found result for this batch. Break.

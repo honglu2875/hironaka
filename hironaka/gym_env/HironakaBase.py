@@ -1,12 +1,12 @@
 import abc
-from typing import Optional, Dict, Any, TypeVar
+from typing import Any, Dict, Optional, TypeVar
 
 import gym
 import numpy as np
 from gym import spaces
 
 from hironaka.core import ListPoints
-from hironaka.src import get_padded_array, get_gym_version_in_float, generate_points
+from hironaka.src import generate_points, get_gym_version_in_float, get_padded_array
 
 ObsType = TypeVar("ObsType")
 ActType = TypeVar("ActType")
@@ -23,6 +23,7 @@ class HironakaBase(gym.Env, abc.ABC):
         step
         _get_obs
     """
+
     metadata = {"render_modes": ["ansi"]}
 
     # Override these two
@@ -34,19 +35,21 @@ class HironakaBase(gym.Env, abc.ABC):
         observation_space: gym.spaces.Space[ObsType]
 
     @abc.abstractmethod
-    def __init__(self,
-                 dimension: Optional[int] = 3,
-                 max_num_points: Optional[int] = 10,
-                 max_value: Optional[int] = 10,
-                 padding_value: Optional[float] = -1.0,
-                 value_threshold: Optional[float] = None,
-                 step_threshold: Optional[int] = 1000,
-                 fixed_penalty_crossing_threshold: Optional[int] = None,
-                 stop_at_threshold: Optional[bool] = True,
-                 improve_efficiency: Optional[bool] = False,
-                 scale_observation: Optional[bool] = True,
-                 reward_based_on_point_reduction: Optional[bool] = False,
-                 **kwargs):
+    def __init__(
+        self,
+        dimension: Optional[int] = 3,
+        max_num_points: Optional[int] = 10,
+        max_value: Optional[int] = 10,
+        padding_value: Optional[float] = -1.0,
+        value_threshold: Optional[float] = None,
+        step_threshold: Optional[int] = 1000,
+        fixed_penalty_crossing_threshold: Optional[int] = None,
+        stop_at_threshold: Optional[bool] = True,
+        improve_efficiency: Optional[bool] = False,
+        scale_observation: Optional[bool] = True,
+        reward_based_on_point_reduction: Optional[bool] = False,
+        **kwargs
+    ):
         self.dimension = dimension
         self.max_num_points = max_num_points
         self.max_value = max_value
@@ -61,13 +64,13 @@ class HironakaBase(gym.Env, abc.ABC):
 
         # Use self.point_observation_space in the definition of observations
         if self.scale_observation:
-            self.point_observation_space = spaces.Box(low=-1.0, high=np.inf,
-                                                      shape=(self.max_num_points, self.dimension),
-                                                      dtype=np.float32)
+            self.point_observation_space = spaces.Box(
+                low=-1.0, high=np.inf, shape=(self.max_num_points, self.dimension), dtype=np.float32
+            )
         else:
-            self.point_observation_space = spaces.Box(low=-1.0, high=1.0,
-                                                      shape=(self.max_num_points, self.dimension),
-                                                      dtype=np.float32)
+            self.point_observation_space = spaces.Box(
+                low=-1.0, high=1.0, shape=(self.max_num_points, self.dimension), dtype=np.float32
+            )
 
         # Configs to pass down to other functions
         self.config_for_points = {key: getattr(self, key) for key in self.config_key_for_points}
@@ -80,18 +83,13 @@ class HironakaBase(gym.Env, abc.ABC):
         self.exceed_threshold = False
         self.last_action_taken = None
 
-    def reset(self,
-              points=None,
-              seed=None,
-              return_info=False,
-              options=None) -> Any:
+    def reset(self, points=None, seed=None, return_info=False, options=None) -> Any:
         if GYM_VERSION >= 0.22:
             super().reset(seed=seed)
 
         if points is None:
             self._points = ListPoints(
-                [generate_points(self.max_num_points, **self.config_for_generate_points)],
-                value_threshold=self.value_threshold
+                [generate_points(self.max_num_points, **self.config_for_generate_points)], value_threshold=self.value_threshold
             )
         else:
             self._points = ListPoints(points, **self.config_for_points)
@@ -128,7 +126,7 @@ class HironakaBase(gym.Env, abc.ABC):
     def step(self, action):
         self.current_step += 1
 
-    def render(self, mode='ansi'):
+    def render(self, mode="ansi"):
         print(self._points)
         print(self._coords)
 
@@ -147,8 +145,9 @@ class HironakaBase(gym.Env, abc.ABC):
         a utility method that returns -1 padded point information.
         return: numpy array of shape (self.max_num_points, self.dimension)
         """
-        return get_padded_array(self._points.get_features()[0], new_length=self.max_num_points,
-                                constant_value=constant_value).astype(np.float32)
+        return get_padded_array(
+            self._points.get_features()[0], new_length=self.max_num_points, constant_value=constant_value
+        ).astype(np.float32)
 
     def _get_coords_multi_bin(self) -> np.ndarray:
         """
@@ -167,8 +166,8 @@ class HironakaBase(gym.Env, abc.ABC):
             return {}
         else:
             return {
-                'step_threshold': self.step_threshold,
-                'current_step': self.current_step,
-                'exceed_threshold': self.exceed_threshold,
-                'last_action_taken': self.last_action_taken
+                "step_threshold": self.step_threshold,
+                "current_step": self.current_step,
+                "exceed_threshold": self.exceed_threshold,
+                "last_action_taken": self.last_action_taken,
             }

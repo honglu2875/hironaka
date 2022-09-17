@@ -2,7 +2,7 @@
 
 # Hironaka
 
-A utility package for a reinforcement learning study of singularities in algebraic geometry.  Resolution of singularities is a central problem in mathematics: it helps us to reduce questions to smooth objects, whose points behave better.
+A utility package for a reinforcement learning study of singularities in algebraic geometry.  Resolution of singularities is a central problem in mathematics: it helps us reduce spaces into smooth manifolds which allow nice theories to happen.
 
 ***What we are doing, TL;DR***: 
 

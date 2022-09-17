@@ -1,11 +1,11 @@
 import abc
 import logging
-from typing import Any, Optional, List, Tuple, Union, Type
+from typing import Any, List, Optional, Tuple, Type, Union
 
 import numpy as np
 import torch
 
-from hironaka.src import get_batched_padded_array, batched_coord_list_to_binary
+from hironaka.src import batched_coord_list_to_binary, get_batched_padded_array
 
 PointsDataTypes = Union[torch.Tensor, List[List[List[Any]]], np.ndarray]
 CoordsDataTypes = Union[torch.Tensor, List[List[int]], np.ndarray]
@@ -23,17 +23,20 @@ class Policy(abc.ABC):
         __init__
         predict
     """
-    allowed_modes = ['host', 'agent']
+
+    allowed_modes = ["host", "agent"]
 
     @abc.abstractmethod
-    def __init__(self,
-                 mode: str,
-                 max_num_points: int,
-                 padding_value: Optional[float] = -1.0,
-                 dimension: Optional[int] = 3,
-                 device: Optional[Union[str, torch.device]] = 'cpu',
-                 dtype: Optional[Type] = torch.float32,
-                 **kwargs):
+    def __init__(
+        self,
+        mode: str,
+        max_num_points: int,
+        padding_value: Optional[float] = -1.0,
+        dimension: Optional[int] = 3,
+        device: Optional[Union[str, torch.device]] = "cpu",
+        dtype: Optional[Type] = torch.float32,
+        **kwargs,
+    ):
         self.logger = logging.getLogger(__class__.__name__)
 
         if mode not in self.allowed_modes:
@@ -77,7 +80,11 @@ class Policy(abc.ABC):
             feature_tensor = torch.flatten(
                 torch.tensor(
                     get_batched_padded_array(features, self.max_num_points, constant_value=self.padding_value),
-                    dtype=self.dtype, device=self.device), start_dim=1)
+                    dtype=self.dtype,
+                    device=self.device,
+                ),
+                start_dim=1,
+            )
         elif isinstance(features, (torch.Tensor, np.ndarray)):
             feature_tensor = torch.flatten(torch.tensor(features, dtype=self.dtype, device=self.device), start_dim=1)
         else:
@@ -99,7 +106,11 @@ class Policy(abc.ABC):
             feature_tensor = torch.flatten(
                 torch.tensor(
                     get_batched_padded_array(features[0], self.max_num_points, constant_value=self.padding_value),
-                    dtype=self.dtype, device=self.device), start_dim=1)
+                    dtype=self.dtype,
+                    device=self.device,
+                ),
+                start_dim=1,
+            )
         elif isinstance(features[0], (torch.Tensor, np.ndarray)):
             feature_tensor = torch.flatten(torch.tensor(features[0], dtype=self.dtype, device=self.device), start_dim=1)
         else:
@@ -108,8 +119,9 @@ class Policy(abc.ABC):
         if isinstance(features[1], (torch.Tensor, np.ndarray)):
             coord_tensor = torch.tensor(features[1], dtype=self.dtype, device=self.device)
         elif isinstance(features[1], List):
-            coord_tensor = torch.tensor(batched_coord_list_to_binary(features[1], self.dimension),
-                                        device=self.device, dtype=self.dtype)
+            coord_tensor = torch.tensor(
+                batched_coord_list_to_binary(features[1], self.dimension), device=self.device, dtype=self.dtype
+            )
         else:
             raise TypeError(f"Unsupported input type. Got {type(features[0])}.")
 

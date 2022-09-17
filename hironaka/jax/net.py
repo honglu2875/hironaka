@@ -1,12 +1,12 @@
 from functools import partial
-from typing import List, Callable, Any, Tuple
+from typing import Any, Callable, List, Tuple
 
 import flax
-import jax.numpy as jnp
 import jax
-from jax import vmap, numpy as jnp, jit, lax
 from flax import linen as nn
-
+from jax import lax
+from jax import numpy as jnp
+from jax import vmap
 
 ModuleDef = Any
 
@@ -18,7 +18,10 @@ class DenseResidueBlock(nn.Module):
     activation: Callable
 
     @nn.compact
-    def __call__(self, x, ):
+    def __call__(
+        self,
+        x,
+    ):
         residual = x
         y = nn.Dense(self.features, dtype=self.dtype)(x)
         y = self.norm()(y)
@@ -27,8 +30,8 @@ class DenseResidueBlock(nn.Module):
         y = self.norm()(y)
 
         if residual.shape != y.shape:
-            residual = nn.Dense(self.features, dtype=self.dtype, name='res_proj')(residual)
-            residual = self.norm(name='norm_proj')(residual)
+            residual = nn.Dense(self.features, dtype=self.dtype, name="res_proj")(residual)
+            residual = self.norm(name="norm_proj")(residual)
 
         return self.activation(residual + y)
 
@@ -45,10 +48,7 @@ class DenseResNet(nn.Module):
     def __call__(self, x, train: bool = True):
         x = vmap(jnp.ravel, 0, 0)(x)  # Flatten
         for i, size in enumerate(self.net_arch):
-            x = self.block_cls(features=size,
-                               dtype=self.dtype,
-                               norm=self.norm,
-                               activation=self.activation)(x)
+            x = self.block_cls(features=size, dtype=self.dtype, norm=self.norm, activation=self.activation)(x)
         x = nn.Dense(self.output_size, dtype=self.dtype)(x)
         return self.activation(x)
 
@@ -58,8 +58,14 @@ DResNet18 = partial(DenseResNet, net_arch=[256] * 18)
 
 
 class PolicyWrapper:
-    def __init__(self, key: jnp.ndarray, input_shape: Tuple, model: flax.linen.Module,
-                 value_model: flax.linen.Module = None, separate_policy_value_models: bool = False):
+    def __init__(
+        self,
+        key: jnp.ndarray,
+        input_shape: Tuple,
+        model: flax.linen.Module,
+        value_model: flax.linen.Module = None,
+        separate_policy_value_models: bool = False,
+    ):
         """
         Parameters:
             key: the PRNG random key.
@@ -123,6 +129,7 @@ class PolicyWrapper:
         if self.separate_policy_value_models:
             raise NotImplementedError()
         else:
+
             def apply_fn(x: jnp.ndarray, params, **kwargs) -> Tuple[jnp.ndarray, jnp.ndarray]:
                 output = self.model.apply(params, x)
                 policy_logits = lax.dynamic_slice(output, (0, 0), (batch_size, logit_length - 1))

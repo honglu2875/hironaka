@@ -8,11 +8,11 @@ from ._fn import get_shape
 
 def get_newton_polytope_approx_lst(points: List[List[List[float]]], inplace=True, get_ended=False):
     """
-        A simple-minded quick-and-dirty method to obtain an approximation of Newton Polytope disregarding convexity.
-        Returns:
-            None, ended_each_batch: List[bool] (if inplace)
-            new_points:List[List[List[int]]], ended_each_batch: List[bool] (if not inplace)
-            None or new_points (if not get_ended)
+    A simple-minded quick-and-dirty method to obtain an approximation of Newton Polytope disregarding convexity.
+    Returns:
+        None, ended_each_batch: List[bool] (if inplace)
+        new_points:List[List[List[int]]], ended_each_batch: List[bool] (if not inplace)
+        None or new_points (if not get_ended)
     """
     batch_num, _, dim = get_shape(points)
 
@@ -56,8 +56,8 @@ def get_newton_polytope_approx_lst(points: List[List[List[float]]], inplace=True
 
 def get_newton_polytope_lst(points: List[List[List[float]]], inplace=True):
     """
-        Get the Newton Polytope for a set of points.
-        TODO: this is perhaps a slow implementation. Must improve!
+    Get the Newton Polytope for a set of points.
+    TODO: this is perhaps a slow implementation. Must improve!
     """
     assert len(get_shape(points)) == 3
 
@@ -85,7 +85,7 @@ def get_newton_polytope_lst(points: List[List[List[float]]], inplace=True):
 
 def shift_lst(points: List[List[List[float]]], coords: List[List[int]], axis: List[int], inplace=True):
     """
-        Shift a set of points according to the rule of Hironaka game.
+    Shift a set of points according to the rule of Hironaka game.
     """
 
     batch_num, _, dim = get_shape(points)
@@ -101,18 +101,16 @@ def shift_lst(points: List[List[List[float]]], coords: List[List[int]], axis: Li
             for i in range(len(points[b])):
                 points[b][i][axis[b]] = sum([points[b][i][k] for k in coords[b]])
     else:
-        result = [[
-            [
-                sum([x[k] for k in coord]) if ax in coord and i == ax else x[i]
-                for i in range(dim)
-            ] for x in point
-        ] for point, coord, ax in zip(points, coords, axis)]
+        result = [
+            [[sum([x[k] for k in coord]) if ax in coord and i == ax else x[i] for i in range(dim)] for x in point]
+            for point, coord, ax in zip(points, coords, axis)
+        ]
         return result
 
 
 def reposition_lst(points: List[List[List[float]]], inplace=True):
     """
-        Reposition all batches of points so that each of them hits all coordinate planes.
+    Reposition all batches of points so that each of them hits all coordinate planes.
     """
     dim = len(points[0][0])
     new_points = []

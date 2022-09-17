@@ -18,14 +18,14 @@ def zip_equal(*iterables):
     sentinel = object()
     for combo in zip_longest(*iterables, fillvalue=sentinel):
         if sentinel in combo:
-            raise ValueError('Iterables have different lengths')
+            raise ValueError("Iterables have different lengths")
         yield combo
 
 
 def polyak_update(
-        params: Iterable[torch.nn.Parameter],
-        target_params: Iterable[torch.nn.Parameter],
-        tau: float,
+    params: Iterable[torch.nn.Parameter],
+    target_params: Iterable[torch.nn.Parameter],
+    tau: float,
 ) -> None:
     """
     Perform a Polyak average update on ``target_params`` using ``params``:

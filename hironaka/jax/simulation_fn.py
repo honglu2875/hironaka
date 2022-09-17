@@ -3,20 +3,29 @@ from functools import partial
 from typing import Callable, Tuple
 
 import jax
-import mctx
-from jax import jit, lax
 import jax.numpy as jnp
+import mctx
+from jax import lax
 from mctx import PolicyOutput
 
-from hironaka.src import get_newton_polytope_jax, rescale_jax, shift_jax
+from hironaka.src import get_newton_polytope_jax, rescale_jax
 from .recurrent_fn import get_recurrent_fn_for_role
 from .util import flatten
 
 
-def get_evaluation_loop(role: str, policy_fn: Callable, opponent_fn: Callable, reward_fn: Callable,
-                        spec: Tuple, num_evaluations: int, max_depth: int,
-                        max_num_considered_actions: int, discount: float, rescale_points: bool,
-                        dtype=jnp.float32) -> Callable:
+def get_evaluation_loop(
+    role: str,
+    policy_fn: Callable,
+    opponent_fn: Callable,
+    reward_fn: Callable,
+    spec: Tuple,
+    num_evaluations: int,
+    max_depth: int,
+    max_num_considered_actions: int,
+    discount: float,
+    rescale_points: bool,
+    dtype=jnp.float32,
+) -> Callable:
     """
     The factory function of `evaluation_loop` which creates a new node and do one single (batched) MCTS search using
         Gumbel MuZero policy.
@@ -47,12 +56,19 @@ def get_evaluation_loop(role: str, policy_fn: Callable, opponent_fn: Callable, r
             the tree search.
     """
     # Create the `recurrent_fn`
-    recurrent_fn = get_recurrent_fn_for_role(role, policy_fn, opponent_fn, reward_fn, spec,
-                                             discount=discount, rescale_points=rescale_points, dtype=dtype)
+    recurrent_fn = get_recurrent_fn_for_role(
+        role, policy_fn, opponent_fn, reward_fn, spec, discount=discount, rescale_points=rescale_points, dtype=dtype
+    )
     # Compile the Gumbel MuZero policy function with parameters
-    muzero = jax.jit(partial(mctx.gumbel_muzero_policy, recurrent_fn=recurrent_fn,
-                             num_simulations=num_evaluations, max_depth=max_depth,
-                             max_num_considered_actions=max_num_considered_actions))
+    muzero = jax.jit(
+        partial(
+            mctx.gumbel_muzero_policy,
+            recurrent_fn=recurrent_fn,
+            num_simulations=num_evaluations,
+            max_depth=max_depth,
+            max_num_considered_actions=max_num_considered_actions,
+        )
+    )
 
     def evaluation_loop(key: jnp.ndarray, root_states: jnp.ndarray,
                         role_fn_args=(), opponent_fn_args=()) -> PolicyOutput:
@@ -78,7 +94,7 @@ def get_evaluation_loop(role: str, policy_fn: Callable, opponent_fn: Callable, r
     return evaluation_loop
 
 
-def get_single_thread_simulation(role: str, evaluation_loop: Callable, rollout_size: int,
+def get_single_thread_simulation(role: str, evaluation_loop: Callable, max_length_game: int,
                                  config: dict, dtype=jnp.float32):
     """
     A simulation process goes roughly as follows:
@@ -89,16 +105,13 @@ def get_single_thread_simulation(role: str, evaluation_loop: Callable, rollout_s
         3. Repeat 0 until enough roll-outs are collected.
     """
     eval_batch_size, max_num_points, dimension = \
-        config['eval_batch_size'], config['max_num_points'], config['dimension']
-    max_value = config['max_value']
+        config["eval_batch_size"], config["max_num_points"], config["dimension"]
+    max_value = config["max_value"]
 
-    input_dim = max_num_points * dimension if role == 'host' else (max_num_points + 1) * dimension
-    action_num = 2 ** dimension - dimension - 1 if role == 'host' else dimension
+    input_dim = max_num_points * dimension if role == "host" else (max_num_points + 1) * dimension
+    action_num = 2**dimension - dimension - 1 if role == "host" else dimension
 
-    rescale_fn = rescale_jax if config['scale_observation'] else (lambda x: x)
-    if rollout_size % eval_batch_size != 0:
-        warnings.warn(f"rollout_size cannot be divided by eval_batch_size. "
-                      f"Output batch size may be different than rollout_size.")
+    rescale_fn = rescale_jax if config["scale_observation"] else (lambda x: x)
 
     def single_thread_simulation(key: jnp.ndarray, role_fn_args=(), opponent_fn_args=()) -> Tuple:
         """
@@ -106,9 +119,14 @@ def get_single_thread_simulation(role: str, evaluation_loop: Callable, rollout_s
         """
         starting_keys = jax.random.split(key, num=3)
 
-        root_state = flatten(rescale_fn(get_newton_polytope_jax(
-            jax.random.randint(starting_keys[1], (eval_batch_size, max_num_points, dimension),
-                               0, max_value).astype(dtype))))
+        root_state = flatten(
+            rescale_fn(
+                get_newton_polytope_jax(
+                    jax.random.randint(starting_keys[1], (eval_batch_size, max_num_points, dimension),
+                                       0, max_value).astype(dtype)
+                )
+            )
+        )
 
         def body_fn(i, keys_and_state):
             (key, subkey, loop_key), rollouts, state = keys_and_state
@@ -116,36 +134,39 @@ def get_single_thread_simulation(role: str, evaluation_loop: Callable, rollout_s
                                             role_fn_args=role_fn_args, opponent_fn_args=opponent_fn_args)
 
             obs, policy, value = rollouts
-            current_obs, current_policy, current_value = \
-                state.reshape(eval_batch_size, 1, input_dim), \
-                policy_output.action_weights.reshape(eval_batch_size, 1, action_num), \
-                policy_output.search_tree.node_values[:, 0].reshape(eval_batch_size, 1)
+            current_obs, current_policy, current_value = (
+                state.reshape(eval_batch_size, 1, input_dim),
+                policy_output.action_weights.reshape(eval_batch_size, 1, action_num),
+                policy_output.search_tree.node_values[:, 0].reshape(eval_batch_size, 1),
+            )
 
             obs = lax.dynamic_update_slice(obs, current_obs, (0, i, 0))
             policy = lax.dynamic_update_slice(policy, current_policy, (0, i, 0))
             value = lax.dynamic_update_slice(value, current_value, (0, i))
 
-            action_idx = jnp.take_along_axis(policy_output.search_tree.children_index[:, 0, :],
-                                             policy_output.action[:, None], axis=1)
-            state = jnp.take_along_axis(policy_output.search_tree.embeddings[:, :, :],
-                                        action_idx[:, None], axis=1).squeeze(1)
+            action_idx = jnp.take_along_axis(
+                policy_output.search_tree.children_index[:, 0, :], policy_output.action[:, None], axis=1
+            )
+            state = jnp.take_along_axis(policy_output.search_tree.embeddings[:, :, :], action_idx[:, None],
+                                        axis=1).squeeze(1)
 
             return jax.random.split(key, num=3), (obs, policy, value), state
 
-        num_loops = ((rollout_size + eval_batch_size - 1) // eval_batch_size)
-
         # `fori_loop` must return tracers of exactly the same shape
-        rollout_obs_init = jnp.zeros((eval_batch_size, num_loops, input_dim))
-        rollout_policy_init = jnp.zeros((eval_batch_size, num_loops, action_num))
-        rollout_value_init = jnp.zeros((eval_batch_size, num_loops,))
+        rollout_obs_init = jnp.zeros((eval_batch_size, max_length_game, input_dim))
+        rollout_policy_init = jnp.zeros((eval_batch_size, max_length_game, action_num))
+        rollout_value_init = jnp.zeros(
+            (
+                eval_batch_size,
+                max_length_game,
+            )
+        )
 
-        _, rollouts, _ = lax.fori_loop(0, num_loops, body_fn,
-                                          (starting_keys, (rollout_obs_init,
-                                                           rollout_policy_init,
-                                                           rollout_value_init), root_state))
+        _, rollouts, _ = lax.fori_loop(
+            0, max_length_game, body_fn,
+            (starting_keys, (rollout_obs_init, rollout_policy_init, rollout_value_init), root_state)
+        )
 
         return rollouts
 
     return single_thread_simulation
-
-

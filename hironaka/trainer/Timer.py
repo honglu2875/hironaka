@@ -22,7 +22,7 @@ class Timer:
                 torch.cuda.current_stream().synchronize()
             self.start = time.perf_counter()
             if self.name not in self._log_dict:
-                self._log_dict[self.name] = .0
+                self._log_dict[self.name] = 0.0
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self._active:

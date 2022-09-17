@@ -1,20 +1,29 @@
 from functools import partial
 from typing import Callable, Tuple
 
-import chex
-import mctx
-import jax
 import jax.numpy as jnp
-from jax import jit
-import time
+import mctx
 
-from hironaka.jax.util import make_agent_obs, get_dones, get_take_actions, get_preprocess_fns, get_batch_decode, \
-    get_batch_decode_from_one_hot
-from hironaka.src import rescale_jax, get_newton_polytope_jax, shift_jax
+from hironaka.jax.util import (
+    get_batch_decode,
+    get_batch_decode_from_one_hot,
+    get_dones,
+    get_preprocess_fns,
+    get_take_actions,
+    make_agent_obs,
+)
 
 
-def get_recurrent_fn_for_role(role: str, role_fn: Callable, opponent_action_fn: Callable, reward_fn: Callable,
-                              spec: Tuple[int, int], discount=0.99, dtype=jnp.float32, rescale_points=True) -> Callable:
+def get_recurrent_fn_for_role(
+    role: str,
+    role_fn: Callable,
+    opponent_action_fn: Callable,
+    reward_fn: Callable,
+    spec: Tuple[int, int],
+    discount=0.99,
+    dtype=jnp.float32,
+    rescale_points=True,
+) -> Callable:
     """
     The factory function for the recurrent_fn corresponding to a role (host or agent).
     Parameters:
@@ -44,18 +53,28 @@ def get_recurrent_fn_for_role(role: str, role_fn: Callable, opponent_action_fn: 
     """
     obs_preprocess, coords_preprocess = get_preprocess_fns(role, spec)
 
-    if role == 'host':
-        def first_obs_update(x, y, z): return x
+    if role == "host":
+
+        def first_obs_update(x, y, z):
+            return x
+
         opponent_action_preprocess = partial(jnp.argmax, axis=1)  # one-hot agent actions to discrete indices
-        second_obs_update = get_take_actions(role='host', spec=spec, rescale_points=rescale_points)
+        second_obs_update = get_take_actions(role="host", spec=spec, rescale_points=rescale_points)
         make_opponent_obs = make_agent_obs
         batch_decode = get_batch_decode(spec[1])
-    elif role == 'agent':
-        first_obs_update = get_take_actions(role='agent', spec=spec, rescale_points=rescale_points)
+    elif role == "agent":
+        first_obs_update = get_take_actions(role="agent", spec=spec, rescale_points=rescale_points)
         opponent_action_preprocess = get_batch_decode_from_one_hot(spec[1])  # one-hot host actions to multi-binary
-        def second_obs_update(x, y, z): return make_agent_obs(x, z)
-        def make_opponent_obs(obs, actions): return obs
-        def batch_decode(x): return x
+
+        def second_obs_update(x, y, z):
+            return make_agent_obs(x, z)
+
+        def make_opponent_obs(obs, actions):
+            return obs
+
+        def batch_decode(x):
+            return x
+
     else:
         raise ValueError(f"role must be either 'host' or 'agent'. Got {role}.")
 
@@ -78,7 +97,8 @@ def get_recurrent_fn_for_role(role: str, role_fn: Callable, opponent_action_fn: 
 
         # The enemy observes the `updated_obs` and `actions`, and makes a decision on its actions
         opponent_actions = opponent_action_preprocess(
-            opponent_action_fn(make_opponent_obs(updated_obs, actions).astype(dtype), *opponent_fn_args))
+            opponent_action_fn(make_opponent_obs(updated_obs, actions).astype(dtype), *opponent_fn_args)
+        )
 
         # If host, `second_obs_update` takes an action (shift->newton polytope->rescale) and returns flattened obs
         # If agent, `second_obs_update` concatenates `updated_obs` and `opponent_actions` and returns flattened obs
@@ -92,7 +112,8 @@ def get_recurrent_fn_for_role(role: str, role_fn: Callable, opponent_action_fn: 
             reward=rewards,
             discount=jnp.array([discount] * batch_size, dtype=dtype),
             prior_logits=policy_prior,
-            value=value_prior)
+            value=value_prior,
+        )
         return recurrent_fn_output, next_observations
 
     return recurrent_fn

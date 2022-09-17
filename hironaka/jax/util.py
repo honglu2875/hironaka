@@ -1,14 +1,12 @@
 from functools import partial
-from typing import Tuple, Callable
+from typing import Callable, Tuple
 
-import flax
 import jax
-import jax.numpy as jnp
-from flax.core import FrozenDict
+from jax import jit, lax
+from jax import numpy as jnp
+from jax import vmap
 
-from jax import vmap, jit, lax, numpy as jnp
-
-from hironaka.src import rescale_jax, get_newton_polytope_jax, shift_jax
+from hironaka.src import get_newton_polytope_jax, rescale_jax, shift_jax
 
 flatten = vmap(jnp.ravel, 0, 0)
 
@@ -44,17 +42,26 @@ def get_preprocess_fns(role: str, spec: Tuple[int, int]) -> Tuple[Callable, Call
             - An agent observation is a host observation concatenated with a (-1, dimension) array
                 of chosen coordinates
     """
-    if role == 'host':
-        def obs_preprocess(observations): return observations.reshape(-1, *spec)
-        def coords_preprocess(observations, actions): return actions
-    elif role == 'agent':
+    if role == "host":
+
+        def obs_preprocess(observations):
+            return observations.reshape(-1, *spec)
+
+        def coords_preprocess(observations, actions):
+            return actions
+
+    elif role == "agent":
+
         def obs_preprocess(observations):
             return vmap(partial(lax.dynamic_slice, start_indices=(0,), slice_sizes=(spec[0] * spec[1],)), 0, 0)(
-                observations).reshape(-1, *spec)
+                observations
+            ).reshape(-1, *spec)
 
         def coords_preprocess(observations, actions):
             return vmap(partial(lax.dynamic_slice, start_indices=(spec[0] * spec[1],), slice_sizes=(spec[1],)), 0, 0)(
-                observations)
+                observations
+            )
+
     else:
         raise ValueError(f"role must be either host or agent. Got {role}.")
 
@@ -97,7 +104,8 @@ def get_take_actions(role: str, spec: Tuple[int, int], rescale_points: bool = Tr
         points = obs_preprocess(observations)
         coords = coords_preprocess(observations, actions)
         shifted_pts = get_newton_polytope_jax(shift_jax(points, coords, axis))
-        return jnp.where(rescale_points, rescale_jax(shifted_pts), shifted_pts).reshape((-1, spec[0]*spec[1]))
+        return jnp.where(rescale_points, rescale_jax(shifted_pts), shifted_pts).reshape((-1, spec[0] * spec[1]))
+
     return take_actions
 
 
@@ -108,14 +116,18 @@ def get_reward_fn(role: str) -> Callable:
     Returns:
         the corresponding reward function.
     """
-    if role == 'host':
+    if role == "host":
+
         @jit
         def reward_fn(dones: jnp.ndarray, prev_dones: jnp.ndarray) -> jnp.ndarray:
             return (dones & (~prev_dones)).astype(jnp.float32)
-    elif role == 'agent':
+
+    elif role == "agent":
+
         @jit
         def reward_fn(dones: jnp.ndarray, prev_dones: jnp.ndarray) -> jnp.ndarray:
             return -(dones & (~prev_dones)).astype(jnp.float32)
+
     else:
         raise ValueError(f"role must be either host or agent. Got {role}.")
 
@@ -134,12 +146,14 @@ def apply_agent_action_mask(agent_policy: Callable, dimension: int) -> Callable:
     """
     Apply a masked agent policy wrapper on top of an `agent_policy` function.
     """
+
     def masked_agent_policy(x: jnp.ndarray, *args, **kwargs) -> Tuple:
         batch_size, feature_num = x.shape
         mask = lax.dynamic_slice(x, (0, feature_num - dimension), (batch_size, dimension)) > 0.5
         policy_prior, value_prior = agent_policy(x, *args, **kwargs)
         return policy_prior * mask - jnp.inf * (~mask), value_prior
-    setattr(masked_agent_policy, '__name__', get_name(agent_policy))
+
+    setattr(masked_agent_policy, "__name__", get_name(agent_policy))
     return masked_agent_policy
 
 
@@ -153,14 +167,15 @@ def action_wrapper(policy_value_fn: Callable, dimension: int) -> Callable:
         out, _ = masked_action(x, *args, **kwargs)
         action_dim = out.shape[1]
         return jax.nn.one_hot(jnp.argmax(out, axis=1), action_dim)
-    setattr(wrapped_action_fn, '__name__', get_name(policy_value_fn))
+
+    setattr(wrapped_action_fn, "__name__", get_name(policy_value_fn))
     return wrapped_action_fn
 
 
 def get_name(obj):
-    if hasattr(obj, '__name__'):
+    if hasattr(obj, "__name__"):
         return obj.__name__
-    elif hasattr(obj, 'func'):  # wrapped by `partial`
+    elif hasattr(obj, "func"):  # wrapped by `partial`
         return get_name(obj.func)
 
 
@@ -172,7 +187,7 @@ def decode_table(dimension: int) -> dict:
     Return a decoding table. The i-th row is the corresponding multi-binary vector.
     """
     res = []
-    for i in range(2 ** dimension):
+    for i in range(2**dimension):
         if i == 0 or i & (i - 1) == 0:
             continue
         binary_str = bin(i)[2:]
@@ -181,7 +196,7 @@ def decode_table(dimension: int) -> dict:
             if j >= len(binary_str):
                 binary_vector.append(0)
             else:
-                binary_vector.append(int(binary_str[- j - 1]))
+                binary_vector.append(int(binary_str[-j - 1]))
         res.append(jnp.array(binary_vector).astype(jnp.int32))
     return jnp.array(res)
 
@@ -257,7 +272,7 @@ def encode_one_hot(multi_binary: jnp.ndarray) -> jnp.ndarray:
         jnp.ndarray with type jnp.float32
     """
     dimension = multi_binary.shape[0]
-    class_num = 2 ** dimension - dimension - 1
+    class_num = 2**dimension - dimension - 1
     return (jnp.arange(class_num) == encode(multi_binary)).astype(jnp.float32)
 
 
@@ -267,18 +282,19 @@ batch_encode_one_hot = vmap(encode_one_hot, 0, 0)
 
 # ---------- Loss functions ---------- #
 
+
 def compute_loss(params, apply_fn, sample, loss_fn) -> jnp.ndarray:
     obs, target_policy_logits, target_value = sample
     policy_logits, value = apply_fn(obs, params)
     return loss_fn(policy_logits, value, target_policy_logits, target_value)
 
 
-def policy_value_loss(policy_logit: jnp.ndarray, value: jnp.ndarray,
-                      target_policy: jnp.ndarray, target_value: jnp.ndarray) -> jnp.ndarray:
+def policy_value_loss(
+    policy_logit: jnp.ndarray, value: jnp.ndarray, target_policy: jnp.ndarray, target_value: jnp.ndarray
+) -> jnp.ndarray:
     # Shapes:
     # policy_logit, target_policy: (B, action)
     # value_logit, target_value: (B,)
     policy_loss = jnp.sum(-jax.nn.softmax(target_policy, axis=-1) * jax.nn.log_softmax(policy_logit, axis=-1), axis=1)
     value_loss = jnp.square(value - target_value)
     return jnp.mean(policy_loss + value_loss)
-

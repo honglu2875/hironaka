@@ -12,13 +12,16 @@ class Game(abc.ABC):
     """
     This framework simulates a fully autonomous game without interference from outside.
     """
+
     @abc.abstractmethod
-    def __init__(self,
-                 state: Union[ListPoints, Points, None],
-                 host: Host,
-                 agent: Agent,
-                 scale_observation: Optional[bool] = True,
-                 **kwargs):
+    def __init__(
+        self,
+        state: Union[ListPoints, Points, None],
+        host: Host,
+        agent: Agent,
+        scale_observation: Optional[bool] = True,
+        **kwargs,
+    ):
         """
         state: initial state
         host: the host player
@@ -78,11 +81,7 @@ class Game(abc.ABC):
 
 
 class GameHironaka(Game):
-    def __init__(self,
-                 state: Union[ListPoints, Points, None],
-                 host: Host,
-                 agent: Agent,
-                 **kwargs):
+    def __init__(self, state: Union[ListPoints, Points, None], host: Host, agent: Agent, **kwargs):
         super().__init__(state, host, agent, **kwargs)
 
     def step(self, verbose: int = 0) -> bool:
@@ -127,11 +126,7 @@ class GameMorin(Game):
     after the shift
     """
 
-    def __init__(self,
-                 state: Union[ListPoints, Points, None],
-                 host: Host,
-                 agent: Agent,
-                 **kwargs):
+    def __init__(self, state: Union[ListPoints, Points, None], host: Host, agent: Agent, **kwargs):
         super().__init__(state, host, agent, **kwargs)
         self.weights = [[1] * self.state.dimension for _ in range(self.state.batch_size)]
 
