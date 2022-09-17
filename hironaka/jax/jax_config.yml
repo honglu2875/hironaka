@@ -10,13 +10,12 @@ dimension: 3
 max_num_points: 20
 max_length_game: 20
 max_value: 20
-
 max_grad_norm: 1
 
 eval_batch_size: 10
 num_evaluations: 100
 max_num_considered_actions: 10
-#rollout process repeats `rollout_size//eval_batch_size` amount of times
+
 discount: 0.99
 
 host:

@@ -1,25 +1,27 @@
-from typing import List, Optional, Union, Type
+from typing import List, Optional, Type, Union
 
 import numpy as np
 import torch
 
-from hironaka.src import get_batched_padded_array, rescale_torch
-from hironaka.src import shift_torch, get_newton_polytope_torch, reposition_torch
+from hironaka.src import get_batched_padded_array, get_newton_polytope_torch, reposition_torch, rescale_torch, \
+    shift_torch
 from .PointsBase import PointsBase
 
 
 class TensorPoints(PointsBase):
-    subcls_config_keys = ['value_threshold', 'device', 'padding_value', 'dtype']
-    running_attributes = ['distinguished_points']
+    subcls_config_keys = ["value_threshold", "device", "padding_value", "dtype"]
+    running_attributes = ["distinguished_points"]
 
-    def __init__(self,
-                 points: Union[torch.Tensor, List[List[List[float]]], np.ndarray],
-                 value_threshold: Optional[float] = 1e8,
-                 device: Optional[Union[str, torch.device]] = 'cpu',
-                 padding_value: Optional[float] = -1.0,
-                 distinguished_points: Optional[List[int]] = None,
-                 dtype: Optional[Union[Type, torch.dtype]] = torch.float32,
-                 **kwargs):
+    def __init__(
+        self,
+        points: Union[torch.Tensor, List[List[List[float]]], np.ndarray],
+        value_threshold: Optional[float] = 1e8,
+        device: Optional[Union[str, torch.device]] = "cpu",
+        padding_value: Optional[float] = -1.0,
+        distinguished_points: Optional[List[int]] = None,
+        dtype: Optional[Union[Type, torch.dtype]] = torch.float32,
+        **kwargs,
+    ):
         self.value_threshold = value_threshold
 
         assert padding_value <= 0, f"'padding_value' must be a non-positive number. Got {padding_value} instead."
@@ -29,9 +31,10 @@ class TensorPoints(PointsBase):
 
         if isinstance(points, list):
             points = torch.tensor(
-                get_batched_padded_array(points,
-                                         new_length=kwargs['max_num_points'],
-                                         constant_value=padding_value), device=self.device, dtype=self.dtype)
+                get_batched_padded_array(points, new_length=kwargs["max_num_points"], constant_value=padding_value),
+                device=self.device,
+                dtype=self.dtype,
+            )
         elif isinstance(points, np.ndarray):
             points = torch.tensor(points, device=self.device, dtype=self.dtype)
         elif isinstance(points, torch.Tensor):
@@ -46,8 +49,8 @@ class TensorPoints(PointsBase):
         super().__init__(points, **kwargs)
 
         # Legacy support
-        if 'device_key' in kwargs:
-            self.device = torch.device(kwargs['device_key'])
+        if "device_key" in kwargs:
+            self.device = torch.device(kwargs["device_key"])
             self.points.to(self.device)
             self.logger.warning("'device_key' is a legacy parameter. Will be deprecated in future version.")
 
@@ -74,20 +77,22 @@ class TensorPoints(PointsBase):
         self.dtype = t
         self.points = self.points.type(t)
 
-    def _shift(self,
-               points: torch.Tensor,
-               coords: Union[torch.Tensor, List[List[int]]],
-               axis: Union[torch.Tensor, List[int]],
-               inplace: Optional[bool] = True,
-               ignore_ended_games: Optional[bool] = True,
-               **kwargs) -> Union[torch.Tensor, None]:
-        return shift_torch(points, coords, axis,
-                           inplace=inplace,
-                           padding_value=self.padding_value,
-                           ignore_ended_games=ignore_ended_games)
+    def _shift(
+        self,
+        points: torch.Tensor,
+        coords: Union[torch.Tensor, List[List[int]]],
+        axis: Union[torch.Tensor, List[int]],
+        inplace: Optional[bool] = True,
+        ignore_ended_games: Optional[bool] = True,
+        **kwargs,
+    ) -> Union[torch.Tensor, None]:
+        return shift_torch(
+            points, coords, axis, inplace=inplace, padding_value=self.padding_value, ignore_ended_games=ignore_ended_games
+        )
 
-    def _get_newton_polytope(self, points: torch.Tensor,
-                             inplace: Optional[bool] = True, **kwargs) -> Union[torch.Tensor, None]:
+    def _get_newton_polytope(
+        self, points: torch.Tensor, inplace: Optional[bool] = True, **kwargs
+    ) -> Union[torch.Tensor, None]:
         return get_newton_polytope_torch(points, inplace=inplace, padding_value=self.padding_value)
 
     def _get_shape(self, points: torch.Tensor) -> torch.Size:

@@ -13,20 +13,19 @@ class HironakaHostEnv(HironakaBase):
     agent, and returns the new observation
     """
 
-    def __init__(self,
-                 host: Host,
-                 invalid_move_penalty: Optional[int] = -1e-3,
-                 stop_after_invalid_move: Optional[bool] = False,
-                 config_kwargs: Optional[Dict[str, Any]] = None,
-                 **kwargs):
+    def __init__(
+        self,
+        host: Host,
+        invalid_move_penalty: Optional[int] = -1e-3,
+        stop_after_invalid_move: Optional[bool] = False,
+        config_kwargs: Optional[Dict[str, Any]] = None,
+        **kwargs
+    ):
         config_kwargs = dict() if config_kwargs is None else config_kwargs
         super().__init__(**{**config_kwargs, **kwargs})
 
         self.observation_space = spaces.Dict(
-            {
-                "points": self.point_observation_space,
-                "coords": spaces.MultiBinary(self.dimension)
-            }
+            {"points": self.point_observation_space, "coords": spaces.MultiBinary(self.dimension)}
         )
 
         self.action_space = spaces.Discrete(self.dimension)
@@ -46,7 +45,7 @@ class HironakaHostEnv(HironakaBase):
         if action in self._coords:
             self._points.shift([self._coords], [action])
             self._points.get_newton_polytope()
-            reward += 1. if not self._points.ended else 0.
+            reward += 1.0 if not self._points.ended else 0.0
         else:
             stopped |= self.stop_after_invalid_move
             reward += self.invalid_move_penalty
@@ -76,10 +75,6 @@ class HironakaHostEnv(HironakaBase):
     def _get_obs(self):
         coords_multi_bin = self._get_coords_multi_bin()
         f = np.array(self._points.get_features()[0])
-        f = np.pad(f,
-                   ((0, self.max_num_points - len(f)),
-                    (0, 0)),
-                   mode='constant',
-                   constant_values=self.padding_value)
-        o = {'points': f.astype(np.float32), 'coords': coords_multi_bin}
+        f = np.pad(f, ((0, self.max_num_points - len(f)), (0, 0)), mode="constant", constant_values=self.padding_value)
+        o = {"points": f.astype(np.float32), "coords": coords_multi_bin}
         return o

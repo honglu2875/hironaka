@@ -1,7 +1,7 @@
 import abc
 import logging
 import random
-from typing import Union, List
+from typing import List, Union
 
 # Blame google colab for not updating their python version...
 from hironaka.src import get_python_version_in_float
@@ -13,8 +13,8 @@ else:
 
 import numpy as np
 
-from hironaka.Points import Points
 from hironaka.core import ListPoints
+from hironaka.Points import Points
 from hironaka.policy.Policy import Policy
 
 
@@ -24,6 +24,7 @@ class Agent(abc.ABC):
     Must implement:
         _get_actions
     """
+
     # Please set the following. They are *class constants*!
     USE_WEIGHTS: bool
     USE_REPOSITION: bool  # apply a self.points.reposition() between shift() and get_newton_polytope()
@@ -130,9 +131,7 @@ class AgentMorin(Agent):
         if weights[coords[0]] == weights[coords[1]]:
             action = np.random.choice(coords, size=1)[0]
         else:
-            action = coords[np.argmin(
-                [weights[coords[0]], weights[coords[1]]]
-            )]
+            action = coords[np.argmin([weights[coords[0]], weights[coords[1]]])]
         return [action]
 
     def _get_weights(self, points, batch_coords, batch_weights, batch_actions):
@@ -141,6 +140,5 @@ class AgentMorin(Agent):
         action = batch_actions[0]
 
         changing_coordinate = [coord for coord in coords if coord != action]
-        next_weights = [weights[i] if i not in changing_coordinate else 0
-                        for i in range(len(weights))]
+        next_weights = [weights[i] if i not in changing_coordinate else 0 for i in range(len(weights))]
         return [next_weights]
