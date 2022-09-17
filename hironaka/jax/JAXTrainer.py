@@ -10,6 +10,7 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 import yaml
+from flax.training import checkpoints
 from jax import vmap
 # Funny that jax doesn't work with tensorflow and I have to use PyTorch's version of tensorboard...
 from torch.utils.tensorboard import SummaryWriter
@@ -163,7 +164,7 @@ class JAXTrainer:
 
             state, loss, grads = train_fn(state, sample)
 
-            if state.step % 20 == 0:  # Just hard-coded the 20-step interval. Empirically working well for logging.
+            if state.step % 20 == 0:  # Just hard-coded the 20-step interval. Working well for logging.
                 if verbose:
                     self.logger.info(f"Loss: {loss}")
 
@@ -330,7 +331,28 @@ class JAXTrainer:
             avg_lst.append(jnp.mean(grads))
         return avg_lst
 
+    def save_checkpoint(self, path: str):
+        for role in ['host', 'agent']:
+            state = self.get_state(role)
+            checkpoints.save_checkpoint(ckpt_dir=path, prefix=f"{role}_", target=state, step=state.step)
+
+    def load_checkpoint(self, path: str, step=None):
+        """
+        Load checkpoint.
+        Parameters:
+            path: the checkpoint path.
+            step: (Optional) the step to restore. If None, restore the latest.
+        """
+        for role in ['host', 'agent']:
+            file_path = checkpoints.latest_checkpoint(ckpt_dir=path, prefix=f"{role}_") if step is None else path
+            state = checkpoints.restore_checkpoint(ckpt_dir=file_path,
+                                                   target=self.get_state(role),
+                                                   step=step, prefix=f"{role}_")
+
+            setattr(self, f"{role}_state", state)
+
     # ---------- Below are getter functions for training-related functions ---------- #
+
     def get_fns(self, role: str, name: str) -> Callable:
         if not hasattr(self, f"{role}_{name}") or getattr(self, f"{role}_{name}") is None:
             self.update_eval_policy_fn(role)
@@ -363,6 +385,7 @@ class JAXTrainer:
                 apply_fn=apply_fn,
                 params=policy_wrapper.parameters,
                 tx=optim)
+            setattr(self, f"{role}_state", state)
         return state
 
     # ---------- Below are either static methods or methods that set its members ---------- #

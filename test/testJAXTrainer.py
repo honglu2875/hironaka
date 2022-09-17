@@ -1,24 +1,62 @@
+import os
 import pathlib
 import unittest
 
 import jax
 import jax.numpy as jnp
+import numpy as np
+import flax
+from flax.training.train_state import TrainState
 
 from hironaka.jax import JAXTrainer
+
+
+def same_dict(d1, d2) -> bool:
+    try:
+        if isinstance(d1, (dict, flax.core.FrozenDict)):
+            for key in d1:
+                if not same_dict(d1[key], d2[key]):
+                    return False
+        elif isinstance(d1, (jnp.ndarray, np.ndarray)):
+            return jnp.all(d1 == d2)
+        else:
+            return d1 == d2
+    except:
+        return False
+    return True
 
 
 class TestJAXTrainer(unittest.TestCase):
     trainer = JAXTrainer(jax.random.PRNGKey(42), str(pathlib.Path(__file__).parent.resolve()) + "/jax_config.yml")
 
-    def test_trainer(self):
+    def test_training_and_save_load(self):
         key = jax.random.PRNGKey(42)
         for role in ['host', 'agent']:
             key, subkey = jax.random.split(key)
             exp = self.trainer.simulate(subkey, role)
             self.trainer.train(subkey, role, 10, exp, random_sampling=True)
-        # print(jnp.sum(exp[0]>=0, axis=1))
-        # print(exp[0].shape)
-        # print(exp)
+
+        original_state = {'host': self.trainer.host_state,
+                          'agent': self.trainer.agent_state}
+        # Make sure they are immutable -> unchanged after trainings
+        assert isinstance(original_state['host'], TrainState)
+        assert isinstance(original_state['agent'], TrainState)
+
+        for path in ['runs/test/host_10', 'runs/test/agent_10']:
+            if os.path.exists(path):
+                os.remove(path)
+        self.trainer.save_checkpoint('runs/test')
+
+        for role in ['host', 'agent']:
+            key, subkey = jax.random.split(key)
+            exp = self.trainer.simulate(subkey, role)
+            self.trainer.train(subkey, role, 10, exp, random_sampling=True)
+
+        self.trainer.load_checkpoint('runs/test')
+        for role in ['host', 'agent']:
+            assert same_dict(original_state[role].params, self.trainer.get_state(role).params)
+            # Optimizer needs to be matched too, as it is supposed to be a feature of `restore_checkpoint` with `target`
+            assert same_dict(original_state[role].tx, self.trainer.get_state(role).tx)
 
     def test_rollout_postprocess(self):
         rollout = (jnp.array([[[0.7777778, 0.05555556, 1., 0.16666667,
@@ -93,3 +131,5 @@ class TestJAXTrainer(unittest.TestCase):
                        -1., 0., 0., 0.,
                        0., 0.], dtype=jnp.float32)  # The first game ended, resulting in discounted reward (penalty)
         assert jnp.all(self.trainer.rollout_postprocess('agent', rollout)[2] - v < 1e-6)
+
+
