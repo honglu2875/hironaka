@@ -6,13 +6,18 @@ import numpy as np
 cppUtil = ctypes.cdll.LoadLibrary("build/cppUtil.so")
 
 cppUtil.getNewtonPolytope_approx.argtypes = [
-    ctypes.POINTER(ctypes.c_long), ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_long)]
+    ctypes.POINTER(ctypes.c_long),
+    ctypes.c_int,
+    ctypes.c_int,
+    ctypes.c_int,
+    ctypes.POINTER(ctypes.c_long),
+]
 cppUtil.getNewtonPolytope_approx.restype = None
 
 
 def get_newton_polytope_approx_py_np(points: np.ndarray, inplace=True):
     """
-        A simple-minded quick-and-dirty method to obtain an approximation of Newton Polytope disregarding convexity.
+    A simple-minded quick-and-dirty method to obtain an approximation of Newton Polytope disregarding convexity.
     """
 
     assert len(points.shape) == 3
@@ -51,7 +56,7 @@ def get_newton_polytope_approx_py_np(points: np.ndarray, inplace=True):
 
 def get_newton_polytope_approx_np(points: np.ndarray, inplace=True):
     """
-        The corresponding C++ implementation of the brute force approximation of Newton Polytope.
+    The corresponding C++ implementation of the brute force approximation of Newton Polytope.
     """
     assert len(points.shape) == 3
 
@@ -81,7 +86,7 @@ def get_newton_polytope_approx_np(points: np.ndarray, inplace=True):
 
 def get_newton_polytope_np(points: np.ndarray, inplace=True):
     """
-        Get the Newton Polytope for a set of points.
+    Get the Newton Polytope for a set of points.
     """
     return get_newton_polytope_approx_np(points, inplace)
     # TODO: change to a more precise algo to obtain Newton Polytope
@@ -89,16 +94,16 @@ def get_newton_polytope_np(points: np.ndarray, inplace=True):
 
 def shift_np(points: np.ndarray, coords: List[List[int]], axis: List[int], inplace=True):
     """
-        Shift a set of points according to the rule of Hironaka game.
-        Directly modify the data of "points".
+    Shift a set of points according to the rule of Hironaka game.
+    Directly modify the data of "points".
 
-        points, coords, axis all have a batch dimension. shifting operation is applied batch by batch.
+    points, coords, axis all have a batch dimension. shifting operation is applied batch by batch.
 
-        return:
-            inplace=True:
-                None
-            inplace=False:
-                a new numpy array consisting of new point locations and a boolean
+    return:
+        inplace=True:
+            None
+        inplace=False:
+            a new numpy array consisting of new point locations and a boolean
     """
     for i in range(len(axis)):
         assert axis[i] in coords[i]

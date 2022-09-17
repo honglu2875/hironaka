@@ -12,7 +12,7 @@ def quadratic_part(order_of_jets: int):
     """
 
     W = [Matrix(np.zeros((order_of_jets, order_of_jets)))]
-    B = MatrixSymbol('b', order_of_jets, order_of_jets)
+    B = MatrixSymbol("b", order_of_jets, order_of_jets)
     blower = np.tril(Matrix(B).transpose())
     for i in range(1, order_of_jets):
         blower[i][0] = 0
@@ -27,14 +27,17 @@ def quadratic_part(order_of_jets: int):
 
 def quadratic_fixed_points(order_of_jets: int):
     """
-        Get the torus fixed points...
+    Get the torus fixed points...
     """
     Q = []
     P = []
     for s in range(2, order_of_jets + 1):
         for lin_set in combinations(list(range(order_of_jets)), s):
-            P = list(list(L) for L in list(combinations_with_replacement(list(range(order_of_jets)), 2)) if
-                     L[0] + L[1] < order_of_jets - 1)
+            P = list(
+                list(L)
+                for L in list(combinations_with_replacement(list(range(order_of_jets)), 2))
+                if L[0] + L[1] < order_of_jets - 1
+            )
             if len(P) >= order_of_jets - s:
                 for comb in list(combinations(list(P), order_of_jets - s)):
                     Q.append([list(lin_set), list(comb)])
@@ -43,9 +46,9 @@ def quadratic_fixed_points(order_of_jets: int):
 
 def thom_monomial_ideal(order_of_jets: int):
     """
-        Get the generators of the monomial ideal of the rational map in the Thom polynomial paper
-        E.g for k=3 this is a homogeneous degree 2 monomial ideal in C[t,b_22,b_23,b_33]:
-        I_3=(b_22*b_33,t*b_33,t*b_23,b_22^2,t^2)
+    Get the generators of the monomial ideal of the rational map in the Thom polynomial paper
+    E.g for k=3 this is a homogeneous degree 2 monomial ideal in C[t,b_22,b_23,b_33]:
+    I_3=(b_22*b_33,t*b_33,t*b_23,b_22^2,t^2)
     """
     minors = []
     QP = quadratic_part(order_of_jets)

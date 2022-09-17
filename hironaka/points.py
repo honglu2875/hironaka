@@ -1,14 +1,12 @@
-from hironaka.core import ListPoints
+from .core import ListPoints
 
 
 class Points:
     """
     A simple wrapper allowing for simple usage of basic functions of `ListPoints`
     """
-    points_config = {
-        'use_precise_newton_polytope': True,
-        'value_threshold': 1e8
-    }
+
+    points_config = {"use_precise_newton_polytope": True, "value_threshold": 1e8}
 
     def __init__(self, points, distinguished_point=None):
         distinguished_point = [distinguished_point] if distinguished_point is not None else None

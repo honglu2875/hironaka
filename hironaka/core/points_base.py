@@ -1,7 +1,7 @@
 import abc
 import logging
 from copy import deepcopy
-from typing import Any, Optional, List, Union, Tuple
+from typing import Any, List, Optional, Tuple
 
 
 class PointsBase(abc.ABC):
@@ -33,17 +33,16 @@ class PointsBase(abc.ABC):
 
     Caution: Put `super().__init__(points, **kwargs)` after where `subcls_config_keys` and `running_attributes` are set.
     """
+
     # Keys in `base_attributes` will be copied. But they are shared in all subclasses and DO NOT need to re-initialize.
-    base_config_keys = ['max_num_points']
+    base_config_keys = ["max_num_points"]
 
     # You MUST define `subcls_config_keys` when subclassing (will be used when initializing a new object in `copy()`).
     subcls_config_keys: List[str]
     # Keys in `running_attributes` change throughout the life-cycle of the object. Will also be directly copied.
     running_attributes: List[str]
 
-    def __init__(self,
-                 points: Any,
-                 **kwargs):
+    def __init__(self, points: Any, **kwargs):
         """
         Parameters:
             max_num_points: (Optional) maximum number of points in a set of points.
@@ -60,11 +59,11 @@ class PointsBase(abc.ABC):
 
         self.batch_size, _, self.dimension = shape
         self.max_num_points = self._get_max_num_points()
-        if 'max_num_points' in kwargs:
-            if kwargs['max_num_points'] < self.max_num_points:
+        if "max_num_points" in kwargs:
+            if kwargs["max_num_points"] < self.max_num_points:
                 self.logger.warning("Specified max_num_points is smaller than the one in input. Ignored.")
             else:
-                self.max_num_points = kwargs['max_num_points']
+                self.max_num_points = kwargs["max_num_points"]
 
         self.config = {}  # Initialize the collection of parameters used to construct copies of this object.
         # Update keys in `self.copied_attributes`
@@ -74,12 +73,12 @@ class PointsBase(abc.ABC):
             else:
                 raise Exception("Must initialize keys in 'subcls_config_keys' before calling super().__init__.")
 
-    def copy(self, points=None) -> 'PointsBase':
+    def copy(self, points=None) -> "PointsBase":
         """
         Copy the object.
         """
         points_input = self._points_copy(self.points) if points is None else points
-        new_points = self.__class__(points_input, **self.config)
+        new_points = self.__class__(points_input, **self.config)  # pytype: disable=not-instantiable
 
         for key in self.running_attributes:
             if hasattr(self, key):
@@ -88,13 +87,13 @@ class PointsBase(abc.ABC):
                 raise Exception(f"Attribute {key} is not initialized.")
         return new_points
 
-    def shift(self, coords: List[List[int]], axis: List[int], inplace=True, **kwargs) -> Union['PointsBase', None]:
+    def shift(self, coords: List[List[int]], axis: List[int], inplace=True, **kwargs) -> "PointsBase":
         """
         Shift each batch according to the list of coords and axis.
         """
         r = self._shift(self.points, coords, axis, inplace=inplace, **kwargs)
         if inplace:
-            return None
+            return self
         else:
             return self.copy(points=r)
 
@@ -108,39 +107,39 @@ class PointsBase(abc.ABC):
         # self.ended_each_batch represents the game status of each batch
         return self._get_batch_ended(self.points)
 
-    def reposition(self, inplace=True, **kwargs):
+    def reposition(self, inplace=True, **kwargs) -> "PointsBase":
         """
         Reposition batches of points so that each batch touches all the coordinate planes.
         """
         r = self._reposition(self.points, inplace=inplace, **kwargs)
         if inplace:
-            return None
+            return self
         else:
             return self.copy(points=r)
 
-    def get_newton_polytope(self, inplace=True, **kwargs):
+    def get_newton_polytope(self, inplace=True, **kwargs) -> "PointsBase":
         """
         Get the Newton Polytope for points in each batch.
         """
         r = self._get_newton_polytope(self.points, inplace=inplace, **kwargs)
 
         if inplace:
-            return None
+            return self
         else:
             new_points = self.copy(points=r)
             return new_points
 
-    def rescale(self, inplace=True, **kwargs):
+    def rescale(self, inplace=True, **kwargs) -> "PointsBase":
         """
         Rescale each batch.
         """
         r = self._rescale(self.points, inplace=inplace, **kwargs)
         if inplace:
-            return None
+            return self
         else:
             return self.copy(points=r)
 
-    def get_features(self):
+    def get_features(self) -> "PointsBase":
         """
         An alias of getting the points.
         Feel free to override if you want to make some transformations and do feature engineering.
@@ -184,12 +183,7 @@ class PointsBase(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def _shift(self,
-               points: Any,
-               coords: List[List[int]],
-               axis: List[int],
-               inplace: Optional[bool] = True,
-               **kwargs):
+    def _shift(self, points: Any, coords: List[List[int]], axis: List[int], inplace: Optional[bool] = True, **kwargs):
         """
         Shift the points.
         Parameters:
@@ -260,10 +254,10 @@ class PointsBase(abc.ABC):
         """
         Check the mandatory class attributes (e.g., `subcls_config_keys`) are initialized.
         """
-        mandatory_keys = ['subcls_config_keys', 'running_attributes']
+        mandatory_keys = ["subcls_config_keys", "running_attributes"]
         for key in mandatory_keys:
             if not hasattr(self, key):
-                raise NotImplementedError(f'{key} must be initialized when subclassing.')
+                raise NotImplementedError(f"{key} must be initialized when subclassing.")
 
     def _check_points_shape(self) -> Tuple[int, int, int]:
         shape = self._get_shape(self.points)
@@ -271,8 +265,10 @@ class PointsBase(abc.ABC):
         if len(shape) == 2:
             try:
                 self.points = self._add_batch_axis(self.points)
-                self.logger.warning("Points are 3-dimensional: batch, max_num_points, coordinates. "
-                                    "A batch dimension is automatically added.")
+                self.logger.warning(
+                    "Points are 3-dimensional: batch, max_num_points, coordinates. "
+                    "A batch dimension is automatically added."
+                )
                 shape = (1, *shape)
             except NotImplementedError:
                 raise ValueError("Points must be 3-dimensional: batch, max_num_points, coordinates.")

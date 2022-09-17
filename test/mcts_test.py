@@ -46,8 +46,8 @@ def action_to_coords(action: int):
 #         print(len(history))
 
 
-if __name__ == '__main__':
-    path = 'train/test_model.pth'
+if __name__ == "__main__":
+    path = "train/test_model.pth"
     net = torch.load(path)
     this_host = trained_host(net)
 

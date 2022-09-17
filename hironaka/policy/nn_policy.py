@@ -1,10 +1,10 @@
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 import numpy as np
 import torch
 
-from hironaka.policy.Policy import Policy
-from hironaka.src import batched_coord_list_to_binary, decode_action, mask_encoded_action, HostActionEncoder
+from hironaka.policy.policy import Policy
+from hironaka.src import HostActionEncoder, batched_coord_list_to_binary
 
 
 class NNPolicy(Policy):
@@ -12,10 +12,7 @@ class NNPolicy(Policy):
     The basic policy that uses neural network to predict an action.
     """
 
-    def __init__(self,
-                 model: torch.nn.Module,
-                 masked: Optional[bool] = True,
-                 eval_mode: Optional[bool] = False,
+    def __init__(self, model: torch.nn.Module, masked: Optional[bool] = True, eval_mode: Optional[bool] = False,
                  **kwargs):
         super().__init__(**kwargs)
         self.model = model.to(self.device)
@@ -24,7 +21,7 @@ class NNPolicy(Policy):
 
         # Always use compressed output dimension.
         # E.g., in 3d, 0, 1, 2, 3 -> [1, 1, 0], [1, 0, 1], [0, 1, 1], [1, 1, 1]
-        if self.mode == 'host':
+        if self.mode == "host":
             self.host_encoder = HostActionEncoder(self.dimension)
 
     def predict(self, features: Any, debug: Optional[bool] = False) -> np.ndarray:
@@ -33,12 +30,12 @@ class NNPolicy(Policy):
         If self.mode=='host', the output should be turned into a batch of multi-binary array,
         If self.mode=='agent', the output should be the argmax (of the whole array or the masked entries only).
         """
-        if self.mode == 'host':
+        if self.mode == "host":
             input_tensor = self.input_preprocess_for_host(features)
-        elif self.mode == 'agent':
+        elif self.mode == "agent":
             input_tensor = self.input_preprocess_for_agent(features)
         else:
-            assert False  # Impossible code path unless something is broken.
+            raise AssertionError()  # Impossible code path unless something is broken.
 
         # Debug message
         if debug:
@@ -57,7 +54,7 @@ class NNPolicy(Policy):
             self.logger.debug("Output tensor:")
             self.logger.debug(output_tensor)
 
-        if self.mode == 'agent':
+        if self.mode == "agent":
             # action probability -> (masked) action
             # E.g., output [[0.7, 0.5, 0.6]] with host coord [[0, 1, 1]] produce a [[2]] if self.masked==True.
             output_tensor = torch.softmax(output_tensor, dim=1)
@@ -65,11 +62,13 @@ class NNPolicy(Policy):
                 mask = torch.tensor(batched_coord_list_to_binary(features[1], self.dimension), device=self.device)
                 output_tensor = output_tensor * mask
             return torch.argmax(output_tensor, dim=1).detach().numpy()
-        elif self.mode == 'host':
+        elif self.mode == "host":
             # action probabilities -> decode into multi-binary.
             # E.g., output [[0.5, 0.7, 0.5, 0.3]] --argmax--> [[1]] --decode_tensor--> [[1, 0, 1]]
             output_tensor = torch.softmax(output_tensor, dim=1)
             return self.host_encoder.decode_tensor(torch.argmax(output_tensor, dim=1)).detach().numpy()
+        else:
+            raise AssertionError()
 
     def _evaluate(self, input_tensor):
         """

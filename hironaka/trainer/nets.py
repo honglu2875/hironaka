@@ -1,5 +1,5 @@
 import abc
-from typing import List, Any, Type, Dict, Union
+from typing import Any, Dict, List, Type, Union
 
 import torch
 from torch import nn
@@ -14,18 +14,19 @@ def expand_net_list(net_arch: List[Any]) -> List[Any]:
     expanded = []
     for item in net_arch:
         if isinstance(item, dict):
-            for key in ['repeat', 'net_arch']:
+            for key in ["repeat", "net_arch"]:
                 assert key in item, f"'{key}' must be a key in the dict."
-            assert isinstance(item['net_arch'], list), f"'net_arch' must be a list. Got {type(item['net_arch'])}."
-            expanded += expand_net_list(item['net_arch']) * item['repeat']
+            assert isinstance(item["net_arch"], list), f"'net_arch' must be a list. Got {type(item['net_arch'])}."
+            expanded += expand_net_list(item["net_arch"]) * item["repeat"]
         else:
             expanded.append(item)
 
     return expanded
 
 
-def create_mlp(head: nn.Module, net_arch: List[Any], input_dim: int, output_dim: int,
-               activation_fn: Type[nn.Module] = nn.ReLU) -> nn.Module:
+def create_mlp(
+        head: nn.Module, net_arch: List[Any], input_dim: int, output_dim: int, activation_fn: Type[nn.Module] = nn.ReLU
+) -> nn.Module:
     """
     A basic MLP network will be constructed according to `head` followed by `net_arch`.
     `head` must output tensors with dim (-1, input_dim).
@@ -46,25 +47,25 @@ def create_mlp(head: nn.Module, net_arch: List[Any], input_dim: int, output_dim:
         if isinstance(item, int):
             nets += [nn.Linear(last_layer_dim, item), activation_fn()]
             last_layer_dim = item
-            last_layer_type = 'l'
+            last_layer_type = "l"
         elif isinstance(item, str):
-            permissible = ('b', 'r')
+            permissible = ("b", "r")
             assert item[0] in permissible, f"First letter in net_arch must be one of {permissible}."
-            if item[0] == 'b':  # Batch norm
-                if last_layer_type == 'b':
+            if item[0] == "b":  # Batch norm
+                if last_layer_type == "b":
                     continue
-                elif last_layer_type == 'l' or last_layer_type == 'r' or last_layer_type is None:
+                elif last_layer_type == "l" or last_layer_type == "r" or last_layer_type is None:
                     nets.pop()  # Remove the last activation function
                     nets += [nn.BatchNorm1d(last_layer_dim), activation_fn()]
                 else:
                     nets.append(nn.BatchNorm1d(last_layer_dim))
-                last_layer_type = 'b'
-            elif item[0] == 'r':  # Residual block
+                last_layer_type = "b"
+            elif item[0] == "r":  # Residual block
                 in_channels, out_channels = last_layer_dim, int(item[1:])
                 assert out_channels > 0, f"Invalid description of residual block. Got {item}"
                 nets += [make_residual(in_channels, out_channels), activation_fn()]
                 last_layer_dim = out_channels
-                last_layer_type = 'r'
+                last_layer_type = "r"
 
     nets.pop()  # remove the last activation function
     nets.append(nn.Linear(last_layer_dim, output_dim))
@@ -99,8 +100,9 @@ def make_residual(in_channels: int, out_channels: int) -> ResidualBlock:
     if in_channels == out_channels:
         return ResidualBlock(in_channels, out_channels)
     else:
-        return ResidualBlock(in_channels, out_channels,
-                             nn.Sequential(nn.Linear(in_channels, out_channels), nn.BatchNorm1d(out_channels)))
+        return ResidualBlock(
+            in_channels, out_channels, nn.Sequential(nn.Linear(in_channels, out_channels), nn.BatchNorm1d(out_channels))
+        )
 
 
 class BaseFeaturesExtractor(nn.Module, abc.ABC):
@@ -128,8 +130,7 @@ class BaseFeaturesExtractor(nn.Module, abc.ABC):
 class AgentFeatureExtractor(BaseFeaturesExtractor):
     def __init__(self, input_dim: int):
         super().__init__(input_dim)
-        self.extractors = {'points': nn.Flatten(),
-                           'coords': nn.Flatten()}
+        self.extractors = {"points": nn.Flatten(), "coords": nn.Flatten()}
 
     def forward(self, observations: TensorDict) -> torch.Tensor:
         tensor_list = []

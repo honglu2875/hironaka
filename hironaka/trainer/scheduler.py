@@ -13,6 +13,7 @@ class Scheduler(abc.ABC):
         - One can optionally record some parameters and states
         - It enforces `mandatory_keys` when fed with parameters at initialization.
     """
+
     key_name = None
     mandatory_keys = []
 
@@ -21,7 +22,7 @@ class Scheduler(abc.ABC):
         self.kwargs = kwargs
 
         for key in self.mandatory_keys:
-            assert key in self.kwargs, \
+            assert (key in self.kwargs), \
                 f"'{key}' must be in {self.key_name if self.key_name is not None else 'the config'}. Got {self.kwargs}."
 
     def __call__(self, steps: int, **kwargs):
@@ -38,30 +39,30 @@ class ConstantScheduler(Scheduler):
 
 
 class ExponentialLRScheduler(Scheduler):
-    key_name = 'lr_schedule'
-    mandatory_keys = ['initial_lr', 'rate']
+    key_name = "lr_schedule"
+    mandatory_keys = ["initial_lr", "rate"]
 
     def get_value(self, steps: int) -> Union[float, int]:
-        initial_lr = self.kwargs['initial_lr']
-        rate = self.kwargs['rate']
+        initial_lr = self.kwargs["initial_lr"]
+        rate = self.kwargs["rate"]
         return initial_lr * (rate ** steps) + self.value * (1 - rate ** steps)
 
 
 class InverseLRScheduler(Scheduler):
-    key_name = 'lr_schedule'
-    mandatory_keys = ['initial_lr', 'rate']
+    key_name = "lr_schedule"
+    mandatory_keys = ["initial_lr", "rate"]
 
     def get_value(self, steps: int) -> Union[float, int]:
-        initial_lr = self.kwargs['initial_lr']
-        rate = self.kwargs['rate']
+        initial_lr = self.kwargs["initial_lr"]
+        rate = self.kwargs["rate"]
         return rate / (steps + rate / initial_lr)
 
 
 class ExponentialERScheduler(Scheduler):
-    key_name = 'er_schedule'
-    mandatory_keys = ['initial_er', 'rate']
+    key_name = "er_schedule"
+    mandatory_keys = ["initial_er", "rate"]
 
     def get_value(self, steps: int) -> Union[float, int]:
-        initial_er = self.kwargs['initial_er']
-        rate = self.kwargs['rate']
+        initial_er = self.kwargs["initial_er"]
+        rate = self.kwargs["rate"]
         return initial_er * (rate ** steps) + self.value * (1 - rate ** steps)

@@ -1,5 +1,4 @@
-import logging
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 from hironaka.core import ListPoints
 from hironaka.game import GameHironaka
@@ -11,23 +10,19 @@ class HironakaValidator(GameHironaka):
     Given an agent and a host, this class inherits GameHironaka and handles the validation process.
     """
 
-    def __init__(self,
-                 host,
-                 agent,
-                 config_kwargs: Optional[Dict[str, Any]] = None,
-                 **kwargs):
+    def __init__(self, host, agent, config_kwargs: Optional[Dict[str, Any]] = None, **kwargs):
         config_kwargs = dict() if config_kwargs is None else config_kwargs
         config = {**config_kwargs, **kwargs}
 
         self.points_config = {
-            'n': config.get('max_num_points', 10),
-            'batch_num': 1,
-            'dimension': config.get('dimension', 3),
-            'max_value': config.get('max_value', 50)
+            "n": config.get("max_num_points", 10),
+            "batch_num": 1,
+            "dimension": config.get("dimension", 3),
+            "max_value": config.get("max_value", 50),
         }
 
-        self.value_threshold = config.get('value_threshold', None)
-        self.step_threshold = config.get('step_threshold', 1000)
+        self.value_threshold = config.get("value_threshold", None)
+        self.step_threshold = config.get("step_threshold", 1000)
 
         super().__init__(None, host, agent, **config)
         self.reset()

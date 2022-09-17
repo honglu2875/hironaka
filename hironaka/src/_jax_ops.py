@@ -1,7 +1,7 @@
 from functools import partial
 
 import jax.numpy as jnp
-from jax import vmap, jit, lax
+from jax import jit, lax, vmap
 
 mul_2_1 = vmap(lax.mul, (0, None), 0)  # (m, d) * (d,) -> (m, d)
 mul_kronecker = vmap(vmap(lax.mul, (None, 0), 0), (0, None), 0)  # (m,) * (n,) -> (m, n) Kronecker product
@@ -56,8 +56,8 @@ def get_interior(points_slice: jnp.ndarray) -> jnp.ndarray:
     available = jnp.all(points_slice >= 0, axis=1)
     available_mask = and_kronecker(available, available)
     diff = sub_2_2(points_slice, points_slice)  # (max_num_points, max_num_points, dimension)
-    res = ~jnp.any(
-        jnp.all(diff >= 0, axis=2) & (~jnp.diag(jnp.ones(max_num_points, dtype=bool))) & available_mask, axis=1)
+    res = ~jnp.any(jnp.all(diff >= 0, axis=2) & (~jnp.diag(jnp.ones(max_num_points, dtype=bool))) & available_mask,
+                   axis=1)
     return res
 
 
@@ -84,8 +84,9 @@ def shift_single_batch(points_slice: jnp.ndarray, coord_slice: jnp.ndarray, axis
     dtype = points_slice.dtype
     axis_binary = jnp.arange(dimension) == axis_slice
     # Get the raw computation of linear transformation
-    return mul_kronecker(jnp.sum(mul_2_1(points_slice, coord_slice.astype(dtype)), axis=1),
-                         axis_binary.astype(dtype)) + mul_2_1(points_slice, (~axis_binary).astype(dtype))
+    return mul_kronecker(
+        jnp.sum(mul_2_1(points_slice, coord_slice.astype(dtype)), axis=1), axis_binary.astype(dtype)
+    ) + mul_2_1(points_slice, (~axis_binary).astype(dtype))
 
 
 @jit
@@ -102,9 +103,7 @@ def calculate_rescale(points: jnp.ndarray) -> jnp.array:
     # Use eps to stay away from division by zero (or very small).
     # But ideally, maximum should always be larger than 1 if the batch points keep rescaling.
     eps = 1e-8
-    return jnp.where(maximum <= eps,
-                     points,
-                     points / maximum)
+    return jnp.where(maximum <= eps, points, points / maximum)
 
 
 @jit
@@ -127,8 +126,7 @@ def subtract_min(vector: jnp.ndarray, padding_value: float = -1.0) -> jnp.array:
     dtype = vector.dtype
     modified = vector * available + (~available * jnp.max(vector)).astype(dtype)
     minimal = jnp.min(modified)
-    return jnp.where(minimal <= 0.0,
-                     vector,
+    return jnp.where(minimal <= 0.0, vector,
                      (vector - minimal) * available + (~available * padding_value).astype(dtype))
 
 

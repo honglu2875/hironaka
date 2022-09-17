@@ -1,21 +1,13 @@
 import abc
 import logging
 import random
-from typing import Union, List
-
-# Sorry about this block of codes. Blame google colab for not updating their python version...
-from hironaka.src import get_python_version_in_float
-
-if get_python_version_in_float() <= 3.7:
-    Final = Union  # Basically we ignore Final in versions <= 3.7
-else:
-    from typing import Final
+from typing import List, Union, Optional
 
 import numpy as np
 
-from hironaka.Points import Points
 from hironaka.core import ListPoints
-from hironaka.policy.Policy import Policy
+from hironaka.points import Points
+from hironaka.policy.policy import Policy
 
 
 class Agent(abc.ABC):
@@ -24,6 +16,7 @@ class Agent(abc.ABC):
     Must implement:
         _get_actions
     """
+
     # Please set the following. They are *class constants*!
     USE_WEIGHTS: bool
     USE_REPOSITION: bool  # apply a self.points.reposition() between shift() and get_newton_polytope()
@@ -39,7 +32,8 @@ class Agent(abc.ABC):
             if not hasattr(self, s) or getattr(self, s) is None:
                 raise NotImplementedError(f"Please specify {s} for the subclass.")
 
-    def move(self, points: Union[ListPoints, Points], coords: List, weights: List = None, inplace: bool = True):
+    def move(self, points: Union[ListPoints, Points], coords: List, weights: Optional[List] = None,
+             inplace: bool = True):
         """
         Make moves on (the set of) points.
         Parameters:
@@ -78,7 +72,7 @@ class Agent(abc.ABC):
             points.reposition()
         points.get_newton_polytope()
         if self.USE_WEIGHTS:
-            weights[:] = new_weights
+            weights[:] = new_weights  # pytype: disable=unsupported-operands
         return actions
 
     @abc.abstractmethod
@@ -90,24 +84,24 @@ class Agent(abc.ABC):
 
 
 class RandomAgent(Agent):
-    USE_WEIGHTS: Final[bool] = False
-    USE_REPOSITION: Final[bool] = False
+    USE_WEIGHTS = False
+    USE_REPOSITION = False
 
     def _get_actions(self, points, batch_coords, batch_weights):
         return [random.choice(coord) if len(coord) > 1 else None for coord in batch_coords]
 
 
 class ChooseFirstAgent(Agent):
-    USE_WEIGHTS: Final[bool] = False
-    USE_REPOSITION: Final[bool] = False
+    USE_WEIGHTS = False
+    USE_REPOSITION = False
 
     def _get_actions(self, points, batch_coords, batch_weights):
         return [min(coord) if len(coord) > 1 else None for coord in batch_coords]
 
 
 class PolicyAgent(Agent):
-    USE_WEIGHTS: Final[bool] = False
-    USE_REPOSITION: Final[bool] = False
+    USE_WEIGHTS = False
+    USE_REPOSITION = False
 
     def __init__(self, policy: Policy, **kwargs):
         self._policy = policy
@@ -119,8 +113,8 @@ class PolicyAgent(Agent):
 
 
 class AgentMorin(Agent):
-    USE_WEIGHTS: Final[bool] = True
-    USE_REPOSITION: Final[bool] = True
+    USE_WEIGHTS = True
+    USE_REPOSITION = True
 
     def _get_actions(self, points, batch_coords, batch_weights):
         assert points.batch_size == 1, "Currently only support batch size 1."  # TODO: generalize!
@@ -130,9 +124,7 @@ class AgentMorin(Agent):
         if weights[coords[0]] == weights[coords[1]]:
             action = np.random.choice(coords, size=1)[0]
         else:
-            action = coords[np.argmin(
-                [weights[coords[0]], weights[coords[1]]]
-            )]
+            action = coords[np.argmin([weights[coords[0]], weights[coords[1]]])]
         return [action]
 
     def _get_weights(self, points, batch_coords, batch_weights, batch_actions):
@@ -141,6 +133,5 @@ class AgentMorin(Agent):
         action = batch_actions[0]
 
         changing_coordinate = [coord for coord in coords if coord != action]
-        next_weights = [weights[i] if i not in changing_coordinate else 0
-                        for i in range(len(weights))]
+        next_weights = [weights[i] if i not in changing_coordinate else 0 for i in range(len(weights))]
         return [next_weights]
