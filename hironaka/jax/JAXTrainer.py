@@ -169,7 +169,7 @@ class JAXTrainer:
 
                 self.tensorboard_log_scalar(f"{role}/loss", loss, state.step)
                 self.summary_writer.add_histogram(
-                    f"{role}/gradient", self.layerwise_average(grads['params']), state.step)
+                    f"{role}/gradient", self.layerwise_average(grads['params']), state.step, [])
 
                 if self.config['tensorboard']['layerwise_logging']:
                     self.tensorboard_log_layers(role, state.params['params'], state.step)

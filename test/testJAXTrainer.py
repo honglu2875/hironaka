@@ -92,4 +92,4 @@ class TestJAXTrainer(unittest.TestCase):
         v = jnp.array([-0.960596, -0.970299, -0.9801, -0.98999995,
                        -1., 0., 0., 0.,
                        0., 0.], dtype=jnp.float32)  # The first game ended, resulting in discounted reward (penalty)
-        assert jnp.all(self.trainer.rollout_postprocess('agent', rollout)[2] == v)
+        assert jnp.all(self.trainer.rollout_postprocess('agent', rollout)[2] - v < 1e-6)
