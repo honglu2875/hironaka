@@ -61,5 +61,20 @@ This provides functions to simulate from the root and generate roll-outs.
 
 ## .JAXTrainer
 
-This is a package of all the above by initialize based on a config file (like `jax_config.yml` as an example), spawn
-evaluation workers, simulation workers and training workers to complete the whole process.
+This is a package of all the above and initialize based on a config file (like `jax_config.yml`).
+
+A sample usage:
+```python
+import jax
+from hironaka.jax import JAXTrainer
+
+key = jax.random.PRNGKey(42)
+trainer = JAXTrainer(key, "jax_config.yml")
+
+for role in ['host', 'agent']:
+    key, subkey = jax.random.split(key)
+    rollout = trainer.simulate(subkey, role)
+    trainer.train(subkey, role, 10, rollout, random_sampling=True)
+```
+
+There are many little things and we recommend to check out the doc in the code. 

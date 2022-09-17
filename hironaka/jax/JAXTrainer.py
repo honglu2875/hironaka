@@ -31,7 +31,9 @@ RollOut = Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]
 
 class JAXTrainer:
     """
-    This consolidates the whole training process given a config file.
+    This consolidates the whole training process given a config file. For detailed usage, please see README or check
+        out the test (e.g., testJAXTrainer.py).
+
     """
     optim_dict = {'adam': optax.adam,
                   'adamw': optax.adamw,
