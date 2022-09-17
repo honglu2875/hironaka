@@ -45,5 +45,5 @@ def polyak_update(
         # zip does not raise an exception if length of parameters does not match.
         # TODO: PEP 618, zip new feature allowing strict=True
         for param, target_param in zip_equal(params, target_params):
-            target_param.data.mul_(1 - tau)
-            torch.add(target_param.data, param.data, alpha=tau, out=target_param.data)
+            target_param.data.mul_(1 - tau)  # pytype: disable=attribute-error
+            torch.add(target_param.data, param.data, alpha=tau, out=target_param.data)  # pytype: disable=attribute-error
