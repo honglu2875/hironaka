@@ -233,7 +233,7 @@ class JAXTrainer:
     def train_step(state: jnp.ndarray, sample: jnp.ndarray,
                    loss_fn: Callable, max_grad=1) -> Tuple[TrainState, jnp.ndarray, jnp.ndarray]:
         loss, grads = jax.value_and_grad(partial(compute_loss, loss_fn=loss_fn))(state.params, state.apply_fn, sample)
-        grads = jnp.clip(grads, a_max=max_grad)
+        grads = jax.tree_util.tree_map(partial(jnp.clip, a_max=max_grad), grads)
         state = state.apply_gradients(grads=grads)
         return state, loss, grads
 
