@@ -57,10 +57,12 @@ class JAXTrainer:
     dimension: int
     max_length_game: int
     max_value: int
+    max_grad_norm: float
     scale_observation: bool
     use_cuda: bool
     version_string: str
     num_evaluations: int
+    eval_on_cpu: bool
     max_num_considered_actions: int
     discount: float
 
@@ -85,10 +87,12 @@ class JAXTrainer:
             "dimension",
             "max_length_game",
             "max_value",
+            "max_grad_norm",
             "scale_observation",
             "use_cuda",
             "version_string",
             "num_evaluations",
+            "eval_on_cpu",
             "max_num_considered_actions",
             "discount",
         ]
@@ -227,8 +231,9 @@ class JAXTrainer:
 
     @staticmethod
     def train_step(state: jnp.ndarray, sample: jnp.ndarray,
-                   loss_fn: Callable) -> Tuple[TrainState, jnp.ndarray, jnp.ndarray]:
+                   loss_fn: Callable, max_grad=1) -> Tuple[TrainState, jnp.ndarray, jnp.ndarray]:
         loss, grads = jax.value_and_grad(partial(compute_loss, loss_fn=loss_fn))(state.params, state.apply_fn, sample)
+        grads = jnp.clip(grads, a_max=max_grad)
         state = state.apply_gradients(grads=grads)
         return state, loss, grads
 
@@ -401,7 +406,7 @@ class JAXTrainer:
     def save_checkpoint(self, path: str):
         for role in ["host", "agent"]:
             state = self.get_state(role)
-            checkpoints.save_checkpoint(ckpt_dir=path, prefix=f"{role}_", target=state, step=state.step, overwrite=True)
+            checkpoints.save_checkpoint(ckpt_dir=path, prefix=f"{role}_", overwrite=True, target=state, step=state.step)
 
     def load_checkpoint(self, path: str, step=None):
         """
@@ -415,16 +420,13 @@ class JAXTrainer:
             state = checkpoints.restore_checkpoint(
                 ckpt_dir=file_path, target=self.get_state(role), step=step, prefix=f"{role}_"
             )
-
             setattr(self, f"{role}_state", state)
 
     # ---------- Below are getter functions for training-related functions ---------- #
 
     def get_fns(self, role: str, name: str) -> Callable:
         if not hasattr(self, f"{role}_{name}") or getattr(self, f"{role}_{name}") is None:
-            self.update_eval_policy_fn(role)
-            self.update_sim_loop(role)
-            self.update_train_fn(role)
+            self._update_fns(role)
         return getattr(self, f"{role}_{name}")
 
     def get_eval_policy_fn(self, role: str) -> Callable:
@@ -466,9 +468,11 @@ class JAXTrainer:
         """
         Update `{role}_eval_policy_fn` based on the current parameters of the network.
         """
-        maybe_jit = jax.jit if jitted else lambda x: x
+        maybe_jit = jax.jit if jitted else lambda x, *_: x
         batch_size = self.eval_batch_size
-        setattr(self, f"{role}_eval_policy_fn", maybe_jit(getattr(self, f"{role}_policy").get_apply_fn(batch_size)))
+        setattr(self, f"{role}_eval_policy_fn",
+                maybe_jit(getattr(self, f"{role}_policy").get_apply_fn(batch_size),
+                          backend='cpu' if self.eval_on_cpu or not self.use_cuda else 'gpu'))
 
     def update_sim_loop(self, role: str, jitted=True, return_function=False) -> Any:
         """
@@ -476,7 +480,7 @@ class JAXTrainer:
         """
         opponent = self._get_opponent(role)
         dim = self.dimension if role == "host" else None
-        maybe_jit = jax.jit if jitted else lambda x: x
+        maybe_jit = jax.jit if jitted else lambda x, *_: x
         simulation_config = {
             "eval_batch_size": self.eval_batch_size,
             "max_num_points": self.max_num_points,
@@ -499,7 +503,8 @@ class JAXTrainer:
             rescale_points=self.scale_observation,
             dtype=self.dtype,
         )
-        sim_fn = maybe_jit(get_single_thread_simulation(role, eval_loop, config=simulation_config, dtype=self.dtype))
+        sim_fn = maybe_jit(get_single_thread_simulation(role, eval_loop, config=simulation_config, dtype=self.dtype),
+                           backend='cpu' if self.eval_on_cpu or not self.use_cuda else 'gpu')
         if return_function:
             return eval_loop, sim_fn
         else:
@@ -511,9 +516,9 @@ class JAXTrainer:
         Update `{role}_train_fn`.
         """
         train_fn = (
-            jax.jit(partial(self.train_step, loss_fn=policy_value_loss))
+            jax.jit(partial(self.train_step, loss_fn=policy_value_loss, max_grad=self.max_grad_norm))
             if jitted
-            else partial(self.train_step, loss_fn=policy_value_loss)
+            else partial(self.train_step, loss_fn=policy_value_loss, max_grad=self.max_grad_norm)
         )
         train_policy_fn = jax.jit(getattr(self, f"{role}_policy").get_apply_fn(self.config[role]["batch_size"]))
         if return_function:
@@ -521,6 +526,11 @@ class JAXTrainer:
         else:
             setattr(self, f"{role}_train_fn", train_fn)
             setattr(self, f"{role}_train_policy_fn", train_policy_fn)
+
+    def _update_fns(self, role: str):
+        self.update_eval_policy_fn(role)
+        self.update_sim_loop(role)
+        self.update_train_fn(role)
 
     def purge_state(self, role: str):
         """

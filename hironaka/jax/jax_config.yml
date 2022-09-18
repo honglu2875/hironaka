@@ -14,6 +14,7 @@ max_grad_norm: 1
 
 eval_batch_size: 10
 num_evaluations: 100
+eval_on_cpu: true
 max_num_considered_actions: 10
 
 discount: 0.99

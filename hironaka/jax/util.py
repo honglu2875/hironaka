@@ -11,7 +11,6 @@ from hironaka.src import get_newton_polytope_jax, rescale_jax, shift_jax
 flatten = vmap(jnp.ravel, 0, 0)
 
 
-@jit
 def make_agent_obs(pts: jnp.ndarray, coords: jnp.ndarray) -> jnp.ndarray:
     """
     Combine points observation and coordinates into a flattened and concatenated agent observation.
@@ -24,12 +23,10 @@ def make_agent_obs(pts: jnp.ndarray, coords: jnp.ndarray) -> jnp.ndarray:
     return jnp.concatenate([flatten(pts), coords], axis=1)
 
 
-@jit
 def get_dones(pts: jnp.ndarray) -> jnp.ndarray:
     return jnp.sum((pts[:, :, 0] >= 0), axis=1) < 2
 
 
-@partial(jit, static_argnames=["role", "dimension"])
 def get_done_from_flatten(obs: jnp.ndarray, role: str, dimension: int) -> jnp.ndarray:
     return jnp.sum(obs >= 0, axis=-1) <= dimension + (role == "agent") * (2 ** dimension - dimension - 1)
 
@@ -86,7 +83,6 @@ def get_take_actions(role: str, spec: Tuple[int, int], rescale_points: bool = Tr
 
     obs_preprocess, coords_preprocess = get_preprocess_fns(role, spec)
 
-    @jit
     def take_actions(observations: jnp.ndarray, actions: jnp.ndarray, axis: jnp.ndarray) -> jnp.ndarray:
         """
         Shift a batch of points depending on the `role` in `get_recurrent_fn_for_role`. Rules are described as below:
@@ -166,7 +162,6 @@ def get_feature_fn(role: str, spec: Tuple) -> Callable:
     return feature_fn
 
 
-@partial(jit, static_argnames=["max_length_game", "reward_fn"])
 def calculate_value_using_reward_fn(
         done: jnp.ndarray, prev_done: jnp.ndarray, discount: float, max_length_game: int, reward_fn: Callable
 ) -> jnp.ndarray:
@@ -285,7 +280,6 @@ def get_batch_decode_from_one_hot(dimension: int) -> Callable:
     return jit(vmap(partial(decode_from_one_hot, lookup_dict=dec_table[dimension]), 0, 0))
 
 
-@jit
 def encode(multi_binary: jnp.ndarray) -> int:
     """
     Encode a multi-binary vector into compressed class number.
@@ -298,7 +292,6 @@ def encode(multi_binary: jnp.ndarray) -> int:
     return naive_binary - jnp.floor(jnp.log2(naive_binary)) - 2
 
 
-@jit
 def encode_one_hot(multi_binary: jnp.ndarray) -> jnp.ndarray:
     """
     Encode a multi-binary vector into the one-hot vector of compressed class.

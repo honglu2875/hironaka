@@ -14,6 +14,7 @@ max_grad_norm: 1
 
 eval_batch_size: 2
 num_evaluations: 10
+eval_on_cpu: true
 max_num_considered_actions: 10
 #rollout process repeats `rollout_size//eval_batch_size` amount of times
 discount: 0.99
