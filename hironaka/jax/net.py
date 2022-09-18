@@ -20,22 +20,31 @@ class DenseResidueBlock(nn.Module):
     activation: Callable
 
     @nn.compact
-    def __call__(
-            self,
-            x,
-    ):
-        residual = x
+    def __call__(self, x):
+        original = x
         y = nn.Dense(self.features, dtype=self.dtype)(x)
         y = self.norm()(y)
         y = self.activation(y)
-        y = nn.Dense(self.features, dtype=self.dtype)(x)
+        y = nn.Dense(self.features, dtype=self.dtype)(y)
         y = self.norm()(y)
 
-        if residual.shape != y.shape:
-            residual = nn.Dense(self.features, dtype=self.dtype, name="res_proj")(residual)
-            residual = self.norm(name="norm_proj")(residual)
+        if original.shape != y.shape:
+            original = nn.Dense(self.features, dtype=self.dtype, name="res_proj")(original)
+            original = self.norm(name="norm_proj")(original)
 
-        return self.activation(residual + y)
+        return self.activation(original + y)
+
+
+class DenseBlock(nn.Module):
+    features: int
+    dtype: jnp.dtype
+    norm: ModuleDef
+    activation: Callable
+
+    @nn.compact
+    def __call__(self, x):
+        y = nn.Dense(self.features, dtype=self.dtype)(x)
+        return self.activation(y)
 
 
 class DenseResNet(nn.Module):
@@ -54,6 +63,10 @@ class DenseResNet(nn.Module):
         x = nn.Dense(self.output_size, dtype=self.dtype)(x)
         return self.activation(x)
 
+
+DenseNet = partial(DenseResNet, block_cls=DenseBlock)
+
+CustomNet = DenseResNet
 
 DResNetMini = partial(DenseResNet, net_arch=[32] * 2)
 DResNet18 = partial(DenseResNet, net_arch=[256] * 18)

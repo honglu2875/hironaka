@@ -15,7 +15,7 @@ from flax.training.train_state import TrainState
 # Funny that jax doesn't work with tensorflow and I have to use PyTorch's version of tensorboard...
 from torch.utils.tensorboard import SummaryWriter
 
-from hironaka.jax.net import DenseResNet, PolicyWrapper
+from hironaka.jax.net import DenseNet, DenseResNet, CustomNet, PolicyWrapper
 from hironaka.jax.players import (
     all_coord_host_fn,
     choose_first_agent_fn,
@@ -61,6 +61,7 @@ class JAXTrainer:
     scale_observation: bool
     use_cuda: bool
     version_string: str
+    net_type: str
     num_evaluations: int
     eval_on_cpu: bool
     max_num_considered_actions: int
@@ -69,6 +70,9 @@ class JAXTrainer:
     optim_dict = {"adam": optax.adam, "adamw": optax.adamw, "sgd": optax.sgd}
     lr_scheduler_dict = {"constant": ConstantScheduler, "exponential": ExponentialLRScheduler,
                          "inverse": InverseLRScheduler}
+    net_dict = {"dense_resnet": DenseResNet,
+                "dense": DenseNet,
+                "custom": CustomNet}
 
     def __init__(self, key, config: Union[dict, str], dtype=jnp.float32):
         self.logger = logging.getLogger(__class__.__name__)
@@ -91,6 +95,7 @@ class JAXTrainer:
             "scale_observation",
             "use_cuda",
             "version_string",
+            "net_type",
             "num_evaluations",
             "eval_on_cpu",
             "max_num_considered_actions",
@@ -114,7 +119,7 @@ class JAXTrainer:
         for role in ["host", "agent"]:
             if role not in self.config:
                 continue
-            net = DenseResNet(self.output_dim[role] + 1, net_arch=self.config[role]["net_arch"])
+            net = self.net_dict[self.net_type](self.output_dim[role] + 1, net_arch=self.config[role]["net_arch"])
             setattr(
                 self,
                 f"{role}_policy",
@@ -213,7 +218,7 @@ class JAXTrainer:
 
             state, loss, grads = train_fn(state, sample)
 
-            if state.step % 20 == 0:  # Just hard-coded the 20-step interval. Working well for logging.
+            if state.step % self.config['tensorboard']['log_interval'] == 0:
                 if verbose:
                     self.logger.info(f"Loss: {loss}")
 

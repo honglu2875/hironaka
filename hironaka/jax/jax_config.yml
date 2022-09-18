@@ -2,9 +2,11 @@ tensorboard:
   use: true
   work_dir: runs
   layerwise_logging: true
+  log_interval: 20
 use_cuda: true
 scale_observation: true
 version_string: 'mcts'
+net_type: dense
 
 dimension: 3
 max_num_points: 20
