@@ -28,11 +28,11 @@ We study this connection and refactor our codes into this repo.
   this [Google Colab file](https://colab.research.google.com/drive/1nVnVA6cyg0GT5qTadJTJH7aU6smgopLm?usp=sharing),
   forget what I say below and start your adventure)
 
-  `DQNTrainer` is a quick implementation combining my interface `Trainer` with `stable-baseline3`'s DQN codes. It runs
+  `dqn_trainer` is a quick implementation combining my interface `Trainer` with `stable-baseline3`'s DQN codes. It runs
   in 3 lines:
     ```python
-    from hironaka.trainer.DQNTrainer import DQNTrainer
-    trainer = DQNTrainer('dqn_config_test.yml')
+    from hironaka.trainer.dqn_trainer import dqn_trainer
+    trainer = dqn_trainer('dqn_config_test.yml')
     trainer.train(100)
     ```
   Of course, for this to work you need to
@@ -70,6 +70,8 @@ setup(
         "mctx>=0.0.2",
         "chex>=0.1.4",
         "optax>=0.1.3",
+        "tensorboard",
+        "tensorflow-cpu"
     ],
     extras_require={
         "tests": [
@@ -96,9 +98,7 @@ setup(
             "sphinx_copybutton",
         ],
         "extra": [
-            # For Tensorboard logging
-            "tensorboard",
-            "tensorflow-cpu",
+            "tensorflow",
         ],
     },
     description="A utility package for a reinforcement learning study of singularities in algebraic geometry",

@@ -1,9 +1,6 @@
 SHELL=/bin/bash
 LINT_PATHS=hironaka/ test/ setup.py
 
-test:
-	python3 -m unittest test/*.py
-
 type:
 	pytype -j auto
 

@@ -401,7 +401,7 @@ class JAXTrainer:
     def save_checkpoint(self, path: str):
         for role in ["host", "agent"]:
             state = self.get_state(role)
-            checkpoints.save_checkpoint(ckpt_dir=path, prefix=f"{role}_", target=state, step=state.step)
+            checkpoints.save_checkpoint(ckpt_dir=path, prefix=f"{role}_", target=state, step=state.step, overwrite=True)
 
     def load_checkpoint(self, path: str, step=None):
         """

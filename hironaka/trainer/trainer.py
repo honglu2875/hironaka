@@ -365,7 +365,7 @@ class Trainer(abc.ABC):
     def save(self, path: str):
         """
         Save only models and config as a dict (Caution: ReplayBuffer is NOT saved).
-        If a subclass creates extra models (e.g., DQNTrainer.{role}_q_net_target), it MUST be overridden.
+        If a subclass creates extra models (e.g., dqn_trainer.{role}_q_net_target), it MUST be overridden.
         """
         saved = {
             "host_net": self.get_net("host"),

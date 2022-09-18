@@ -13,6 +13,7 @@ from hironaka.agent import ChooseFirstAgent
 from hironaka.core import TensorPoints
 from hironaka.src import _fn as snip
 from hironaka.trainer.player_modules import ChooseFirstAgentModule
+from hironaka.trainer.trainer import Trainer
 from hironaka.validator import HironakaValidator
 
 ITERATIONS = 1000
@@ -192,7 +193,7 @@ class MCTS:
         return current_reward
 
 
-class MCTSTrainer2(Trainer.Trainer):
+class MCTSTrainer2(Trainer):
     role_specific_hyperparameters = ["iterations", "c_puct", "lr", "max_depth", "MSE_coefficient", "agent"]
 
     def __init__(self, config: Union[Dict[str, Any], str]):
