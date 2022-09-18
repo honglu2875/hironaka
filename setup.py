@@ -70,6 +70,8 @@ setup(
         "mctx>=0.0.2",
         "chex>=0.1.4",
         "optax>=0.1.3",
+        "tensorboard",
+        "tensorflow-cpu"
     ],
     extras_require={
         "tests": [
@@ -96,9 +98,7 @@ setup(
             "sphinx_copybutton",
         ],
         "extra": [
-            # For Tensorboard logging
-            "tensorboard",
-            "tensorflow-cpu",
+            "tensorflow",
         ],
     },
     description="A utility package for a reinforcement learning study of singularities in algebraic geometry",
