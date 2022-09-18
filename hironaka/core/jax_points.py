@@ -8,7 +8,7 @@ import numpy as np
 from jax import vmap
 
 from hironaka.src import get_batched_padded_array, get_newton_polytope_jax, reposition_jax, rescale_jax, shift_jax
-from . import PointsBase
+from .points_base import PointsBase
 
 
 class JAXPoints(PointsBase):

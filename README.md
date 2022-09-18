@@ -52,7 +52,7 @@ There are 2 ways to start a proper Reinforcement Learning training:
   `DQNTrainer` is a quick implementation combining my interface `Trainer` with `stable-baseline3`'s DQN codes. It runs
   in 3 lines:
     ```python
-    from hironaka.trainer.DQNTrainer import DQNTrainer
+    from hironaka.trainer.dqn_trainer import DQNTrainer
     trainer = DQNTrainer('dqn_config_test.yml')
     trainer.train(100)
     ```

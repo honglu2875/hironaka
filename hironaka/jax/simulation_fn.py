@@ -116,6 +116,7 @@ def get_single_thread_simulation(role: str, evaluation_loop: Callable, config: d
         The returning sample size is `eval_batch_size * max_length_game`.
         """
         starting_keys = jax.random.split(key, num=3)
+        root_state = root_state.astype(dtype)
 
         def body_fn(i, keys_and_state):
             (key, subkey, loop_key), rollouts, state = keys_and_state
@@ -144,20 +145,15 @@ def get_single_thread_simulation(role: str, evaluation_loop: Callable, config: d
         num_loops = max_length_game
 
         # `fori_loop` must return tracers of exactly the same shape
-        rollout_obs_init = jnp.zeros((eval_batch_size, num_loops, input_dim))
-        rollout_policy_init = jnp.zeros((eval_batch_size, num_loops, action_num))
-        rollout_value_init = jnp.zeros(
-            (
-                eval_batch_size,
-                num_loops,
-            )
-        )
+        rollout_obs_init = jnp.zeros((eval_batch_size, num_loops, input_dim), dtype=dtype)
+        rollout_policy_init = jnp.zeros((eval_batch_size, num_loops, action_num), dtype=dtype)
+        rollout_value_init = jnp.zeros((eval_batch_size, num_loops,), dtype=dtype)
 
         _, rollouts, _ = lax.fori_loop(
             0, num_loops, body_fn,
             (starting_keys, (rollout_obs_init, rollout_policy_init, rollout_value_init), root_state)
         )
 
-        return rollouts.astype(dtype)
+        return rollouts
 
     return single_thread_simulation
