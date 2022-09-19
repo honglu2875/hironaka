@@ -338,7 +338,7 @@ class JAXTrainer:
                 self.logger.info(f"  {get_name(metric_fn)}: {rho}")
             if write_tensorboard:
                 self.summary_writer.add_scalar(f"{get_name(host)}_v_{get_name(agent)}",
-                                               rho, self.get_state('host').step)
+                                               float(rho), self.get_state('host').step)
                 hist = np.concatenate(
                     [np.full((detail[i],), i) for i in range(len(detail) - 1)], axis=0
                 )
