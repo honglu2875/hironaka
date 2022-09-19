@@ -233,7 +233,7 @@ class JAXTrainer:
             p_loss, p_grad = p_loss_fn(state, sample)
             loss, grad = tree_map(partial(jnp.mean, axis=0), p_loss), tree_map(partial(jnp.mean, axis=0), p_grad)
 
-            state = state.apply_gradients(grads=tree_map(lambda x: x.squeeze(0) / self.device_num, grad))
+            state = state.apply_gradients(grads=grad)
 
             # Tensorboard logging
             if state.step % self.config['tensorboard']['log_interval'] == 0:
