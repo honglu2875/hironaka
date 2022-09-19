@@ -337,12 +337,13 @@ class JAXTrainer:
                 self.logger.info(f"{get_name(host)} vs {get_name(agent)}:")
                 self.logger.info(f"  {get_name(metric_fn)}: {rho}")
             if write_tensorboard:
-                self.summary_writer.add_scalar(f"{get_name(host)}_v_{get_name(agent)}", rho, self.host_state.step)
+                self.summary_writer.add_scalar(f"{get_name(host)}_v_{get_name(agent)}",
+                                               rho, self.get_state('host').step)
                 hist = np.concatenate(
                     [np.full((detail[i],), i) for i in range(len(detail) - 1)], axis=0
                 )
                 self.summary_writer.add_histogram(f"{get_name(host)}_v_{get_name(agent)}/length_histogram",
-                                                  hist, self.host_state.step)
+                                                  hist, self.get_state('host').step)
 
         return rhos, details
 
@@ -410,9 +411,9 @@ class JAXTrainer:
 
             if write_tensorboard:
                 self.summary_writer.add_histogram("host_action_distributions",
-                                                  np.concatenate(collect_host_actions), self.host_state.step)
+                                                  np.concatenate(collect_host_actions), self.get_state('host').step)
                 self.summary_writer.add_histogram("agent_action_distributions",
-                                                  np.concatenate(collect_agent_actions), self.agent_state.step)
+                                                  np.concatenate(collect_agent_actions), self.get_state('agent').step)
 
         rho = sum(details[1:]) / sum([i * num for i, num in enumerate(details)])
         return rho, details
