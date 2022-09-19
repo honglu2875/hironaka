@@ -2,9 +2,11 @@ tensorboard:
   use: true
   work_dir: runs
   layerwise_logging: true
-use_cuda: true
+  log_interval: 20
+use_all_gpu: true
 scale_observation: true
 version_string: 'mcts'
+net_type: dense
 
 dimension: 3
 max_num_points: 20
@@ -14,9 +16,11 @@ max_grad_norm: 1
 
 eval_batch_size: 10
 num_evaluations: 100
+eval_on_cpu: false
 max_num_considered_actions: 10
-
 discount: 0.99
+
+apply_selection_after_sim: true
 
 host:
   batch_size: 256

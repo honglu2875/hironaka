@@ -20,22 +20,31 @@ class DenseResidueBlock(nn.Module):
     activation: Callable
 
     @nn.compact
-    def __call__(
-            self,
-            x,
-    ):
-        residual = x
+    def __call__(self, x):
+        original = x
         y = nn.Dense(self.features, dtype=self.dtype)(x)
         y = self.norm()(y)
         y = self.activation(y)
-        y = nn.Dense(self.features, dtype=self.dtype)(x)
+        y = nn.Dense(self.features, dtype=self.dtype)(y)
         y = self.norm()(y)
 
-        if residual.shape != y.shape:
-            residual = nn.Dense(self.features, dtype=self.dtype, name="res_proj")(residual)
-            residual = self.norm(name="norm_proj")(residual)
+        if original.shape != y.shape:
+            original = nn.Dense(self.features, dtype=self.dtype, name="res_proj")(original)
+            original = self.norm(name="norm_proj")(original)
 
-        return self.activation(residual + y)
+        return self.activation(original + y)
+
+
+class DenseBlock(nn.Module):
+    features: int
+    dtype: jnp.dtype
+    norm: ModuleDef
+    activation: Callable
+
+    @nn.compact
+    def __call__(self, x):
+        y = nn.Dense(self.features, dtype=self.dtype)(x)
+        return self.activation(y)
 
 
 class DenseResNet(nn.Module):
@@ -52,8 +61,12 @@ class DenseResNet(nn.Module):
         for _, size in enumerate(self.net_arch):
             x = self.block_cls(features=size, dtype=self.dtype, norm=self.norm, activation=self.activation)(x)
         x = nn.Dense(self.output_size, dtype=self.dtype)(x)
-        return self.activation(x)
+        return x
 
+
+DenseNet = partial(DenseResNet, block_cls=DenseBlock)
+
+CustomNet = DenseResNet
 
 DResNetMini = partial(DenseResNet, net_arch=[32] * 2)
 DResNet18 = partial(DenseResNet, net_arch=[256] * 18)
@@ -113,15 +126,15 @@ class PolicyWrapper:
         if self.separate_policy_value_models:
             self.value_parameters = self.value_model.init(value_key, jnp.ones(self.input_shape))
 
-    def get_apply_fn(self, new_batch_size=None) -> Callable:
+    def get_apply_fn(self, new_batch_size=None, feature_fn=None) -> Callable:
         batch_size = new_batch_size if new_batch_size is not None else self.input_shape[0]
         _, logit_length = self.output_shape
-        feature_fn = get_feature_fn(self.role, self.batch_spec[1:])
+        if feature_fn is None:
+            feature_fn = get_feature_fn(self.role, self.batch_spec[1:])
 
         if self.separate_policy_value_models:
             raise NotImplementedError()
         else:
-
             def apply_fn(x: jnp.ndarray, params, **kwargs) -> Tuple[jnp.ndarray, jnp.ndarray]:
                 output = self.model.apply(params, feature_fn(x))
                 policy_logits = lax.dynamic_slice(output, (0, 0), (batch_size, logit_length - 1))
