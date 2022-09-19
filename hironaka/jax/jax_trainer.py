@@ -7,6 +7,9 @@ from typing import Any, Callable, List, Tuple, Union, Optional
 import flax
 import jax
 import jax.numpy as jnp
+from jax import pmap
+from jax.tree_util import tree_map
+
 import numpy as np
 import optax
 import yaml
@@ -59,17 +62,19 @@ class JAXTrainer:
     max_value: int
     max_grad_norm: float
     scale_observation: bool
+
+    # If use_cuda is True, we try to map to all available GPUs.
     use_cuda: bool
+
     version_string: str
     net_type: str
+
     num_evaluations: int
     eval_on_cpu: bool
     max_num_considered_actions: int
     discount: float
 
     optim_dict = {"adam": optax.adam, "adamw": optax.adamw, "sgd": optax.sgd}
-    lr_scheduler_dict = {"constant": ConstantScheduler, "exponential": ExponentialLRScheduler,
-                         "inverse": InverseLRScheduler}
     net_dict = {"dense_resnet": DenseResNet,
                 "dense": DenseNet,
                 "custom": CustomNet}
@@ -99,7 +104,7 @@ class JAXTrainer:
             "num_evaluations",
             "eval_on_cpu",
             "max_num_considered_actions",
-            "discount",
+            "discount"
         ]
         for config_key in config_keys:
             setattr(self, config_key, self.config[config_key])
@@ -108,6 +113,7 @@ class JAXTrainer:
 
         if not self.use_cuda:
             jax.config.update("jax_platform_name", "cpu")
+        self.device_num = len(jax.devices())
 
         eval_batch_size, max_num_points, dimension = self.eval_batch_size, self.max_num_points, self.dimension
         self.output_dim = {"host": 2 ** dimension - dimension - 1, "agent": dimension}
@@ -144,14 +150,13 @@ class JAXTrainer:
 
         for role in ["host", "agent"]:
             self.update_sim_loop(role)
-            self.update_train_fn(role)
+            self.update_loss_fn(role)
 
-        self.gradient_step = 0
         self.host_opponent_policy, self.agent_opponent_policy = None, None
 
     def simulate(self, key: jnp.ndarray, role: str) -> RollOut:
         """
-        A helper function of performing a simulation. The core is nothing but calling `{role}_sim_fn`
+        Performing a simulation. The core is nothing but calling `{role}_sim_fn`
         Parameters:
             key: the PRNG key.
             role: host or agent.
@@ -163,24 +168,27 @@ class JAXTrainer:
         opponent = self._get_opponent(role)
         opp_policy_wrapper = getattr(self, f"{opponent}_policy")
 
+        role_params = policy_wrapper.parameters
+        opp_params = opp_policy_wrapper.parameters
+
         # Generate root state
-        root_state = self.generate_pts(
-            key, (self.eval_batch_size, self.max_num_points, self.dimension), self.max_value, self.dtype
-        )
+        keys = jax.random.split(key, num=self.device_num + 1)
+        root_state = pmap(partial(self.generate_pts, shape=(self.eval_batch_size, self.max_num_points, self.dimension),
+                                  max_value=self.max_value, dtype=self.dtype, rescale=self.scale_observation))(keys[1:])
         if role == "agent":
-            coords, _ = self.get_eval_policy_fn("host")(root_state, self.host_policy.parameters)
+            coords, _ = pmap(self.get_eval_policy_fn("host"), in_axes=(0, None))(root_state, opp_params)
             batch_decode_from_one_hot = get_batch_decode_from_one_hot(self.dimension)
-            root_state = jnp.concatenate([flatten(root_state), batch_decode_from_one_hot(coords)], axis=-1)
+            root_state = jnp.concatenate([pmap(flatten)(root_state), pmap(batch_decode_from_one_hot)(coords)], axis=-1)
         elif role == "host":
-            root_state = flatten(root_state)
+            root_state = pmap(flatten)(root_state)
         else:
             raise ValueError(f"role must be either host or agent. Got {role}.")
 
-        simulate_output = sim_fn(
-            key, root_state, role_fn_args=(policy_wrapper.parameters,),
-            opponent_fn_args=(opp_policy_wrapper.parameters,)
+        keys = jax.random.split(keys[0], num=self.device_num + 1)
+        simulate_output = pmap(sim_fn, in_axes=(0, 0, None, None))(
+            keys[1:], root_state, (role_params,), (opp_params,)
         )
-        return self.rollout_postprocess(role, simulate_output)
+        return pmap(partial(self.rollout_postprocess, role=role))(simulate_output)
 
     def train(self, key: jnp.ndarray, role: str, gradient_steps: int, rollouts: jnp.ndarray, random_sampling=False,
               verbose=0):
@@ -190,7 +198,7 @@ class JAXTrainer:
             key: the PRNG key.
             role: either host or agent.
             gradient_steps: number of gradient steps to take.
-            rollouts: (batch_size, *input_dim), a batch of simulation samples.
+            rollouts: observation, policy_logits, values of the form (device_num, batch_size, ...)
             random_sampling: (Optional) whether to do random sampling in the rollouts.
             verbose: (Optional) whether to print out the loss
         """
@@ -201,23 +209,37 @@ class JAXTrainer:
 
         batch_size = self.config[role]["batch_size"]
         state = self.get_state(role)
-        train_fn = self.get_train_fn(role)
+
+        loss_fn = self.get_loss_fn(role)
+
+        def reduce(state, sample):
+            loss, grad = loss_fn(state, sample)
+            return jax.lax.psum(loss, 'i'), jax.lax.psum(grad, 'i')
+
+        p_loss_fn = pmap(reduce, in_axes=(None, 0), out_axes=(0, 0), axis_name='i')
 
         sample_size = rollouts[0].shape[0]
         gradient_steps = sample_size // batch_size if not random_sampling else gradient_steps
 
         for i in range(gradient_steps):
-            key, subkey = jax.random.PRNGKey(key)
-
+            keys = jax.random.split(key, num=self.device_num + 1)
             if random_sampling:
-                sample_idx = jax.random.randint(subkey, (batch_size,), 0, sample_size)
+                sample_idx = pmap(
+                    partial(jax.random.randint, shape=(batch_size,), minval=0, maxval=sample_size)
+                )(keys[1:])
             else:
-                sample_idx = jnp.arange(i * batch_size, (i + 1) * batch_size)
+                sample_idx = jnp.repeat(
+                    jnp.expand_dims(jnp.arange(i * batch_size, (i + 1) * batch_size), axis=0),
+                    self.device_num, axis=0)
 
-            sample = rollouts[0][sample_idx, :], rollouts[1][sample_idx, :], rollouts[2][sample_idx]
+            sample = pmap(lambda x, y: (x[0][y, :], x[1][y, :], x[2][y]), in_axes=(0, 0), out_axes=(0, 0, 0))(
+                rollouts, sample_idx)
 
-            state, loss, grads = train_fn(state, sample)
+            loss, grads = p_loss_fn(state, sample)
 
+            state = state.apply_gradients(grads=tree_map(lambda x: x.squeeze(0) / self.device_num, grads))
+
+            # Tensorboard logging
             if state.step % self.config['tensorboard']['log_interval'] == 0:
                 if verbose:
                     self.logger.info(f"Loss: {loss}")
@@ -235,12 +257,11 @@ class JAXTrainer:
         getattr(self, f"{role}_policy").parameters = state.params
 
     @staticmethod
-    def train_step(state: jnp.ndarray, sample: jnp.ndarray,
-                   loss_fn: Callable, max_grad=1) -> Tuple[TrainState, jnp.ndarray, jnp.ndarray]:
+    def loss_and_grad(state: TrainState, sample: jnp.ndarray,
+                      loss_fn: Callable, max_grad=1) -> Tuple[jnp.ndarray, jnp.ndarray]:
         loss, grads = jax.value_and_grad(partial(compute_loss, loss_fn=loss_fn))(state.params, state.apply_fn, sample)
         grads = jax.tree_util.tree_map(partial(jnp.clip, a_max=max_grad), grads)
-        state = state.apply_gradients(grads=grads)
-        return state, loss, grads
+        return loss, grads
 
     def evaluate(
             self, eval_fn: Optional[Callable] = None, verbose=1, batch_size=10, num_of_loops=10, max_length=None,
@@ -353,13 +374,13 @@ class JAXTrainer:
         rho = sum(details[1:]) / sum([i * num for i, num in enumerate(details)])
         return rho, details
 
-    def rollout_postprocess(self, role: str, rollouts: RollOut) -> RollOut:
+    def rollout_postprocess(self, rollouts: RollOut, role: str) -> RollOut:
         """
         Perform postprocessing on the rollout samples. In this default postprocessing, we replace the value_prior
             from the MCTS tree by the ground-truth value depending on the game win/lose.
         Parameters:
-            role: the current role (agent value is the negative of host value)
             rollouts: the rollout set to be processed. (observations, policy_prior, value_prior).
+            role: the current role (agent value is the negative of host value)
         Returns:
             the processed rollouts.
         """
@@ -446,8 +467,8 @@ class JAXTrainer:
     def get_sim_fn(self, role: str) -> Callable:
         return self.get_fns(role, "sim_fn")
 
-    def get_train_fn(self, role: str) -> Callable:
-        return self.get_fns(role, "train_fn")
+    def get_loss_fn(self, role: str) -> Callable:
+        return self.get_fns(role, "loss_fn")
 
     def get_state(self, role: str) -> TrainState:
         state = getattr(self, f"{role}_state")
@@ -516,26 +537,26 @@ class JAXTrainer:
             setattr(self, f"{role}_eval_loop", eval_loop)
             setattr(self, f"{role}_sim_fn", sim_fn)
 
-    def update_train_fn(self, role: str, jitted=True, return_function=False) -> Any:
+    def update_loss_fn(self, role: str, jitted=True, return_function=False) -> Any:
         """
-        Update `{role}_train_fn`.
+        Update `{role}_loss_fn`.
         """
-        train_fn = (
-            jax.jit(partial(self.train_step, loss_fn=policy_value_loss, max_grad=self.max_grad_norm))
+        loss_fn = (
+            jax.jit(partial(self.loss_and_grad, loss_fn=policy_value_loss, max_grad=self.max_grad_norm))
             if jitted
-            else partial(self.train_step, loss_fn=policy_value_loss, max_grad=self.max_grad_norm)
+            else partial(self.loss_and_grad, loss_fn=policy_value_loss, max_grad=self.max_grad_norm)
         )
         train_policy_fn = jax.jit(getattr(self, f"{role}_policy").get_apply_fn(self.config[role]["batch_size"]))
         if return_function:
-            return train_fn, train_policy_fn
+            return loss_fn, train_policy_fn
         else:
-            setattr(self, f"{role}_train_fn", train_fn)
+            setattr(self, f"{role}_loss_fn", loss_fn)
             setattr(self, f"{role}_train_policy_fn", train_policy_fn)
 
     def _update_fns(self, role: str):
         self.update_eval_policy_fn(role)
         self.update_sim_loop(role)
-        self.update_train_fn(role)
+        self.update_loss_fn(role)
 
     def purge_state(self, role: str):
         """
@@ -557,5 +578,6 @@ class JAXTrainer:
     @staticmethod
     def generate_pts(key: jnp.ndarray, shape: Tuple, max_value: int, dtype=jnp.float32, rescale=True) -> jnp.ndarray:
         pts = jax.random.randint(key, shape, 0, max_value).astype(dtype)
-        pts = rescale_jax(get_newton_polytope_jax(pts)) if rescale else get_newton_polytope_jax(pts)
+        pts = jnp.where(rescale, rescale_jax(get_newton_polytope_jax(pts)),
+                        get_newton_polytope_jax(pts))
         return pts
