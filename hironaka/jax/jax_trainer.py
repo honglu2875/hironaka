@@ -231,7 +231,7 @@ class JAXTrainer:
                 rollouts, sample_idx)
 
             p_loss, p_grad = p_loss_fn(state, sample)
-            loss, grad = jnp.mean(p_loss, axis=0), jnp.mean(p_grad, axis=0)
+            loss, grad = tree_map(partial(jnp.mean, axis=0), p_loss), tree_map(partial(jnp.mean, axis=0), p_grad)
 
             state = state.apply_gradients(grads=tree_map(lambda x: x.squeeze(0) / self.device_num, grad))
 
