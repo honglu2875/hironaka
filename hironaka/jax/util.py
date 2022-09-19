@@ -232,7 +232,8 @@ def select_sample_after_sim(rollout: Rollout, role: str, dimension: int, key=Non
 
     undone_idx = jnp.sum(rollout[0] >= 0, axis=-1) > dimension + offset
     undone_num = jnp.sum(undone_idx)
-    random_idx = jax.random.randint(key, (undone_num,), 0, size)
+    random_idx = jax.random.randint(key, (size,), 0, size)
+    random_idx = random_idx * (jnp.arange(size) <= undone_num)
     index = undone_idx.at[random_idx].set(True)
     return rollout[0][index], rollout[1][index], rollout[2][index]
 

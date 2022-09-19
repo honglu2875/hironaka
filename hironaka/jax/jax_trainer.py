@@ -113,6 +113,7 @@ class JAXTrainer:
 
         if not self.use_cuda:
             jax.config.update("jax_platform_name", "cpu")
+        self.default_backend = jax.default_backend()
         self.device_num = len(jax.devices())
 
         eval_batch_size, max_num_points, dimension = self.eval_batch_size, self.max_num_points, self.dimension
@@ -210,13 +211,7 @@ class JAXTrainer:
         batch_size = self.config[role]["batch_size"]
         state = self.get_state(role)
 
-        loss_fn = self.get_loss_fn(role)
-
-        def reduce(state, sample):
-            loss, grad = loss_fn(state, sample)
-            return jax.lax.psum(loss, 'i'), jax.lax.psum(grad, 'i')
-
-        p_loss_fn = pmap(reduce, in_axes=(None, 0), out_axes=(0, 0), axis_name='i')
+        p_loss_fn = pmap(self.get_loss_fn(role), in_axes=(None, 0), out_axes=(0, 0))
 
         sample_size = rollouts[0].shape[0]
         gradient_steps = sample_size // batch_size if not random_sampling else gradient_steps
@@ -235,9 +230,10 @@ class JAXTrainer:
             sample = pmap(lambda x, y: (x[0][y, :], x[1][y, :], x[2][y]), in_axes=(0, 0), out_axes=(0, 0, 0))(
                 rollouts, sample_idx)
 
-            loss, grads = p_loss_fn(state, sample)
+            p_loss, p_grad = p_loss_fn(state, sample)
+            loss, grad = jnp.mean(p_loss, axis=0), jnp.mean(p_grad, axis=0)
 
-            state = state.apply_gradients(grads=tree_map(lambda x: x.squeeze(0) / self.device_num, grads))
+            state = state.apply_gradients(grads=tree_map(lambda x: x.squeeze(0) / self.device_num, grad))
 
             # Tensorboard logging
             if state.step % self.config['tensorboard']['log_interval'] == 0:
@@ -246,7 +242,7 @@ class JAXTrainer:
 
                 self.tensorboard_log_scalar(f"{role}/loss", loss, state.step)
                 self.summary_writer.add_histogram(
-                    f"{role}/gradient", np.array(self.layerwise_average(grads["params"], [])), state.step
+                    f"{role}/gradient", np.array(self.layerwise_average(grad["params"], [])), state.step
                 )
 
                 if self.config["tensorboard"]["layerwise_logging"]:
@@ -498,7 +494,7 @@ class JAXTrainer:
         batch_size = self.eval_batch_size
         setattr(self, f"{role}_eval_policy_fn",
                 maybe_jit(getattr(self, f"{role}_policy").get_apply_fn(batch_size),
-                          backend='cpu' if self.eval_on_cpu or not self.use_cuda else 'gpu'))
+                          backend='cpu' if self.eval_on_cpu or not self.use_cuda else self.default_backend))
 
     def update_sim_loop(self, role: str, jitted=True, return_function=False) -> Any:
         """
@@ -530,7 +526,7 @@ class JAXTrainer:
             dtype=self.dtype,
         )
         sim_fn = maybe_jit(get_single_thread_simulation(role, eval_loop, config=simulation_config, dtype=self.dtype),
-                           backend='cpu' if self.eval_on_cpu or not self.use_cuda else 'gpu')
+                           backend='cpu' if self.eval_on_cpu or not self.use_cuda else jax.default_backend())
         if return_function:
             return eval_loop, sim_fn
         else:
