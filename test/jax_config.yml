@@ -3,6 +3,8 @@ tensorboard:
   work_dir: runs
   layerwise_logging: true
   log_interval: 20
+  validation_interval: 1000
+
 use_cuda: true
 scale_observation: true
 version_string: 'mcts'

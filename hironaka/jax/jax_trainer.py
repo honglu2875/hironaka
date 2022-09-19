@@ -44,7 +44,6 @@ from hironaka.jax.util import (
     policy_value_loss,
 )
 from hironaka.src import get_newton_polytope_jax, rescale_jax
-from hironaka.trainer.scheduler import ConstantScheduler, ExponentialLRScheduler, InverseLRScheduler
 
 RollOut = Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]
 
@@ -236,17 +235,24 @@ class JAXTrainer:
             state = state.apply_gradients(grads=grad)
 
             # Tensorboard logging
-            if state.step % self.config['tensorboard']['log_interval'] == 0:
-                if verbose:
-                    self.logger.info(f"Loss: {loss}")
+            if self.config['tensorboard']['use']:
+                if state.step % self.config['tensorboard']['log_interval'] == 0:
+                    if verbose:
+                        self.logger.info(f"Loss: {loss}")
 
-                self.tensorboard_log_scalar(f"{role}/loss", loss, state.step)
-                self.summary_writer.add_histogram(
-                    f"{role}/gradient", np.array(self.layerwise_average(grad["params"], [])), state.step
-                )
+                    self.tensorboard_log_scalar(f"{role}/loss", loss, state.step)
+                    self.summary_writer.add_histogram(
+                        f"{role}/gradient", np.array(self.layerwise_average(grad["params"], [])), state.step
+                    )
 
-                if self.config["tensorboard"]["layerwise_logging"]:
-                    self.tensorboard_log_layers(role, state.params["params"], state.step)
+                    if self.config["tensorboard"]["layerwise_logging"]:
+                        self.tensorboard_log_layers(role, state.params["params"], state.step)
+
+                if state.step % self.config['tensorboard']['validation_interval'] == 0:
+                    rhos, details = self.validate(write_tensorboard=True)
+                    if verbose:
+                        self.logger.info(f"Rhos:\n{rhos}\nGame length histogram:\n{details}")
+
 
         # Save the state and parameters
         setattr(self, f"{role}_state", state)
@@ -259,13 +265,29 @@ class JAXTrainer:
         grads = jax.tree_util.tree_map(partial(jnp.clip, a_max=max_grad), grads)
         return loss, grads
 
-    def evaluate(
-            self, eval_fn: Optional[Callable] = None, verbose=1, batch_size=10, num_of_loops=10, max_length=None,
-            key=None
+    def validate(
+            self, metric_fn: Optional[Callable] = None, verbose=1, batch_size=10, num_of_loops=10, max_length=None,
+            write_tensorboard=False, key=None
     ) -> Tuple[List, List]:
+        """
+        This method validates the current host and agent by pitting them against pre-defined strategies including:
+            host: random_host_fn, all_coord_host_fn, zeillinger_fn
+            agent: random_agent_fn, choose_first_agent_fn, choose_last_agent_fn
+        For the details, please check out the `battle_schedule` variable inside.
+        Parameters:
+            metric_fn: (Optional) the function that computes metrics given a host-agent pair. Defaults to calculate rho.
+            verbose: (Optional) whether to put the result into the logger.
+            batch_size: (Optional) the batch size of samples to feed into players.
+            num_of_loops: (Optional) number of loops in computing the metric. To be fed into the metric_fn.
+            max_length: (Optional) max length of games. Default to self.max_length_game.
+            write_tensorboard: (Optional) write the results to tensorboard.
+            key: (Optional) the PRNG random key. Default to the key from the seed `time.time_ns()`.
+        Returns:
+            a tuple of a list of computed metric(rho) and a list of details (histogram of game lengths)
+        """
         key = jax.random.PRNGKey(time.time_ns()) if key is None else key
         max_length = self.max_length_game if max_length is None else max_length
-        eval_fn = self.compute_rho if eval_fn is None else eval_fn
+        metric_fn = self.compute_rho if metric_fn is None else metric_fn
 
         spec = (self.max_num_points, self.dimension)
 
@@ -305,19 +327,28 @@ class JAXTrainer:
             key, subkey = jax.random.split(key)
 
             host, agent = hosts[pair_idx[0]], agents[pair_idx[1]]
-            rho, detail = eval_fn(
-                host, agent, batch_size=batch_size, num_of_loops=num_of_loops, max_length=max_length, key=key
+            rho, detail = metric_fn(
+                host, agent, batch_size=batch_size, num_of_loops=num_of_loops, max_length=max_length,
+                write_tensorboard=pair_idx==(0, 0) and write_tensorboard, key=key
             )
             rhos.append(rho)
             details.append(detail)
             if verbose:
                 self.logger.info(f"{get_name(host)} vs {get_name(agent)}:")
-                self.logger.info(f"  {get_name(eval_fn)}: {rho}")
+                self.logger.info(f"  {get_name(metric_fn)}: {rho}")
+            if write_tensorboard:
+                self.summary_writer.add_scalar(f"{get_name(host)}_v_{get_name(agent)}", rho, self.host_state.step)
+                hist = np.concatenate(
+                    [np.full((detail[i],), i) for i in range(len(detail) - 1)], axis=0
+                )
+                self.summary_writer.add_histogram(f"{get_name(host)}_v_{get_name(agent)}/length_histogram",
+                                                  hist, self.host_state.step)
 
         return rhos, details
 
     def compute_rho(
-            self, host: Callable, agent: Callable, batch_size=None, num_of_loops=10, max_length=None, key=None
+            self, host: Callable, agent: Callable, batch_size=None, num_of_loops=10, max_length=None,
+            write_tensorboard=False, key=None
     ) -> Tuple[float, List]:
         """
         Calculate the rho number between the host and agent.
@@ -327,9 +358,10 @@ class JAXTrainer:
             batch_size: (Optional) the batch size. Default to self.eval_batch_size.
             num_of_loops: (Optional) the number of times to run a batch of points. Default to 10.
             max_length: (Optional) the maximal length of game. Default is self.max_length_game
+            write_tensorboard: (Optional) write the histogram of host/agent policy argmax
             key: (Optional) the PRNG random key (if None, will use time.time_ns() to seed a key)
         Returns:
-            the rho number.
+            a tuple of the rho number and a list of game details (histogram of game lengths).
         """
         key = jax.random.PRNGKey(time.time_ns()) if key is None else key
         max_length = self.max_length_game if max_length is None else max_length
@@ -355,17 +387,32 @@ class JAXTrainer:
             prev_done, done = 0, jnp.sum(get_dones(pts))  # Calculate the finished games
             pts = flatten(pts)
 
+            # For tensorboard logging
+            collect_host_actions, collect_agent_actions = [], []
+
             for step in range(max_length - 1):
                 key, host_key, agent_key = jax.random.split(key, num=3)
 
                 details[step] += done - prev_done
 
-                coords = batch_decode(host(pts, key=host_key)).astype(self.dtype)
+                host_action = host(pts, key=host_key)
+                coords = batch_decode(host_action).astype(self.dtype)
                 axis = jnp.argmax(agent(make_agent_obs(pts, coords), key=agent_key), axis=1).astype(self.dtype)
                 pts = take_action(pts, coords, axis)
 
                 prev_done, done = done, jnp.sum(get_dones(pts.reshape((-1, *spec))))  # Update the finished games
+
+                if write_tensorboard:
+                    collect_host_actions.append(np.ravel(np.argmax(host_action, axis=1)))
+                    collect_agent_actions.append(np.ravel(axis))
+
             details[max_length - 1] += batch_size - done
+
+            if write_tensorboard:
+                self.summary_writer.add_histogram("host_action_distributions",
+                                                  np.concatenate(collect_host_actions), self.host_state.step)
+                self.summary_writer.add_histogram("agent_action_distributions",
+                                                  np.concatenate(collect_agent_actions), self.agent_state.step)
 
         rho = sum(details[1:]) / sum([i * num for i, num in enumerate(details)])
         return rho, details
@@ -380,9 +427,10 @@ class JAXTrainer:
         Returns:
             the processed rollouts.
         """
-        # obs (b, max_length_game, input_dim)
-        # policy (b, max_length_game, dimension)
-        # value (b, max_length_game)
+        # Shapes:
+        #   obs (b, max_length_game, input_dim)
+        #   policy (b, max_length_game, dimension)
+        #   value (b, max_length_game)
         obs, policy, value = rollouts
         batch_size, max_length_game = obs.shape[0], obs.shape[1]
         value_dtype = value.dtype
@@ -439,10 +487,11 @@ class JAXTrainer:
         """
         for role in ["host", "agent"]:
             file_path = checkpoints.latest_checkpoint(ckpt_dir=path, prefix=f"{role}_") if step is None else path
-            state = checkpoints.restore_checkpoint(
-                ckpt_dir=file_path, target=self.get_state(role), step=step, prefix=f"{role}_"
-            )
-            setattr(self, f"{role}_state", state)
+            if file_path is not None:
+                state = checkpoints.restore_checkpoint(
+                    ckpt_dir=file_path, target=self.get_state(role), step=step, prefix=f"{role}_"
+                )
+                setattr(self, f"{role}_state", state)
 
     # ---------- Below are getter functions for training-related functions ---------- #
 

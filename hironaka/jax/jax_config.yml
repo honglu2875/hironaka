@@ -3,6 +3,9 @@ tensorboard:
   work_dir: runs
   layerwise_logging: true
   log_interval: 20
+  # Validation: test host and agent against pre-determined benchmarks including random/fixed action/zeillinger
+  validation_interval: 1000
+
 use_all_gpu: true
 scale_observation: true
 version_string: 'mcts'
@@ -19,8 +22,6 @@ num_evaluations: 100
 eval_on_cpu: false
 max_num_considered_actions: 10
 discount: 0.99
-
-apply_selection_after_sim: true
 
 host:
   batch_size: 256
