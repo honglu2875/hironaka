@@ -329,7 +329,7 @@ class JAXTrainer:
             host, agent = hosts[pair_idx[0]], agents[pair_idx[1]]
             rho, detail = metric_fn(
                 host, agent, batch_size=batch_size, num_of_loops=num_of_loops, max_length=max_length,
-                write_tensorboard=pair_idx==(0, 0) and write_tensorboard, key=key
+                write_tensorboard=pair_idx == (0, 0) and write_tensorboard, key=key
             )
             rhos.append(rho)
             details.append(detail)
@@ -339,11 +339,12 @@ class JAXTrainer:
             if write_tensorboard:
                 self.summary_writer.add_scalar(f"{get_name(host)}_v_{get_name(agent)}",
                                                float(rho), self.get_state('host').step)
-                hist = np.concatenate(
-                    [np.full((detail[i],), i) for i in range(len(detail) - 1)], axis=0
-                )
-                self.summary_writer.add_histogram(f"{get_name(host)}_v_{get_name(agent)}/length_histogram",
-                                                  hist, self.get_state('host').step)
+                if sum(detail) > 0:
+                    hist = np.concatenate(
+                        [np.full((detail[i],), i) for i in range(len(detail) - 1)], axis=0
+                    )
+                    self.summary_writer.add_histogram(f"{get_name(host)}_v_{get_name(agent)}/length_histogram",
+                                                      hist, self.get_state('host').step)
 
         return rhos, details
 
