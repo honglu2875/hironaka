@@ -277,19 +277,22 @@ class TestJAX(unittest.TestCase):
         #   params, key, actions: jnp.ndarray, observations: jnp.ndarray
         #   (warning: observations is already flattened)
 
+        key = jax.random.PRNGKey(42)
         # Test host `recurrent_fn`
         nnet = DResNet18(4 + 1)
         host_wrapper = PolicyWrapper(jax.random.PRNGKey(0), "host", (2, *spec), nnet)
+        parameters, _ = host_wrapper.init(key, (2, *spec))
         host_policy = host_wrapper.get_apply_fn()
         reward_fn = get_reward_fn("host")
         recurrent_fn = get_recurrent_fn_for_role(
             "host", host_policy, partial(choose_first_agent_fn, spec=spec), reward_fn, spec, dtype=jnp.float32
         )
-        print(recurrent_fn(((host_wrapper.parameters,), ()), None, host_actions, host_obs))
+        print(recurrent_fn(((parameters,), ()), None, host_actions, host_obs))
         # Test agent `recurrent_fn`
         obs_preprocess, coords_preprocess = get_preprocess_fns("host", spec)
         nnet = DResNet18(3 + 1)
         agent_wrapper = PolicyWrapper(jax.random.PRNGKey(0), "agent", (2, *spec), nnet)
+        parameters, _ = agent_wrapper.init(key, (2, *spec))
         agent_policy = agent_wrapper.get_apply_fn()
         reward_fn = get_reward_fn("agent")
 
@@ -299,7 +302,7 @@ class TestJAX(unittest.TestCase):
         recurrent_fn = get_recurrent_fn_for_role(
             "agent", agent_policy, zeillinger_fn_flatten, reward_fn, spec, dtype=jnp.float32
         )
-        print(recurrent_fn(((agent_wrapper.parameters,), ()), None, agent_actions, agent_obs))
+        print(recurrent_fn(((parameters,), ()), None, agent_actions, agent_obs))
 
     def test_mcts_search(self):
         key = jax.random.PRNGKey(42)
