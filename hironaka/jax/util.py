@@ -1,3 +1,4 @@
+import functools
 import time
 from functools import partial
 from typing import Callable, Tuple, Union
@@ -34,6 +35,7 @@ def get_done_from_flatten(obs: jnp.ndarray, role: str, dimension: int) -> jnp.nd
     return jnp.sum(obs >= 0, axis=-1) <= dimension + (role == "agent") * (2 ** dimension - dimension - 1)
 
 
+@functools.lru_cache
 def get_preprocess_fns(role: str, spec: Tuple[int, int]) -> Tuple[Callable, Callable]:
     """
     Parameters:
@@ -73,6 +75,7 @@ def get_preprocess_fns(role: str, spec: Tuple[int, int]) -> Tuple[Callable, Call
     return jit(obs_preprocess), jit(coords_preprocess)
 
 
+@functools.lru_cache
 def get_take_actions(role: str, spec: Tuple[int, int], rescale_points: bool = True) -> Callable:
     """
     Factory function that returns a `take_actions` function to perform observation update depending on the current role.
@@ -115,6 +118,7 @@ def get_take_actions(role: str, spec: Tuple[int, int], rescale_points: bool = Tr
     return take_actions
 
 
+@functools.lru_cache
 def get_reward_fn(role: str) -> Callable:
     """
     Parameters:
@@ -124,13 +128,11 @@ def get_reward_fn(role: str) -> Callable:
     """
     if role == "host":
 
-        @jit
         def reward_fn(dones: jnp.ndarray, prev_dones: jnp.ndarray) -> jnp.ndarray:
             return (dones & (~prev_dones)).astype(jnp.float32)
 
     elif role == "agent":
 
-        @jit
         def reward_fn(dones: jnp.ndarray, prev_dones: jnp.ndarray) -> jnp.ndarray:
             return -(dones & (~prev_dones)).astype(jnp.float32)
 
@@ -140,20 +142,19 @@ def get_reward_fn(role: str) -> Callable:
     return reward_fn
 
 
+@functools.lru_cache
 def get_feature_fn(role: str, spec: Tuple) -> Callable:
     """
     Get the feature function on (possibly flattened) observations.
     """
     if role == "host":
 
-        @jit
         def feature_fn(observations: jnp.ndarray) -> jnp.ndarray:
             return -flatten(vmap(partial(jnp.sort, axis=0), 0, 0)(-observations.reshape(-1, *spec)))
 
     elif role == "agent":
         obs_preprocess, coords_preprocess = get_preprocess_fns("agent", spec)
 
-        @jit
         def feature_fn(observations: jnp.ndarray) -> jnp.ndarray:
             points = -flatten(vmap(partial(jnp.sort, axis=0), 0, 0)(-obs_preprocess(observations)))
             coords = coords_preprocess(observations, None)
@@ -290,22 +291,24 @@ def decode(cls: int, lookup_dict: jnp.ndarray) -> jnp.ndarray:
     return lookup_dict[cls]
 
 
+@functools.lru_cache
 def get_batch_decode(dimension: int) -> Callable:
     """
     The factory function of getting a batch decoder function with given dimension.
     """
     if dimension >= _MAX_DIM:
         raise ValueError(f"Dimension is capped at {_MAX_DIM}. Got {dimension}.")
-    return jit(vmap(partial(decode, lookup_dict=dec_table[dimension]), 0, 0))
+    return vmap(partial(decode, lookup_dict=dec_table[dimension]), 0, 0)
 
 
+@functools.lru_cache
 def get_batch_decode_from_one_hot(dimension: int) -> Callable:
     """
     The factory function of getting a batch decoder (from one-hot vectors) function with given dimension.
     """
     if dimension >= _MAX_DIM:
         raise ValueError(f"Dimension is capped at {_MAX_DIM}. Got {dimension}.")
-    return jit(vmap(partial(decode_from_one_hot, lookup_dict=dec_table[dimension]), 0, 0))
+    return vmap(partial(decode_from_one_hot, lookup_dict=dec_table[dimension]), 0, 0)
 
 
 def encode(multi_binary: jnp.ndarray) -> int:

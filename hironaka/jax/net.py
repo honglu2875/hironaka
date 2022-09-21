@@ -73,6 +73,17 @@ DResNet18 = partial(DenseResNet, net_arch=[256] * 18)
 
 
 class PolicyWrapper:
+    """
+    A wrapper class over the flax.linen.Module used for the policy/value predictions. It creates model parameters and
+        apply functions. It also hosts metadata related to the particular policy/value model in the life-cycle of
+        a JAXTrainer object, including:
+        - model, the module.
+        - batch_spec, the shape of the input (batch_size, max_num_points, dimension).
+        - separate_policy_value_models, a bool value about whether to use separate models for policy and value.
+        - output_shape, the output shape of the given model, under the input shape of `batch_spec`
+    Note that it does not save the model parameters. Parameters are sent out and saved as TrainState externally. This
+        class is only responsible for initializing and re-initializing them (perhaps with a different batch size).
+    """
     def __init__(
             self,
             key: jnp.ndarray,
@@ -102,38 +113,64 @@ class PolicyWrapper:
         self.value_model = value_model
 
         self.init_key, self.input_shape, self.output_shape = None, None, None
-        self.parameters, self.value_parameters = None, None
 
         self.init(key, batch_spec)
 
-    def init(self, key: jnp.ndarray, batch_spec: Tuple):
+    def init(self, key: jnp.ndarray, batch_spec: Tuple, input_shape=None):
         """
-        (Re-)initialize the model.
+        (Re-)initialize the model, update the output shape of the model (`self.output_shape`), and return the newly
+            initialized parameters.
+        Parameters:
+            key: the PRNG key.
+            batch_spec: shape specifications including batch size, (batch_size, max_num_points, dimension).
+        Returns:
+            tuple, in the form of
+                (policy_net_parameters, value_net_parameters).
+            when self.separate_policy_value_models==False, value_net_parameters is None
         """
-        if self.separate_policy_value_models:
-            key, value_key = jax.random.split(key)
-        else:
-            key, value_key = key, None
+        key, value_key = jax.random.split(key)
 
         self.init_key = key
-        self.input_shape = (
-            (batch_spec[0], batch_spec[1] * batch_spec[2])
-            if self.role == "host"
-            else (batch_spec[0], batch_spec[1] * batch_spec[2] + batch_spec[2])
-        )
-        self.parameters = self.model.init(key, jnp.ones(self.input_shape))
-        self.output_shape = self.model.apply(self.parameters, jnp.ones(self.input_shape)).shape
+        if input_shape is None:
+            # When the feature function is not customized: we simply flatten the point states,
+            # resulting in the following numbers:
+            self.input_shape = (
+                (batch_spec[0], batch_spec[1] * batch_spec[2])
+                if self.role == "host"
+                else (batch_spec[0], batch_spec[1] * batch_spec[2] + batch_spec[2])
+            )
+        else:
+            self.input_shape = input_shape
+
+        parameters = self.model.init(key, jnp.ones(self.input_shape))
+        self.output_shape = self.model.apply(parameters, jnp.ones(self.input_shape)).shape
+
         if self.separate_policy_value_models:
-            self.value_parameters = self.value_model.init(value_key, jnp.ones(self.input_shape))
+            value_parameters = self.value_model.init(value_key, jnp.ones(self.input_shape))
+        else:
+            value_parameters = None
+        return parameters, value_parameters
 
     def get_apply_fn(self, new_batch_size=None, feature_fn=None) -> Callable:
+        """
+        The factory function for the `apply_fn` which evaluates on the point states and network parameters.
+        Note that the first input of apply_fn is the batch of points: (batch_size, max_num_points, dimension). It needs
+            to be later fed into a feature function which can be customized in `feature_fn` parameter. If not, we simply
+            carry out the default process: flatten for host, flatten and concatenate with coordinates for agent.
+        Parameters:
+            new_batch_size: (Optional) the potential new batch size used to override the original setup. The override
+                is one-time only and does not rewrite `self.input_shape`.
+            feature_fn: (Optional) the custom feature function.
+        Returns:
+            the `apply_fn`.
+        """
         batch_size = new_batch_size if new_batch_size is not None else self.input_shape[0]
         _, logit_length = self.output_shape
         if feature_fn is None:
             feature_fn = get_feature_fn(self.role, self.batch_spec[1:])
 
         if self.separate_policy_value_models:
-            raise NotImplementedError()
+            raise NotImplementedError()  # Not implemented yet. Will do when the need arises.
         else:
             def apply_fn(x: jnp.ndarray, params, **kwargs) -> Tuple[jnp.ndarray, jnp.ndarray]:
                 output = self.model.apply(params, feature_fn(x))
