@@ -9,6 +9,7 @@ import numpy as np
 from flax.training.train_state import TrainState
 
 from hironaka.jax import JAXTrainer
+from hironaka.jax.util import select_sample_after_sim
 
 
 def same_dict(d1, d2) -> bool:
@@ -32,9 +33,15 @@ class TestJAXTrainer(unittest.TestCase):
     def test_training_and_save_load(self):
         key = jax.random.PRNGKey(42)
         for role in ["host", "agent"]:
-            key, subkey = jax.random.split(key)
+            keys = jax.random.split(key, num=len(jax.devices()) + 2)
+            key, subkey = keys[0], keys[1]
+            device_keys = keys[2:]
+
             exp = self.trainer.simulate(subkey, role)
-            self.trainer.train(subkey, role, 10, exp, random_sampling=True)
+            # Test the post-selection of rollouts (prevent the dataset from being dominated by terminal states)
+            mask = jax.pmap(select_sample_after_sim, static_broadcasted_argnums=(0, 2, 3))(
+                role, exp, 3, True, device_keys)
+            self.trainer.train(subkey, role, 10, exp, random_sampling=True, mask=mask)
 
         original_state = {"host": self.trainer.host_state, "agent": self.trainer.agent_state}
         # Make sure they are immutable -> unchanged after trainings

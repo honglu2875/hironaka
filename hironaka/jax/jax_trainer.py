@@ -13,7 +13,8 @@ import yaml
 from flax.training import checkpoints
 from flax.training.train_state import TrainState
 from jax import pmap
-# Funny that jax doesn't work with tensorflow and I have to use PyTorch's version of tensorboard...
+
+# Funny that jax doesn't work with tensorflow well, and using PyTorch's tensorboard is the most convenient...
 from torch.utils.tensorboard import SummaryWriter
 
 from hironaka.jax.net import DenseNet, DenseResNet, CustomNet, PolicyWrapper
@@ -39,30 +40,32 @@ from hironaka.jax.util import (
     get_reward_fn,
     get_take_actions,
     make_agent_obs,
-    policy_value_loss,
+    policy_value_loss, generate_pts,
 )
-from hironaka.src import get_newton_polytope_jax, rescale_jax
 
 RollOut = Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]
 
 
 class JAXTrainer:
     """
-    This consolidates the whole training process given a config file.
+    This class consolidates the whole training process given a config file. One training setup <-> one class.
     For what it is worth, the class caches functions that have compilation overhead. Although pmap is already doing a
-        great job at caching its input function, there are still occasions where manual caching is necessary (e.g.,
-        pmap(partial(...)) where a new function creates every time when partial is called). One can certainly have a lot
+        great job at caching its input functions, there are still occasions where manual caching is necessary (e.g.,
+        in `pmap(partial(...))`, as `partial` creates a new function on every call). One can certainly have a lot
         of small functions and factory functions, and apply lru_cache everywhere, but I personally find it slightly
         easier to track everything as members of a class.
+    JAX is ultimately following the idea of functional programming. I look to avoid fancy usage of classes and only
+        stick to the very beginner-friendly class-method-attribute style.
     The whole JAXTrainer life cycle is designed to do the following:
     - Read the config and load all parameters
     - One calls JAXTrainer.simulate to do
         1. Generate policy logit and value estimates based on the neural network.
-        2. Perform MCTS to improve the policy and value (currently only make use of mctx.gumbel_muzero_policy)
+        2. Perform MCTS to improve the policy and value (currently only makes use of `mctx.gumbel_muzero_policy`)
         3. Continue the evaluation (policy improving via MCTS) simulation (perform the actual game step based on the
             improved policy) cycle, and return them as training samples.
     - One calls JAXTrainer.train to train the neural network for certain amount of gradient steps.
-    - Repeat the simulation-training cycle, or change some parameters here and there and call JAXTrainer.update_fns.
+    - Repeat the simulation-training cycle, or change some parameters here and there, call JAXTrainer.update_fns and
+        perform some trainings.
     """
     eval_batch_size: int
     max_num_points: int
@@ -165,7 +168,7 @@ class JAXTrainer:
             self.get_state(role, subkey)
 
         self.host_opponent_policy, self.agent_opponent_policy = None, None
-        self.hosts_agents_for_validation = None
+        self.hosts_agents_for_validation = {}  # use to cache the lists of host and agent policy functions
 
     def simulate(self, key: jnp.ndarray, role: str) -> RollOut:
         """
@@ -204,16 +207,18 @@ class JAXTrainer:
         )
         return pmap(self.rollout_postprocess, static_broadcasted_argnums=1)(simulate_output, role)
 
-    def train(self, key: jnp.ndarray, role: str, gradient_steps: int, rollouts: jnp.ndarray, random_sampling=False,
-              verbose=0):
+    def train(self, key: jnp.ndarray, role: str, gradient_steps: int, rollouts: jnp.ndarray, mask=None,
+              random_sampling=False, verbose=0):
         """
         Trains the neural network with a collection of samples ('rollouts', supposedly collected from simulation).
         Parameters:
             key: the PRNG key.
             role: either host or agent.
             gradient_steps: number of gradient steps to take.
-            rollouts: observation, policy_logits, values of the form (device_num, batch_size, ...)
-            random_sampling: (Optional) whether to do random sampling in the rollouts.
+            rollouts: observation, policy_logits, values of the form (device_num, sample_size, ...)
+            mask: (Optional) the mask on rollout, so that we ignore some samples. Must be of the shape
+                (device_num, sample_size) with bool entries.
+            random_sampling: (Optional) whether to do random sampling or cut out contiguous batches in the rollouts.
             verbose: (Optional) whether to print out the loss
         """
         opponent = self._get_opponent(role)
@@ -221,20 +226,24 @@ class JAXTrainer:
         if getattr(self, f"{role}_policy") is None:
             raise RuntimeError(f"opponent {opponent} policy function not initialized.")
 
+        # On each device, choose `batch_size` amount of rollouts out of `sample_size`, and perform regression.
         batch_size = self.config[role]["batch_size"]
+        sample_size = rollouts[0].shape[1]
+        # The shape of the mask should be (device_num, sample_size) which is the same as value predictions in rollouts.
+        mask = jnp.ones_like(rollouts[2], dtype=jnp.float32) if mask is None else mask.astype(jnp.float32)
         state = self.get_state(role)
-
-        sample_size = rollouts[0].shape[0]
-        gradient_steps = sample_size // batch_size if not random_sampling else gradient_steps
 
         for i in range(gradient_steps):
             keys = jax.random.split(key, num=self.device_num + 1)
+            key = keys[0]
+
             if random_sampling:
-                sample_idx = pmap(jax.random.randint, static_broadcasted_argnums=(1, 2, 3))(
-                    keys[1:], (batch_size,), 0, sample_size)
+                sample_idx = pmap(jax.random.choice, static_broadcasted_argnums=(2, 3))(
+                    keys[1:], flax.jax_utils.replicate(jnp.arange(sample_size)), (batch_size,), True, mask
+                )
             else:
                 sample_idx = jnp.repeat(
-                    jnp.expand_dims(jnp.arange(i * batch_size, (i + 1) * batch_size), axis=0),
+                    jnp.expand_dims(jnp.arange(i * batch_size, (i + 1) * batch_size) % sample_size, axis=0),
                     self.device_num, axis=0)
 
             sample = p_get_index(rollouts, sample_idx)
@@ -402,24 +411,25 @@ class JAXTrainer:
         Perform postprocessing on the rollout samples. In this default postprocessing, we replace the value_prior
             from the MCTS tree by the ground-truth value depending on the game win/lose.
         Parameters:
-            rollouts: the rollout set to be processed. (observations, policy_prior, value_prior).
+            rollouts: the rollout set to be processed. (observations, policy_prior, value_prior). Shapes are below.
+                - obs (b, max_length_game, input_dim), where input_dim is the dim of all flattened features.
+                - policy (b, max_length_game, dimension)
+                - value (b, max_length_game)
             role: the current role (agent value is the negative of host value)
         Returns:
-            the processed rollouts.
+            the processed rollouts. The return shapes are below.
+                - obs (b * max_length_game, input_dim)
+                - policy (b * max_length_game, dimension)
+                - value (b * max_length_game,)
         """
-        # Shapes:
-        #   obs (b, max_length_game, input_dim)
-        #   policy (b, max_length_game, dimension)
-        #   value (b, max_length_game)
         obs, policy, value = rollouts
         batch_size, max_length_game = obs.shape[0], obs.shape[1]
         value_dtype = value.dtype
 
-        reward_fn = getattr(self, f"{role}_reward_fn")  # will be frozen after jit
+        reward_fn = getattr(self, f"{role}_reward_fn")
         done = get_done_from_flatten(obs, role, self.dimension)  # (b, max_length_game)
         prev_done = jnp.concatenate([jnp.zeros((batch_size, 1), dtype=bool), done[:, :-1]], axis=1)
         value = calculate_value_using_reward_fn(done, prev_done, self.discount, max_length_game, reward_fn)
-
         value = jnp.ravel(value).astype(value_dtype)
 
         obs = obs.reshape((-1, obs.shape[2]))
@@ -511,8 +521,17 @@ class JAXTrainer:
             setattr(self, f"{role}_state", state)
         return state
 
-    def get_hosts_agents_for_validation(self, batch_size: int):
-        if self.hosts_agents_for_validation is None:
+    def get_hosts_agents_for_validation(self, batch_size: int, force_update=False):
+        """
+        Get a set of host functions and a set of agent functions. They are policies of different strategies and will
+            be used to fight against each other. We cache those functions after the first access.
+        Parameters:
+            batch_size: the batch size of the input observations.
+            force_update: force an update on all the policy functions.
+        Returns:
+            a list of host functions and a list of agent functions.
+        """
+        if batch_size not in self.hosts_agents_for_validation or force_update:
             spec = (self.max_num_points, self.dimension)
             host_apply_fn = pmap(action_wrapper(self.host_policy.get_apply_fn(batch_size), None))
             agent_apply_fn = pmap(action_wrapper(self.agent_policy.get_apply_fn(batch_size), self.dimension))
@@ -535,9 +554,9 @@ class JAXTrainer:
                 jax.pmap(partial(choose_first_agent_fn, spec=spec)),
                 jax.pmap(partial(choose_last_agent_fn, spec=spec)),
             ]
-            self.hosts_agents_for_validation = hosts, agents
+            self.hosts_agents_for_validation[batch_size] = hosts, agents
 
-        return self.hosts_agents_for_validation
+        return self.hosts_agents_for_validation[batch_size]
 
     # ---------- Below are either static methods or methods that set its members ---------- #
 
@@ -627,14 +646,6 @@ class JAXTrainer:
             return "host"
         else:
             raise ValueError(f"role must be either host or agent. Got {role}.")
-
-
-@partial(jax.pmap, static_broadcasted_argnums=(1, 2, 3, 4))
-def generate_pts(key: jnp.ndarray, shape: Tuple, max_value: int, dtype=jnp.float32, rescale=True) -> jnp.ndarray:
-    pts = jax.random.randint(key, shape, 0, max_value).astype(dtype)
-    pts = jnp.where(rescale, rescale_jax(get_newton_polytope_jax(pts)),
-                    get_newton_polytope_jax(pts))
-    return pts
 
 
 @partial(pmap, axis_name='d', static_broadcasted_argnums=(2, 3))

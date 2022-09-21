@@ -1,12 +1,14 @@
 import unittest
 from functools import partial
 
+import flax
 import jax
 import jax.numpy as jnp
 import mctx
 
 from hironaka.core import JAXPoints
 from hironaka.jax import JAXTrainer
+from hironaka.jax.util import generate_pts
 from hironaka.jax.net import DResNet18, DResNetMini, PolicyWrapper
 from hironaka.jax.players import (
     all_coord_host_fn,
@@ -319,6 +321,7 @@ class TestJAX(unittest.TestCase):
         action_dim = 2 ** dimension - dimension - 1
         nnet = DResNetMini(action_dim + 1)
         host_wrapper = PolicyWrapper(jax.random.PRNGKey(seed), "host", (batch_size, *spec), nnet)
+        parameters, _ = host_wrapper.init(key, (batch_size, *spec))
         host_policy = jax.jit(host_wrapper.get_apply_fn())
         reward_fn = get_reward_fn("host")
         recurrent_fn = get_recurrent_fn_for_role(
@@ -329,8 +332,8 @@ class TestJAX(unittest.TestCase):
             partial(
                 mctx.gumbel_muzero_policy,
                 recurrent_fn=recurrent_fn,
-                num_simulations=100,
-                max_depth=200,
+                num_simulations=10,
+                max_depth=20,
                 max_num_considered_actions=10,
             )
         )
@@ -340,7 +343,7 @@ class TestJAX(unittest.TestCase):
             embedding=state,
         )
         policy_output = muzero(
-            params=((host_wrapper.parameters,), ()),
+            params=((parameters,), ()),
             rng_key=key,
             root=root,
         )
@@ -352,6 +355,7 @@ class TestJAX(unittest.TestCase):
         del nnet
         nnet = DResNetMini(action_dim + 1)
         agent_wrapper = PolicyWrapper(jax.random.PRNGKey(seed), "agent", (batch_size, *spec), nnet)
+        parameters, _ = agent_wrapper.init(key, (batch_size, *spec))
         agent_policy = jax.jit(apply_agent_action_mask(agent_wrapper.get_apply_fn(), dimension))
         obs_preprocess, coords_preprocess = get_preprocess_fns("host", spec)
         reward_fn = get_reward_fn("agent")
@@ -379,7 +383,7 @@ class TestJAX(unittest.TestCase):
             embedding=state,
         )
         policy_output = muzero(
-            params=((agent_wrapper.parameters,), ()),
+            params=((parameters,), ()),
             rng_key=key,
             root=root,
         )
@@ -411,6 +415,7 @@ class TestJAX(unittest.TestCase):
         action_dim = 2 ** dimension - dimension - 1
         nnet = DResNetMini(action_dim + 1)
         host_wrapper = PolicyWrapper(policy_key, "host", (batch_size, *spec), nnet)
+        parameters, _ = flax.jax_utils.replicate(host_wrapper.init(key, (batch_size, *spec)))
         host_policy = jax.jit(host_wrapper.get_apply_fn())
         reward_fn = get_reward_fn("host")
 
@@ -426,9 +431,12 @@ class TestJAX(unittest.TestCase):
             discount=0.99,
             rescale_points=True,
         )
-        root_state = JAXTrainer.generate_pts(key, (batch_size, max_num_points, dimension), config["max_value"])
+
+        pkey = flax.jax_utils.replicate(key)
+        root_state = generate_pts(pkey, (batch_size, max_num_points, dimension),
+                                  config["max_value"], jnp.float32, True)
         sim = get_single_thread_simulation("host", eval_loop, config=config, dtype=jnp.float32)
-        sim(key, flatten(root_state), role_fn_args=(host_wrapper.parameters,), opponent_fn_args=())
+        jax.pmap(sim)(pkey, jax.pmap(flatten)(root_state), role_fn_args=(parameters,), opponent_fn_args=())
 
     def test_jax_util(self):
         obs = jnp.ones((32, 60), dtype=jnp.float32)
