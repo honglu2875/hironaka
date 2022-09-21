@@ -121,7 +121,6 @@ def get_host_with_flattened_obs(spec, func, dtype=jnp.float32) -> Callable:
 # ---------- Agent functions ---------- #
 
 
-@partial(jit, static_argnames=["spec", "dtype"])
 def random_agent_fn(
         pts: jnp.ndarray, spec: Tuple, key=default_key, dtype=jnp.float32, **kwargs
 ) -> jnp.ndarray:
@@ -155,7 +154,6 @@ def choose_first_agent_fn_slice(pts: jnp.ndarray, spec: Tuple) -> jnp.ndarray:
     return (jnp.arange(dimension) == first_host_action).astype(jnp.float32)
 
 
-@partial(jit, static_argnames=["spec", "dtype"])
 def choose_first_agent_fn(pts: jnp.ndarray, spec: Tuple, dtype=jnp.float32, **kwargs) -> jnp.ndarray:
     """
     Parameters:
@@ -186,7 +184,6 @@ def choose_last_agent_fn_slice(pts: jnp.ndarray, spec: Tuple) -> jnp.ndarray:
     return (jnp.arange(dimension) == last_host_action).astype(jnp.float32)
 
 
-@partial(jit, static_argnames=["spec", "dtype"])
 def choose_last_agent_fn(pts: jnp.ndarray, spec: Tuple, dtype=jnp.float32, **kwargs) -> jnp.ndarray:
     """
     Parameters:

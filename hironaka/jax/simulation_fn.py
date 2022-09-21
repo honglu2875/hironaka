@@ -110,7 +110,7 @@ def get_single_thread_simulation(role: str, evaluation_loop: Callable, config: d
     input_dim = max_num_points * dimension if role == "host" else (max_num_points + 1) * dimension
     action_num = 2 ** dimension - dimension - 1 if role == "host" else dimension
 
-    def single_thread_simulation(key: jnp.ndarray, root_state, role_fn_args=(), opponent_fn_args=()) -> Tuple:
+    def simulation(key: jnp.ndarray, root_state, role_fn_args=(), opponent_fn_args=()) -> Tuple:
         """
         Returns a tuple (obs, policy_prior, value_prior).
         The returning sample size is `eval_batch_size * max_length_game`.
@@ -156,4 +156,4 @@ def get_single_thread_simulation(role: str, evaluation_loop: Callable, config: d
 
         return rollouts
 
-    return single_thread_simulation
+    return simulation

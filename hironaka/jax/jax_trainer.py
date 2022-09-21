@@ -7,15 +7,14 @@ from typing import Any, Callable, List, Tuple, Union, Optional
 import flax
 import jax
 import jax.numpy as jnp
-from jax import pmap
-from jax.tree_util import tree_map
-
 import numpy as np
 import optax
 import yaml
 from flax.training import checkpoints
 from flax.training.train_state import TrainState
-# Funny that jax doesn't work with tensorflow and I have to use PyTorch's version of tensorboard...
+from jax import pmap
+
+# Funny that jax doesn't work with tensorflow well, and using PyTorch's tensorboard is the most convenient...
 from torch.utils.tensorboard import SummaryWriter
 
 from hironaka.jax.net import DenseNet, DenseResNet, CustomNet, PolicyWrapper
@@ -41,19 +40,32 @@ from hironaka.jax.util import (
     get_reward_fn,
     get_take_actions,
     make_agent_obs,
-    policy_value_loss,
+    policy_value_loss, generate_pts,
 )
-from hironaka.src import get_newton_polytope_jax, rescale_jax
-from hironaka.trainer.scheduler import ConstantScheduler, ExponentialLRScheduler, InverseLRScheduler
 
 RollOut = Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]
 
 
 class JAXTrainer:
     """
-    This consolidates the whole training process given a config file. For detailed usage, please see README or check
-        out the test (e.g., testJAXTrainer.py).
-
+    This class consolidates the whole training process given a config file. One training setup <-> one class.
+    For what it is worth, the class caches functions that have compilation overhead. Although pmap is already doing a
+        great job at caching its input functions, there are still occasions where manual caching is necessary (e.g.,
+        in `pmap(partial(...))`, as `partial` creates a new function on every call). One can certainly have a lot
+        of small functions and factory functions, and apply lru_cache everywhere, but I personally find it slightly
+        easier to track everything as members of a class.
+    JAX is ultimately following the idea of functional programming. I look to avoid fancy usage of classes and only
+        stick to the very beginner-friendly class-method-attribute style.
+    The whole JAXTrainer life cycle is designed to do the following:
+    - Read the config and load all parameters
+    - One calls JAXTrainer.simulate to do
+        1. Generate policy logit and value estimates based on the neural network.
+        2. Perform MCTS to improve the policy and value (currently only makes use of `mctx.gumbel_muzero_policy`)
+        3. Continue the evaluation (policy improving via MCTS) simulation (perform the actual game step based on the
+            improved policy) cycle, and return them as training samples.
+    - One calls JAXTrainer.train to train the neural network for certain amount of gradient steps.
+    - Repeat the simulation-training cycle, or change some parameters here and there, call JAXTrainer.update_fns and
+        perform some trainings.
     """
     eval_batch_size: int
     max_num_points: int
@@ -79,7 +91,7 @@ class JAXTrainer:
                 "dense": DenseNet,
                 "custom": CustomNet}
 
-    def __init__(self, key, config: Union[dict, str], dtype=jnp.float32):
+    def __init__(self, key: jnp.ndarray, config: Union[dict, str], dtype=jnp.float32, loss_fn=policy_value_loss):
         self.logger = logging.getLogger(__class__.__name__)
 
         if isinstance(config, str):
@@ -110,6 +122,7 @@ class JAXTrainer:
             setattr(self, config_key, self.config[config_key])
 
         self.dtype = dtype
+        self.loss_fn = loss_fn
 
         if not self.use_cuda:
             jax.config.update("jax_platform_name", "cpu")
@@ -127,17 +140,14 @@ class JAXTrainer:
             if role not in self.config:
                 continue
             net = self.net_dict[self.net_type](self.output_dim[role] + 1, net_arch=self.config[role]["net_arch"])
-            setattr(
-                self,
-                f"{role}_policy",
-                PolicyWrapper(policy_keys[role], role, (eval_batch_size, max_num_points, dimension), net),
-            )
+            setattr(self, f"{role}_policy",
+                    PolicyWrapper(policy_keys[role], role, (eval_batch_size, max_num_points, dimension), net))
             self.set_optim(role, self.config[role]["optim"])
 
             # Set up policy functions (policy and evaluation have different batch sizes)
             self.update_eval_policy_fn(role)
 
-            # Use fixed reward function for now.
+            # Use a fixed reward function for now.
             setattr(self, f"{role}_reward_fn", get_reward_fn(role))
 
             setattr(self, f"{role}_state", None)
@@ -151,9 +161,14 @@ class JAXTrainer:
 
         for role in ["host", "agent"]:
             self.update_sim_loop(role)
-            self.update_loss_fn(role)
+            self.update_train_policy_fn(role)
+
+            # get_state will initialize '{role}_state'
+            key, subkey = jax.random.PRNGKey(key)
+            self.get_state(role, subkey)
 
         self.host_opponent_policy, self.agent_opponent_policy = None, None
+        self.hosts_agents_for_validation = {}  # use to cache the lists of host and agent policy functions
 
     def simulate(self, key: jnp.ndarray, role: str) -> RollOut:
         """
@@ -165,42 +180,45 @@ class JAXTrainer:
             obs, target_policy, target_value
         """
         sim_fn = self.get_sim_fn(role)
-        policy_wrapper = getattr(self, f"{role}_policy")
         opponent = self._get_opponent(role)
-        opp_policy_wrapper = getattr(self, f"{opponent}_policy")
 
-        role_params = policy_wrapper.parameters
-        opp_params = opp_policy_wrapper.parameters
+        role_train_state = self.get_state(role)
+        opp_train_state = self.get_state(opponent)
 
         # Generate root state
         keys = jax.random.split(key, num=self.device_num + 1)
-        root_state = pmap(partial(self.generate_pts, shape=(self.eval_batch_size, self.max_num_points, self.dimension),
-                                  max_value=self.max_value, dtype=self.dtype, rescale=self.scale_observation))(keys[1:])
+        root_state = generate_pts(keys[1:], (self.eval_batch_size, self.max_num_points, self.dimension),
+                                  self.max_value, self.dtype, self.scale_observation)
+
         if role == "agent":
-            coords, _ = pmap(self.get_eval_policy_fn("host"), in_axes=(0, None))(root_state, opp_params)
+            # Get host coordinates, flatten and concatenate to make agent observations
+            coords, _ = pmap(self.get_eval_policy_fn("host"))(root_state, opp_train_state.params)
             batch_decode_from_one_hot = get_batch_decode_from_one_hot(self.dimension)
             root_state = jnp.concatenate([pmap(flatten)(root_state), pmap(batch_decode_from_one_hot)(coords)], axis=-1)
         elif role == "host":
+            # Host observations are merely flattened arrays
             root_state = pmap(flatten)(root_state)
         else:
             raise ValueError(f"role must be either host or agent. Got {role}.")
 
         keys = jax.random.split(keys[0], num=self.device_num + 1)
-        simulate_output = pmap(sim_fn, in_axes=(0, 0, None, None))(
-            keys[1:], root_state, (role_params,), (opp_params,)
+        simulate_output = pmap(sim_fn)(
+            keys[1:], root_state, (role_train_state.params,), (opp_train_state.params,)
         )
-        return pmap(partial(self.rollout_postprocess, role=role))(simulate_output)
+        return pmap(self.rollout_postprocess, static_broadcasted_argnums=1)(simulate_output, role)
 
-    def train(self, key: jnp.ndarray, role: str, gradient_steps: int, rollouts: jnp.ndarray, random_sampling=False,
-              verbose=0):
+    def train(self, key: jnp.ndarray, role: str, gradient_steps: int, rollouts: jnp.ndarray, mask=None,
+              random_sampling=False, verbose=0):
         """
         Trains the neural network with a collection of samples ('rollouts', supposedly collected from simulation).
         Parameters:
             key: the PRNG key.
             role: either host or agent.
             gradient_steps: number of gradient steps to take.
-            rollouts: observation, policy_logits, values of the form (device_num, batch_size, ...)
-            random_sampling: (Optional) whether to do random sampling in the rollouts.
+            rollouts: observation, policy_logits, values of the form (device_num, sample_size, ...)
+            mask: (Optional) the mask on rollout, so that we ignore some samples. Must be of the shape
+                (device_num, sample_size) with bool entries.
+            random_sampling: (Optional) whether to do random sampling or cut out contiguous batches in the rollouts.
             verbose: (Optional) whether to print out the loss
         """
         opponent = self._get_opponent(role)
@@ -208,116 +226,112 @@ class JAXTrainer:
         if getattr(self, f"{role}_policy") is None:
             raise RuntimeError(f"opponent {opponent} policy function not initialized.")
 
+        # On each device, choose `batch_size` amount of rollouts out of `sample_size`, and perform regression.
         batch_size = self.config[role]["batch_size"]
+        sample_size = rollouts[0].shape[1]
+        # The shape of the mask should be (device_num, sample_size) which is the same as value predictions in rollouts.
+        mask = jnp.ones_like(rollouts[2], dtype=jnp.float32) if mask is None else mask.astype(jnp.float32)
         state = self.get_state(role)
-
-        p_loss_fn = pmap(self.get_loss_fn(role), in_axes=(None, 0), out_axes=(0, 0))
-
-        sample_size = rollouts[0].shape[0]
-        gradient_steps = sample_size // batch_size if not random_sampling else gradient_steps
 
         for i in range(gradient_steps):
             keys = jax.random.split(key, num=self.device_num + 1)
+            key = keys[0]
+
             if random_sampling:
-                sample_idx = pmap(
-                    partial(jax.random.randint, shape=(batch_size,), minval=0, maxval=sample_size)
-                )(keys[1:])
+                sample_idx = pmap(jax.random.choice, static_broadcasted_argnums=(2, 3))(
+                    keys[1:], flax.jax_utils.replicate(jnp.arange(sample_size)), (batch_size,), True, mask
+                )
             else:
                 sample_idx = jnp.repeat(
-                    jnp.expand_dims(jnp.arange(i * batch_size, (i + 1) * batch_size), axis=0),
+                    jnp.expand_dims(jnp.arange(i * batch_size, (i + 1) * batch_size) % sample_size, axis=0),
                     self.device_num, axis=0)
 
-            sample = pmap(lambda x, y: (x[0][y, :], x[1][y, :], x[2][y]), in_axes=(0, 0), out_axes=(0, 0, 0))(
-                rollouts, sample_idx)
+            sample = p_get_index(rollouts, sample_idx)
 
-            p_loss, p_grad = p_loss_fn(state, sample)
-            loss, grad = tree_map(partial(jnp.mean, axis=0), p_loss), tree_map(partial(jnp.mean, axis=0), p_grad)
-
-            state = state.apply_gradients(grads=grad)
+            state, loss, grad = train_loop(state, sample, self.loss_fn, self.max_grad_norm)
 
             # Tensorboard logging
-            if state.step % self.config['tensorboard']['log_interval'] == 0:
-                if verbose:
-                    self.logger.info(f"Loss: {loss}")
+            if self.config['tensorboard']['use']:
+                if state.step[0] % self.config['tensorboard']['log_interval'] == 0:
+                    if verbose:
+                        self.logger.info(f"Loss: {loss}")
 
-                self.tensorboard_log_scalar(f"{role}/loss", loss, state.step)
-                self.summary_writer.add_histogram(
-                    f"{role}/gradient", np.array(self.layerwise_average(grad["params"], [])), state.step
-                )
+                    self.tensorboard_log_scalar(f"{role}/loss", loss, state.step[0])
+                    self.summary_writer.add_histogram(
+                        f"{role}/gradient", np.array(self.layerwise_average(grad["params"], [])), state.step[0]
+                    )
 
-                if self.config["tensorboard"]["layerwise_logging"]:
-                    self.tensorboard_log_layers(role, state.params["params"], state.step)
+                    if self.config["tensorboard"]["layerwise_logging"]:
+                        self.tensorboard_log_layers(role, state.params["params"], state.step[0])
 
-        # Save the state and parameters
+                if state.step[0] % self.config['tensorboard']['validation_interval'] == 0:
+                    rhos, details = self.validate(write_tensorboard=True)
+                    if verbose:
+                        self.logger.info(f"Rhos:\n{rhos}\nGame length histogram:\n{details}")
+
+        # Save the state
         setattr(self, f"{role}_state", state)
-        getattr(self, f"{role}_policy").parameters = state.params
 
-    @staticmethod
-    def loss_and_grad(state: TrainState, sample: jnp.ndarray,
-                      loss_fn: Callable, max_grad=1) -> Tuple[jnp.ndarray, jnp.ndarray]:
-        loss, grads = jax.value_and_grad(partial(compute_loss, loss_fn=loss_fn))(state.params, state.apply_fn, sample)
-        grads = jax.tree_util.tree_map(partial(jnp.clip, a_max=max_grad), grads)
-        return loss, grads
-
-    def evaluate(
-            self, eval_fn: Optional[Callable] = None, verbose=1, batch_size=10, num_of_loops=10, max_length=None,
-            key=None
+    def validate(
+            self, metric_fn: Optional[Callable] = None, verbose=1, batch_size=10, num_of_loops=10, max_length=None,
+            write_tensorboard=False, key=None
     ) -> Tuple[List, List]:
+        """
+        This method validates the current host and agent by pitting them against pre-defined strategies including:
+            host: random_host_fn, all_coord_host_fn, zeillinger_fn
+            agent: random_agent_fn, choose_first_agent_fn, choose_last_agent_fn
+        For the details, please check out the `battle_schedule` variable inside.
+        Parameters:
+            metric_fn: (Optional) the function that computes metrics given a host-agent pair. Defaults to calculate rho.
+            verbose: (Optional) whether to put the result into the logger.
+            batch_size: (Optional) the batch size of samples to feed into players.
+            num_of_loops: (Optional) number of loops in computing the metric. To be fed into the metric_fn.
+            max_length: (Optional) max length of games. Default to self.max_length_game.
+            write_tensorboard: (Optional) write the results to tensorboard.
+            key: (Optional) the PRNG random key. Default to the key from the seed `time.time_ns()`.
+        Returns:
+            a tuple of a list of computed metric(rho) and a list of details (histogram of game lengths)
+        """
         key = jax.random.PRNGKey(time.time_ns()) if key is None else key
         max_length = self.max_length_game if max_length is None else max_length
-        eval_fn = self.compute_rho if eval_fn is None else eval_fn
+        metric_fn = self.compute_rho if metric_fn is None else metric_fn
 
-        spec = (self.max_num_points, self.dimension)
-
-        host_policy_wrapper = self.host_policy
-        agent_policy_wrapper = self.agent_policy
-
-        host_fn = jax.jit(
-            action_wrapper(partial(host_policy_wrapper.get_apply_fn(batch_size), params=host_policy_wrapper.parameters),
-                           None)
-        )
-        agent_fn = jax.jit(
-            action_wrapper(
-                partial(agent_policy_wrapper.get_apply_fn(batch_size), params=agent_policy_wrapper.parameters),
-                self.dimension
-            )
-        )
-
-        hosts = [
-            host_fn,
-            get_host_with_flattened_obs(spec, random_host_fn),
-            get_host_with_flattened_obs(spec, zeillinger_fn),
-            get_host_with_flattened_obs(spec, all_coord_host_fn),
-        ]
-        agents = [
-            agent_fn,
-            partial(random_agent_fn, spec=spec),
-            partial(choose_first_agent_fn, spec=spec),
-            partial(choose_last_agent_fn, spec=spec),
-        ]
+        hosts, agents = self.get_hosts_agents_for_validation(batch_size)
 
         # Pit host network against all and agent network against the rest.
         battle_schedule = [(0, i) for i in range(len(agents))] + [(i, 0) for i in range(1, len(hosts))]
 
         rhos = []
         details = []
+
         for pair_idx in battle_schedule:
             key, subkey = jax.random.split(key)
 
             host, agent = hosts[pair_idx[0]], agents[pair_idx[1]]
-            rho, detail = eval_fn(
-                host, agent, batch_size=batch_size, num_of_loops=num_of_loops, max_length=max_length, key=key
+            rho, detail = metric_fn(
+                host, agent, batch_size=batch_size, num_of_loops=num_of_loops, max_length=max_length,
+                write_tensorboard=pair_idx == (0, 0) and write_tensorboard, key=key
             )
             rhos.append(rho)
             details.append(detail)
             if verbose:
                 self.logger.info(f"{get_name(host)} vs {get_name(agent)}:")
-                self.logger.info(f"  {get_name(eval_fn)}: {rho}")
+                self.logger.info(f"  {get_name(metric_fn)}: {rho}")
+            if write_tensorboard:
+                self.summary_writer.add_scalar(f"{get_name(host)}_v_{get_name(agent)}",
+                                               float(rho), self.get_state('host').step[0])
+                if sum(detail) > 0:
+                    hist = np.concatenate(
+                        [np.full((detail[i],), i) for i in range(len(detail) - 1)], axis=0
+                    )
+                    self.summary_writer.add_histogram(f"{get_name(host)}_v_{get_name(agent)}/length_histogram",
+                                                      hist, self.get_state('host').step[0])
 
         return rhos, details
 
     def compute_rho(
-            self, host: Callable, agent: Callable, batch_size=None, num_of_loops=10, max_length=None, key=None
+            self, host: Callable, agent: Callable, batch_size=None, num_of_loops=10, max_length=None,
+            write_tensorboard=False, key=None
     ) -> Tuple[float, List]:
         """
         Calculate the rho number between the host and agent.
@@ -327,9 +341,10 @@ class JAXTrainer:
             batch_size: (Optional) the batch size. Default to self.eval_batch_size.
             num_of_loops: (Optional) the number of times to run a batch of points. Default to 10.
             max_length: (Optional) the maximal length of game. Default is self.max_length_game
+            write_tensorboard: (Optional) write the histogram of host/agent policy argmax
             key: (Optional) the PRNG random key (if None, will use time.time_ns() to seed a key)
         Returns:
-            the rho number.
+            a tuple of the rho number and a list of game details (histogram of game lengths).
         """
         key = jax.random.PRNGKey(time.time_ns()) if key is None else key
         max_length = self.max_length_game if max_length is None else max_length
@@ -338,34 +353,55 @@ class JAXTrainer:
         max_num_points, dimension = self.max_num_points, self.dimension
         spec = (max_num_points, dimension)
 
-        take_action = get_take_actions(role="host", spec=spec, rescale_points=self.scale_observation)
-        batch_decode = get_batch_decode_from_one_hot(dimension)
+        take_action = pmap(get_take_actions(role="host", spec=spec, rescale_points=self.scale_observation))
+        batch_decode = pmap(get_batch_decode_from_one_hot(dimension))
+        p_reshape = pmap(jnp.reshape, static_broadcasted_argnums=1)
 
         details = [0] * max_length
         for _ in range(num_of_loops):
-            key, host_key, agent_key = jax.random.split(key, num=3)
+            keys = jax.random.split(key, num=1 + self.device_num)
+            key = keys[0]
 
-            pts = self.generate_pts(
-                host_key,
-                (batch_size, max_num_points, dimension),
-                self.max_value,
-                dtype=self.dtype,
-                rescale=self.scale_observation,
-            )
-            prev_done, done = 0, jnp.sum(get_dones(pts))  # Calculate the finished games
-            pts = flatten(pts)
+            pts = generate_pts(keys[1:], (batch_size, self.max_num_points, self.dimension),
+                               self.max_value, self.dtype, self.scale_observation)
+
+            prev_done, done = 0, jnp.sum(pmap(get_dones)(pts))  # Calculate the finished games
+            pts = pmap(flatten)(pts)
+
+            # For tensorboard logging
+            collect_host_actions, collect_agent_actions = [], []
 
             for step in range(max_length - 1):
-                key, host_key, agent_key = jax.random.split(key, num=3)
+                keys = jax.random.split(key, num=2 * self.device_num + 1)
+                key = keys[0]
+                host_keys = keys[1:self.device_num + 1]
+                agent_keys = keys[self.device_num + 1:]
 
                 details[step] += done - prev_done
-
-                coords = batch_decode(host(pts, key=host_key)).astype(self.dtype)
-                axis = jnp.argmax(agent(make_agent_obs(pts, coords), key=agent_key), axis=1).astype(self.dtype)
+                host_action = host(pts, key=host_keys)
+                coords = batch_decode(host_action).astype(self.dtype)
+                agent_obs = pmap(make_agent_obs)(pts, coords)
+                axis = jnp.argmax(agent(agent_obs, key=agent_keys), axis=2).astype(self.dtype)
                 pts = take_action(pts, coords, axis)
 
-                prev_done, done = done, jnp.sum(get_dones(pts.reshape((-1, *spec))))  # Update the finished games
+                # Have to sync by summing results across devices. prev_done and done are single scalars.
+                prev_done, done = done, jnp.sum(pmap(get_dones)(
+                    p_reshape(pts, (-1, *spec))
+                ))  # Update the finished games
+
+                if write_tensorboard:
+                    collect_host_actions.append(np.array(jnp.ravel(np.argmax(host_action, axis=2))))
+                    collect_agent_actions.append(np.array(jnp.ravel(axis)))
+
             details[max_length - 1] += batch_size - done
+
+            if write_tensorboard:
+                self.summary_writer.add_histogram("host_action_distributions",
+                                                  np.concatenate(collect_host_actions),
+                                                  self.get_state('host').step[0])
+                self.summary_writer.add_histogram("agent_action_distributions",
+                                                  np.concatenate(collect_agent_actions),
+                                                  self.get_state('agent').step[0])
 
         rho = sum(details[1:]) / sum([i * num for i, num in enumerate(details)])
         return rho, details
@@ -375,14 +411,17 @@ class JAXTrainer:
         Perform postprocessing on the rollout samples. In this default postprocessing, we replace the value_prior
             from the MCTS tree by the ground-truth value depending on the game win/lose.
         Parameters:
-            rollouts: the rollout set to be processed. (observations, policy_prior, value_prior).
+            rollouts: the rollout set to be processed. (observations, policy_prior, value_prior). Shapes are below.
+                - obs (b, max_length_game, input_dim), where input_dim is the dim of all flattened features.
+                - policy (b, max_length_game, dimension)
+                - value (b, max_length_game)
             role: the current role (agent value is the negative of host value)
         Returns:
-            the processed rollouts.
+            the processed rollouts. The return shapes are below.
+                - obs (b * max_length_game, input_dim)
+                - policy (b * max_length_game, dimension)
+                - value (b * max_length_game,)
         """
-        # obs (b, max_length_game, input_dim)
-        # policy (b, max_length_game, dimension)
-        # value (b, max_length_game)
         obs, policy, value = rollouts
         batch_size, max_length_game = obs.shape[0], obs.shape[1]
         value_dtype = value.dtype
@@ -391,7 +430,6 @@ class JAXTrainer:
         done = get_done_from_flatten(obs, role, self.dimension)  # (b, max_length_game)
         prev_done = jnp.concatenate([jnp.zeros((batch_size, 1), dtype=bool), done[:, :-1]], axis=1)
         value = calculate_value_using_reward_fn(done, prev_done, self.discount, max_length_game, reward_fn)
-
         value = jnp.ravel(value).astype(value_dtype)
 
         obs = obs.reshape((-1, obs.shape[2]))
@@ -428,7 +466,8 @@ class JAXTrainer:
     def save_checkpoint(self, path: str):
         for role in ["host", "agent"]:
             state = self.get_state(role)
-            checkpoints.save_checkpoint(ckpt_dir=path, prefix=f"{role}_", overwrite=True, target=state, step=state.step)
+            checkpoints.save_checkpoint(ckpt_dir=path, prefix=f"{role}_", overwrite=True,
+                                        target=flax.jax_utils.unreplicate(state), step=state.step[0])
 
     def load_checkpoint(self, path: str, step=None):
         """
@@ -439,16 +478,17 @@ class JAXTrainer:
         """
         for role in ["host", "agent"]:
             file_path = checkpoints.latest_checkpoint(ckpt_dir=path, prefix=f"{role}_") if step is None else path
-            state = checkpoints.restore_checkpoint(
-                ckpt_dir=file_path, target=self.get_state(role), step=step, prefix=f"{role}_"
-            )
-            setattr(self, f"{role}_state", state)
+            if file_path is not None:
+                state = flax.jax_utils.replicate(checkpoints.restore_checkpoint(
+                    ckpt_dir=file_path, target=self.get_state(role), step=step, prefix=f"{role}_"
+                ))
+                setattr(self, f"{role}_state", state)
 
-    # ---------- Below are getter functions for training-related functions ---------- #
+    # ---------- Below are getter functions for functions that are cached inside the class after first call ---------- #
 
     def get_fns(self, role: str, name: str) -> Callable:
         if not hasattr(self, f"{role}_{name}") or getattr(self, f"{role}_{name}") is None:
-            self._update_fns(role)
+            self.update_fns(role)
         return getattr(self, f"{role}_{name}")
 
     def get_eval_policy_fn(self, role: str) -> Callable:
@@ -463,18 +503,60 @@ class JAXTrainer:
     def get_sim_fn(self, role: str) -> Callable:
         return self.get_fns(role, "sim_fn")
 
-    def get_loss_fn(self, role: str) -> Callable:
-        return self.get_fns(role, "loss_fn")
-
-    def get_state(self, role: str) -> TrainState:
-        state = getattr(self, f"{role}_state")
+    def get_state(self, role: str, key=None) -> TrainState:
+        """
+        TrainState is a pytree object. In our case, the tensors inside are already SharedDeviceArray where the first
+            dimension is a device axis (see `flax.jax_utils.replicate`).
+        """
+        state = getattr(self, f"{role}_state", None)
         if state is None:
+            key = jax.random.PRNGKey(time.time_ns()) if key is None else key
             optim = getattr(self, f"{role}_optim")
             policy_wrapper = getattr(self, f"{role}_policy")
             apply_fn = self.get_train_policy_fn(role)
-            state = TrainState.create(apply_fn=apply_fn, params=policy_wrapper.parameters, tx=optim)
+            parameters = policy_wrapper.init(key,
+                                             (self.config[role]['batch_size'], self.max_num_points, self.dimension))[0]
+            state = flax.jax_utils.replicate(
+                TrainState.create(apply_fn=apply_fn, params=parameters, tx=optim))
             setattr(self, f"{role}_state", state)
         return state
+
+    def get_hosts_agents_for_validation(self, batch_size: int, force_update=False):
+        """
+        Get a set of host functions and a set of agent functions. They are policies of different strategies and will
+            be used to fight against each other. We cache those functions after the first access.
+        Parameters:
+            batch_size: the batch size of the input observations.
+            force_update: force an update on all the policy functions.
+        Returns:
+            a list of host functions and a list of agent functions.
+        """
+        if batch_size not in self.hosts_agents_for_validation or force_update:
+            spec = (self.max_num_points, self.dimension)
+            host_apply_fn = pmap(action_wrapper(self.host_policy.get_apply_fn(batch_size), None))
+            agent_apply_fn = pmap(action_wrapper(self.agent_policy.get_apply_fn(batch_size), self.dimension))
+
+            def host_fn(x, **_):
+                return host_apply_fn(x, self.host_state.params)
+
+            def agent_fn(x, **_):
+                return agent_apply_fn(x, self.agent_state.params)
+
+            hosts = [
+                host_fn,
+                jax.pmap(get_host_with_flattened_obs(spec, random_host_fn)),
+                jax.pmap(get_host_with_flattened_obs(spec, zeillinger_fn)),
+                jax.pmap(get_host_with_flattened_obs(spec, all_coord_host_fn)),
+            ]
+            agents = [
+                agent_fn,
+                jax.pmap(partial(random_agent_fn, spec=spec)),
+                jax.pmap(partial(choose_first_agent_fn, spec=spec)),
+                jax.pmap(partial(choose_last_agent_fn, spec=spec)),
+            ]
+            self.hosts_agents_for_validation[batch_size] = hosts, agents
+
+        return self.hosts_agents_for_validation[batch_size]
 
     # ---------- Below are either static methods or methods that set its members ---------- #
 
@@ -533,26 +615,20 @@ class JAXTrainer:
             setattr(self, f"{role}_eval_loop", eval_loop)
             setattr(self, f"{role}_sim_fn", sim_fn)
 
-    def update_loss_fn(self, role: str, jitted=True, return_function=False) -> Any:
+    def update_train_policy_fn(self, role: str, jitted=True, return_function=False) -> Any:
         """
-        Update `{role}_loss_fn`.
+        Update `{role}_train_policy_fn`.
         """
-        loss_fn = (
-            jax.jit(partial(self.loss_and_grad, loss_fn=policy_value_loss, max_grad=self.max_grad_norm))
-            if jitted
-            else partial(self.loss_and_grad, loss_fn=policy_value_loss, max_grad=self.max_grad_norm)
-        )
         train_policy_fn = jax.jit(getattr(self, f"{role}_policy").get_apply_fn(self.config[role]["batch_size"]))
         if return_function:
-            return loss_fn, train_policy_fn
+            return train_policy_fn
         else:
-            setattr(self, f"{role}_loss_fn", loss_fn)
             setattr(self, f"{role}_train_policy_fn", train_policy_fn)
 
-    def _update_fns(self, role: str):
+    def update_fns(self, role: str):
         self.update_eval_policy_fn(role)
         self.update_sim_loop(role)
-        self.update_loss_fn(role)
+        self.update_train_policy_fn(role)
 
     def purge_state(self, role: str):
         """
@@ -571,9 +647,18 @@ class JAXTrainer:
         else:
             raise ValueError(f"role must be either host or agent. Got {role}.")
 
-    @staticmethod
-    def generate_pts(key: jnp.ndarray, shape: Tuple, max_value: int, dtype=jnp.float32, rescale=True) -> jnp.ndarray:
-        pts = jax.random.randint(key, shape, 0, max_value).astype(dtype)
-        pts = jnp.where(rescale, rescale_jax(get_newton_polytope_jax(pts)),
-                        get_newton_polytope_jax(pts))
-        return pts
+
+@partial(pmap, axis_name='d', static_broadcasted_argnums=(2, 3))
+def train_loop(state: TrainState, sample: jnp.ndarray,
+               loss_fn: Callable, max_grad=1) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    loss, grad = jax.value_and_grad(partial(compute_loss, loss_fn=loss_fn))(state.params, state.apply_fn, sample)
+    grads = jax.tree_util.tree_map(partial(jnp.clip, a_max=max_grad), grad)
+
+    loss, grad = jax.lax.pmean(loss, 'd'), jax.lax.pmean(grad, 'd')
+    state = state.apply_gradients(grads=grad)
+    return state, loss, grads
+
+
+# A helper function that selects the indices of the 3-item tuple
+#   (used in the selection of training data of the (observation, policy, value)-tuple)
+p_get_index = pmap(lambda x, y: (x[0][y, :], x[1][y, :], x[2][y]))
