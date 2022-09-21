@@ -9,7 +9,7 @@ import mctx
 from hironaka.core import JAXPoints
 from hironaka.jax import JAXTrainer
 from hironaka.jax.util import generate_pts
-from hironaka.jax.net import DResNet18, DResNetMini, PolicyWrapper
+from hironaka.jax.net import DResNet18, DResNetMini
 from hironaka.jax.players import (
     all_coord_host_fn,
     choose_first_agent_fn,

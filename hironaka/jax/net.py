@@ -1,10 +1,7 @@
 from functools import partial
 from typing import Any, Callable, List, Tuple
 
-import flax
-import jax
 from flax import linen as nn
-from jax import lax
 from jax import numpy as jnp
 from jax import vmap
 
@@ -63,6 +60,8 @@ class DenseResNet(nn.Module):
         # Policy head and value head
         p = nn.Dense(self.output_size, dtype=self.dtype)(x)
         v = nn.Dense(1, dtype=self.dtype)(x)
+        # Regulate the value output between -1 and 1
+        v = nn.tanh(v)
         return p, v
 
 
