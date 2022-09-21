@@ -17,7 +17,7 @@ from jax import pmap
 # Funny that jax doesn't work with tensorflow well, and using PyTorch's tensorboard is the most convenient...
 from torch.utils.tensorboard import SummaryWriter
 
-from hironaka.jax.net import DenseNet, DenseResNet, CustomNet, PolicyWrapper
+from hironaka.jax.net import DenseNet, DenseResNet, CustomNet, get_apply_fn
 from hironaka.jax.players import (
     all_coord_host_fn,
     choose_first_agent_fn,
@@ -58,12 +58,12 @@ class JAXTrainer:
         stick to the very beginner-friendly class-method-attribute style.
     The whole JAXTrainer life cycle is designed to do the following:
     - Read the config and load all parameters
-    - One calls JAXTrainer.simulate to do
+    - One calls `JAXTrainer.simulate` to do
         1. Generate policy logit and value estimates based on the neural network.
         2. Perform MCTS to improve the policy and value (currently only makes use of `mctx.gumbel_muzero_policy`)
         3. Continue the evaluation (policy improving via MCTS) simulation (perform the actual game step based on the
             improved policy) cycle, and return them as training samples.
-    - One calls JAXTrainer.train to train the neural network for certain amount of gradient steps.
+    - One calls `JAXTrainer.train` to train the neural network for certain amount of gradient steps.
     - Repeat the simulation-training cycle, or change some parameters here and there, call JAXTrainer.update_fns and
         perform some trainings.
     """
@@ -91,7 +91,8 @@ class JAXTrainer:
                 "dense": DenseNet,
                 "custom": CustomNet}
 
-    def __init__(self, key: jnp.ndarray, config: Union[dict, str], dtype=jnp.float32, loss_fn=policy_value_loss):
+    def __init__(self, key: jnp.ndarray, config: Union[dict, str], dtype=jnp.float32, loss_fn=policy_value_loss,
+                 host_feature_fn=None, agent_feature_fn=None):
         self.logger = logging.getLogger(__class__.__name__)
 
         if isinstance(config, str):
@@ -123,6 +124,8 @@ class JAXTrainer:
 
         self.dtype = dtype
         self.loss_fn = loss_fn
+        self.host_feature_fn=host_feature_fn
+        self.agent_feature_fn=agent_feature_fn
 
         if not self.use_cuda:
             jax.config.update("jax_platform_name", "cpu")
@@ -130,27 +133,26 @@ class JAXTrainer:
         self.device_num = len(jax.devices())
 
         eval_batch_size, max_num_points, dimension = self.eval_batch_size, self.max_num_points, self.dimension
+        self.input_dim = {"host": max_num_points * dimension, "agent": max_num_points * dimension + dimension}
         self.output_dim = {"host": 2 ** dimension - dimension - 1, "agent": dimension}
-        policy_keys = {}
         sim_keys = {}
-        key, policy_keys["host"], policy_keys["agent"], sim_keys["host"], sim_keys["agent"] = jax.random.split(key,
-                                                                                                               num=5)
+        key, sim_keys["host"], sim_keys["agent"] = jax.random.split(key, num=3)
 
         for role in ["host", "agent"]:
             if role not in self.config:
                 continue
-            net = self.net_dict[self.net_type](self.output_dim[role] + 1, net_arch=self.config[role]["net_arch"])
-            setattr(self, f"{role}_policy",
-                    PolicyWrapper(policy_keys[role], role, (eval_batch_size, max_num_points, dimension), net))
-            self.set_optim(role, self.config[role]["optim"])
 
-            # Set up policy functions (policy and evaluation have different batch sizes)
-            self.update_eval_policy_fn(role)
+            # Note: self.output_dim means the dimension of policy vectors only.
+            net = self.net_dict[self.net_type](self.output_dim[role], net_arch=self.config[role]["net_arch"])
+            setattr(self, f"{role}_model", net)
+            self.set_optim(role, self.config[role]["optim"])
 
             # Use a fixed reward function for now.
             setattr(self, f"{role}_reward_fn", get_reward_fn(role))
-
             setattr(self, f"{role}_state", None)
+
+            self.update_policy_fn(role)
+
 
         if self.config["tensorboard"]["use"]:
             self.log_string = (
@@ -161,7 +163,6 @@ class JAXTrainer:
 
         for role in ["host", "agent"]:
             self.update_sim_loop(role)
-            self.update_train_policy_fn(role)
 
             # get_state will initialize '{role}_state'
             key, subkey = jax.random.PRNGKey(key)
@@ -192,7 +193,7 @@ class JAXTrainer:
 
         if role == "agent":
             # Get host coordinates, flatten and concatenate to make agent observations
-            coords, _ = pmap(self.get_eval_policy_fn("host"))(root_state, opp_train_state.params)
+            coords, _ = pmap(self.get_policy_fn("host"))(root_state, opp_train_state.params)
             batch_decode_from_one_hot = get_batch_decode_from_one_hot(self.dimension)
             root_state = jnp.concatenate([pmap(flatten)(root_state), pmap(batch_decode_from_one_hot)(coords)], axis=-1)
         elif role == "host":
@@ -221,11 +222,6 @@ class JAXTrainer:
             random_sampling: (Optional) whether to do random sampling or cut out contiguous batches in the rollouts.
             verbose: (Optional) whether to print out the loss
         """
-        opponent = self._get_opponent(role)
-
-        if getattr(self, f"{role}_policy") is None:
-            raise RuntimeError(f"opponent {opponent} policy function not initialized.")
-
         # On each device, choose `batch_size` amount of rollouts out of `sample_size`, and perform regression.
         batch_size = self.config[role]["batch_size"]
         sample_size = rollouts[0].shape[1]
@@ -273,7 +269,7 @@ class JAXTrainer:
         setattr(self, f"{role}_state", state)
 
     def validate(
-            self, metric_fn: Optional[Callable] = None, verbose=1, batch_size=10, num_of_loops=10, max_length=None,
+            self, metric_fn: Optional[Callable] = None, verbose=1, batch_size=50, num_of_loops=10, max_length=None,
             write_tensorboard=False, key=None
     ) -> Tuple[List, List]:
         """
@@ -483,6 +479,7 @@ class JAXTrainer:
                     ckpt_dir=file_path, target=self.get_state(role), step=step, prefix=f"{role}_"
                 ))
                 setattr(self, f"{role}_state", state)
+                self.update_fns(role)
 
     # ---------- Below are getter functions for functions that are cached inside the class after first call ---------- #
 
@@ -491,11 +488,8 @@ class JAXTrainer:
             self.update_fns(role)
         return getattr(self, f"{role}_{name}")
 
-    def get_eval_policy_fn(self, role: str) -> Callable:
-        return self.get_fns(role, "eval_policy_fn")
-
-    def get_train_policy_fn(self, role: str) -> Callable:
-        return self.get_fns(role, "train_policy_fn")
+    def get_policy_fn(self, role: str) -> Callable:
+        return self.get_fns(role, "policy_fn")
 
     def get_eval_loop(self, role: str) -> Callable:
         return self.get_fns(role, "eval_loop")
@@ -512,10 +506,9 @@ class JAXTrainer:
         if state is None:
             key = jax.random.PRNGKey(time.time_ns()) if key is None else key
             optim = getattr(self, f"{role}_optim")
-            policy_wrapper = getattr(self, f"{role}_policy")
-            apply_fn = self.get_train_policy_fn(role)
-            parameters = policy_wrapper.init(key,
-                                             (self.config[role]['batch_size'], self.max_num_points, self.dimension))[0]
+            net = getattr(self, f"{role}_model")
+            apply_fn = self.get_policy_fn(role)
+            parameters = net.init(key, jnp.ones((1, self.input_dim[role])))
             state = flax.jax_utils.replicate(
                 TrainState.create(apply_fn=apply_fn, params=parameters, tx=optim))
             setattr(self, f"{role}_state", state)
@@ -533,14 +526,19 @@ class JAXTrainer:
         """
         if batch_size not in self.hosts_agents_for_validation or force_update:
             spec = (self.max_num_points, self.dimension)
-            host_apply_fn = pmap(action_wrapper(self.host_policy.get_apply_fn(batch_size), None))
-            agent_apply_fn = pmap(action_wrapper(self.agent_policy.get_apply_fn(batch_size), self.dimension))
+            host_apply_fn = pmap(action_wrapper(self.host_policy_fn, None))
+            agent_apply_fn = pmap(action_wrapper(self.agent_policy_fn, self.dimension))
 
             def host_fn(x, **_):
                 return host_apply_fn(x, self.host_state.params)
 
             def agent_fn(x, **_):
                 return agent_apply_fn(x, self.agent_state.params)
+
+            def expose_name(func):
+                if hasattr(func, "func"):
+                    func.__name__ = func.func.__name__
+                return func
 
             hosts = [
                 host_fn,
@@ -550,9 +548,9 @@ class JAXTrainer:
             ]
             agents = [
                 agent_fn,
-                jax.pmap(partial(random_agent_fn, spec=spec)),
-                jax.pmap(partial(choose_first_agent_fn, spec=spec)),
-                jax.pmap(partial(choose_last_agent_fn, spec=spec)),
+                jax.pmap(expose_name(partial(random_agent_fn, spec=spec))),
+                jax.pmap(expose_name(partial(choose_first_agent_fn, spec=spec))),
+                jax.pmap(expose_name(partial(choose_last_agent_fn, spec=spec))),
             ]
             self.hosts_agents_for_validation[batch_size] = hosts, agents
 
@@ -567,16 +565,6 @@ class JAXTrainer:
         optim_name = optim_config["name"]
         optim_args = optim_config["args"]
         setattr(self, f"{role}_optim", self.optim_dict[optim_name](**optim_args))
-
-    def update_eval_policy_fn(self, role: str, jitted=True):
-        """
-        Update `{role}_eval_policy_fn` based on the current parameters of the network.
-        """
-        maybe_jit = jax.jit if jitted else lambda x, *_: x
-        batch_size = self.eval_batch_size
-        setattr(self, f"{role}_eval_policy_fn",
-                maybe_jit(getattr(self, f"{role}_policy").get_apply_fn(batch_size),
-                          backend='cpu' if self.eval_on_cpu or not self.use_cuda else self.default_backend))
 
     def update_sim_loop(self, role: str, jitted=True, return_function=False) -> Any:
         """
@@ -596,8 +584,8 @@ class JAXTrainer:
 
         eval_loop = get_evaluation_loop(
             role,
-            self.get_eval_policy_fn(role),
-            action_wrapper(self.get_eval_policy_fn(opponent), dim),
+            getattr(self, f"{role}_policy_fn"),
+            action_wrapper(getattr(self, f"{opponent}_policy_fn"), dim),
             getattr(self, f"{role}_reward_fn"),
             spec=(self.max_num_points, self.dimension),
             num_evaluations=self.num_evaluations,
@@ -615,20 +603,21 @@ class JAXTrainer:
             setattr(self, f"{role}_eval_loop", eval_loop)
             setattr(self, f"{role}_sim_fn", sim_fn)
 
-    def update_train_policy_fn(self, role: str, jitted=True, return_function=False) -> Any:
+    def update_policy_fn(self, role: str, return_function=False) -> Any:
         """
-        Update `{role}_train_policy_fn`.
+        Update `{role}_policy_fn`.
         """
-        train_policy_fn = jax.jit(getattr(self, f"{role}_policy").get_apply_fn(self.config[role]["batch_size"]))
+        feature_fn = getattr(self, f"{role}_feature_fn")
+        model = getattr(self, f"{role}_model")
+        policy_fn = get_apply_fn(role, model, (self.max_num_points, self.dimension), feature_fn=feature_fn)
         if return_function:
-            return train_policy_fn
+            return policy_fn
         else:
-            setattr(self, f"{role}_train_policy_fn", train_policy_fn)
+            setattr(self, f"{role}_policy_fn", policy_fn)
 
     def update_fns(self, role: str):
-        self.update_eval_policy_fn(role)
         self.update_sim_loop(role)
-        self.update_train_policy_fn(role)
+        self.update_policy_fn(role)
 
     def purge_state(self, role: str):
         """

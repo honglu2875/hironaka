@@ -242,7 +242,7 @@ def select_sample_after_sim(role: str, rollout: Rollout, dimension: int,
     if mix_random_terminal_states:
         undone_num = jnp.sum(undone_idx)
         random_idx = jax.random.choice(key, jnp.arange(size), (size,), False)
-        selected_idx = random_idx & (jnp.arange(size) < undone_num)
+        selected_idx = random_idx | (jnp.arange(size) < undone_num)
     else:
         selected_idx = undone_idx
     return selected_idx
