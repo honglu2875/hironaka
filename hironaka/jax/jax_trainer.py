@@ -176,18 +176,44 @@ class JAXTrainer:
             self.get_state(role, subkey)
 
         self.host_opponent_policy, self.agent_opponent_policy = None, None
-        self.hosts_agents_for_validation = {}  # use to cache the lists of host and agent policy functions
+        # Used in caching the lists of host and agent policy functions
+        self.hosts_agents_for_validation = {}
+        # Used in self.simulate, only when mcts policy is used. Sometimes we want to use old compiled functions
+        # ignoring the fact that they contain old parameters to avoid compilation overhead.
+        self._cached_sim_fn = {}
 
-    def simulate(self, key: jnp.ndarray, role: str) -> RollOut:
+    def simulate(self, key: jnp.ndarray, role: str, use_mcts_policy=False, use_cached_sim_fn=False) -> RollOut:
         """
         Performing a simulation. The core is nothing but calling `{role}_sim_fn`
         Parameters:
             key: the PRNG key.
             role: host or agent.
+            use_mcts_policy: (Optional) use MCTS policy functions to simulate.
+                - Note that this is the real key of AlphaZero style MCTS. But we default to False first as the resource
+                    consumption is massive for every simulation. If one only uses policy network output, the result
+                    is in fact pretty good. It is worth to compare or mix the two ways.
+            use_cached_sim_fn: (Optional) effective only when use_mcts_policy is True. It uses a cached version
+                of simulation function which might contain old weights of networks.
         Returns:
             obs, target_policy, target_value
         """
-        sim_fn = self.get_sim_fn(role)
+        if use_mcts_policy:
+            if not use_cached_sim_fn:
+                opponent = self._get_opponent(role)
+                # Freeze the opponent parameters for the opponent's policy function (the invisible opponent moves which
+                #   is combined into every state transition).
+                # This could cause some cross-device sync overhead as we squash parameters into one DeviceArray.
+                policy_fn = self.get_policy_fn(role)
+                opp_policy_fn = partial(getattr(self, f"{opponent}_mcts_policy_fn"),
+                                        opp_params=flax.jax_utils.unreplicate(self.get_state(role).params))
+                _, sim_fn, _ = self.update_eval_sim_and_mcts_policy(role,
+                                                                    policy_fn,
+                                                                    opp_policy_fn,
+                                                                    return_function=True)
+                self._cached_sim_fn[role] = sim_fn
+            sim_fn = self._cached_sim_fn[role]
+        else:
+            sim_fn = self.get_sim_fn(role)
         opponent = self._get_opponent(role)
 
         role_train_state = self.get_state(role)
@@ -270,15 +296,15 @@ class JAXTrainer:
 
             sample = p_get_index(rollouts, sample_idx)
 
-            state, loss, grad = train_loop(state, sample, self.loss_fn, self.max_grad_norm)
+            state, loss, grad = p_train_loop(state, sample, self.loss_fn, self.max_grad_norm)
 
             # Tensorboard logging
             if self.config["tensorboard"]["use"]:
                 if state.step[0] % self.config["tensorboard"]["log_interval"] == 0:
                     if verbose:
-                        self.logger.info(f"Loss: {loss}")
+                        self.logger.info(f"Loss: {loss[0]}")
 
-                    self.tensorboard_log_scalar(f"{role}/loss", loss, state.step[0])
+                    self.tensorboard_log_scalar(f"{role}/loss", loss[0], state.step[0])
                     self.summary_writer.add_histogram(
                         f"{role}/gradient", np.array(self.layerwise_average(grad["params"], [])), state.step[0]
                     )
@@ -605,11 +631,17 @@ class JAXTrainer:
         optim_args = optim_config["args"]
         setattr(self, f"{role}_optim", self.optim_dict[optim_name](**optim_args))
 
-    def update_eval_sim_and_mcts_policy(self, role: str, jitted=True, return_function=False) -> Any:
+    def update_eval_sim_and_mcts_policy(self, role: str,
+                                        policy_fn: Optional[Callable] = None,
+                                        opp_policy_fn: Optional[Callable] = None,
+                                        jitted=False,
+                                        return_function=False) -> Any:
         """
         Update `{role}_eval_loop`, `{role}_sim_fn`, and `{role}_mcts_policy_fn`.
         Parameters:
             role: host or agent.
+            policy_fn: (Optional) the policy function used to generate simulations.
+            opp_policy_fn: (Optional) the opponent policy function used to generate simulations.
             jitted: (Optional) whether to jit the functions. (Might deprecate soon)
             return_function: (Optional) if true, return the functions.
         Returns:
@@ -617,7 +649,7 @@ class JAXTrainer:
             Otherwise, nothing.
         """
         opponent = self._get_opponent(role)
-        maybe_jit = jax.jit if jitted else lambda x, *_: x
+        maybe_jit = jax.jit if jitted else lambda x, **_: x
         simulation_config = {
             "eval_batch_size": self.eval_batch_size,
             "max_num_points": self.max_num_points,
@@ -627,10 +659,13 @@ class JAXTrainer:
             "scale_observation": self.scale_observation,
         }
 
+        policy_fn = getattr(self, f"{role}_policy_fn") if policy_fn is None else policy_fn
+        opp_policy_fn = getattr(self, f"{opponent}_policy_fn") if opp_policy_fn is None else opp_policy_fn
+
         eval_loop = get_evaluation_loop(
             role,
-            getattr(self, f"{role}_policy_fn"),  # output policy logits and value estimates
-            action_wrapper(getattr(self, f"{opponent}_policy_fn"), None),  # output definitive actions as one-hot array
+            policy_fn,  # output policy logits and value estimates
+            action_wrapper(opp_policy_fn, None),  # output definitive actions as one-hot array
             getattr(self, f"{role}_reward_fn"),
             spec=(self.max_num_points, self.dimension),
             num_evaluations=self.num_evaluations,
@@ -645,6 +680,8 @@ class JAXTrainer:
             backend="cpu" if self.eval_on_cpu or not self.use_cuda else jax.default_backend(),
         )
         mcts_policy_fn = mcts_wrapper(eval_loop)
+        if role == 'agent':
+            mcts_policy_fn = apply_agent_action_mask(mcts_policy_fn, self.dimension)
 
         if return_function:
             return eval_loop, sim_fn, mcts_policy_fn
@@ -697,7 +734,7 @@ class JAXTrainer:
 
 
 @partial(pmap, axis_name="d", static_broadcasted_argnums=(2, 3))
-def train_loop(
+def p_train_loop(
     state: TrainState, sample: jnp.ndarray, loss_fn: Callable, max_grad=1
 ) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     loss, grad = jax.value_and_grad(partial(compute_loss, loss_fn=loss_fn))(state.params, state.apply_fn, sample)

@@ -1,6 +1,7 @@
 from functools import partial
 from typing import Callable, Tuple
 
+import jax
 import mctx
 
 import jax.numpy as jnp
@@ -54,7 +55,6 @@ def get_recurrent_fn_for_role(
     obs_preprocess, coords_preprocess = get_preprocess_fns(role, spec)
 
     if role == "host":
-
         def first_obs_update(x, y, z):
             return x
 
@@ -79,7 +79,6 @@ def get_recurrent_fn_for_role(
         raise ValueError(f"role must be either 'host' or 'agent'. Got {role}.")
 
     def recurrent_fn(params, key, actions: jnp.ndarray, observations: jnp.ndarray):
-        del key
         role_fn_args, opponent_fn_args = params
 
         batch_size = observations.shape[0]
@@ -96,8 +95,9 @@ def get_recurrent_fn_for_role(
         updated_obs = first_obs_update(observations, actions, actions)
 
         # The enemy observes the `updated_obs` and `actions`, and makes a decision on its actions
+        key, subkey = jax.random.split(key)
         opponent_actions = opponent_action_preprocess(
-            opponent_action_fn(make_opponent_obs(updated_obs, actions).astype(dtype), *opponent_fn_args)
+            opponent_action_fn(make_opponent_obs(updated_obs, actions).astype(dtype), *opponent_fn_args, key=subkey)
         )
 
         # If host, `second_obs_update` takes an action (shift->newton polytope->rescale) and returns flattened obs
@@ -106,7 +106,8 @@ def get_recurrent_fn_for_role(
         dones = get_dones(obs_preprocess(next_observations))
         rewards = reward_fn(dones, prev_dones)
 
-        policy_prior, value_prior = role_fn(next_observations, *role_fn_args)
+        key, subkey = jax.random.split(key)
+        policy_prior, value_prior = role_fn(next_observations, *role_fn_args, key=subkey)
 
         recurrent_fn_output = mctx.RecurrentFnOutput(
             reward=rewards,

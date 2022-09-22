@@ -7,6 +7,8 @@ import flax
 import numpy as np
 from flax.training.train_state import TrainState
 
+os.environ['XLA_FLAGS'] = '--xla_force_host_platform_device_count=2'
+
 import jax
 import jax.numpy as jnp
 from hironaka.jax import JAXTrainer
@@ -32,13 +34,17 @@ class TestJAXTrainer(unittest.TestCase):
     trainer = JAXTrainer(jax.random.PRNGKey(42), str(pathlib.Path(__file__).parent.resolve()) + "/jax_config.yml")
 
     def test_training_and_save_load(self):
+        assert len(jax.devices()) == 2
         key = jax.random.PRNGKey(42)
         for role in ["host", "agent"]:
             keys = jax.random.split(key, num=len(jax.devices()) + 2)
             key, subkey = keys[0], keys[1]
             device_keys = keys[2:]
 
+            # Test both simplified simulation and mcts simulation
             exp = self.trainer.simulate(subkey, role)
+            exp = self.trainer.simulate(subkey, role, use_mcts_policy=True)
+
             assert exp[0].shape[1] == self.trainer.eval_batch_size * self.trainer.max_length_game
             # Test the post-selection of rollouts (prevent the dataset from being dominated by terminal states)
             if role == "agent":

@@ -79,7 +79,7 @@ def get_evaluation_loop(
         Returns:
             `PolicyOutput` representing the search outcome.
         """
-        policy_prior, value_prior = policy_fn(root_states, *role_fn_args)
+        policy_prior, value_prior = policy_fn(root_states, *role_fn_args, key=key)
         root = mctx.RootFnOutput(prior_logits=policy_prior, value=value_prior, embedding=root_states)
         policy_output = muzero(
             params=(role_fn_args, opponent_fn_args), rng_key=key, root=root, invalid_actions=invalid_actions
