@@ -6,7 +6,7 @@ from hironaka.src import batched_coord_list_to_binary, remove_repeated
 
 
 def get_newton_polytope_approx_torch(
-        points: torch.Tensor, inplace: Optional[bool] = True, padding_value: Optional[float] = -1.0
+    points: torch.Tensor, inplace: Optional[bool] = True, padding_value: Optional[float] = -1.0
 ):
     assert len(points.shape) == 3
     remove_repeated(points, padding_value=padding_value)
@@ -16,13 +16,11 @@ def get_newton_polytope_approx_torch(
     available_points = points.ge(0)
 
     # get a filter matrix
-    filter_matrix = available_points.unsqueeze(2).repeat(1, 1, max_num_points, 1) & available_points.unsqueeze(
-        1).repeat(
+    filter_matrix = available_points.unsqueeze(2).repeat(1, 1, max_num_points, 1) & available_points.unsqueeze(1).repeat(
         1, max_num_points, 1, 1
     )
     # get the difference matrix for the second axis
-    difference = points.unsqueeze(2).repeat(1, 1, max_num_points, 1) - points.unsqueeze(1).repeat(1, max_num_points, 1,
-                                                                                                  1)
+    difference = points.unsqueeze(2).repeat(1, 1, max_num_points, 1) - points.unsqueeze(1).repeat(1, max_num_points, 1, 1)
 
     # filter the diagonal
     diag_filter = ~torch.diag(torch.ones(max_num_points, device=device)).type(torch.bool)
@@ -41,18 +39,17 @@ def get_newton_polytope_approx_torch(
         return r
 
 
-def get_newton_polytope_torch(points: torch.Tensor, inplace: Optional[bool] = True,
-                              padding_value: Optional[float] = -1.0):
+def get_newton_polytope_torch(points: torch.Tensor, inplace: Optional[bool] = True, padding_value: Optional[float] = -1.0):
     return get_newton_polytope_approx_torch(points, inplace=inplace, padding_value=padding_value)
 
 
 def shift_torch(
-        points: torch.Tensor,
-        coord: Union[torch.Tensor, List[List[int]]],
-        axis: Union[torch.Tensor, List[int]],
-        inplace: Optional[bool] = True,
-        padding_value: Optional[float] = -1.0,
-        ignore_ended_games: Optional[bool] = True,
+    points: torch.Tensor,
+    coord: Union[torch.Tensor, List[List[int]]],
+    axis: Union[torch.Tensor, List[int]],
+    inplace: Optional[bool] = True,
+    padding_value: Optional[float] = -1.0,
+    ignore_ended_games: Optional[bool] = True,
 ):
     """
     note:
@@ -96,14 +93,15 @@ def shift_torch(
         axis_binary *= torch.sum(points[:, :, 0].ge(0), 1).ge(2).reshape(-1, 1)  # Filter by whether game ended
 
     # Generate transition matrices
-    trans_matrix = (axis_binary.unsqueeze(2) * coord.unsqueeze(1) +
-                    torch.diag(torch.ones(dimension, device=device, dtype=_TENSOR_TYPE)).repeat(batch_size, 1, 1) -
-                    axis_binary.unsqueeze(2) * axis_binary.unsqueeze(1))
+    trans_matrix = (
+        axis_binary.unsqueeze(2) * coord.unsqueeze(1)
+        + torch.diag(torch.ones(dimension, device=device, dtype=_TENSOR_TYPE)).repeat(batch_size, 1, 1)
+        - axis_binary.unsqueeze(2) * axis_binary.unsqueeze(1)
+    )
     trans_matrix = trans_matrix.unsqueeze(1).repeat(1, max_num_points, 1, 1)
 
     transformed_points = torch.matmul(trans_matrix, points.unsqueeze(3)).squeeze(3)
-    r = (transformed_points * available_points) + torch.full(points.shape, padding_value,
-                                                             device=device) * ~available_points
+    r = (transformed_points * available_points) + torch.full(points.shape, padding_value, device=device) * ~available_points
 
     if inplace:
         points[:, :, :] = r
@@ -118,12 +116,16 @@ def reposition_torch(points: torch.Tensor, inplace: Optional[bool] = True, paddi
     _TENSOR_TYPE = points.dtype
     device = points.device
 
-    preprocessed = (points * available_points +
-                    torch.full(points.shape, maximum + 1, device=device, dtype=_TENSOR_TYPE) * ~available_points)
+    preprocessed = (
+        points * available_points
+        + torch.full(points.shape, maximum + 1, device=device, dtype=_TENSOR_TYPE) * ~available_points
+    )
     coordinate_minimum = torch.amin(preprocessed, 1)
     unfiltered_result = points - coordinate_minimum.unsqueeze(1).repeat(1, points.shape[1], 1)
-    r = (unfiltered_result * available_points +
-         torch.full(points.shape, padding_value, device=device, dtype=_TENSOR_TYPE) * ~available_points)
+    r = (
+        unfiltered_result * available_points
+        + torch.full(points.shape, padding_value, device=device, dtype=_TENSOR_TYPE) * ~available_points
+    )
     if inplace:
         points[:, :, :] = r
         return None

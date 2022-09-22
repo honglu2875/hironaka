@@ -15,9 +15,8 @@ from typing import Callable, Tuple
 
 import jax
 import jax.numpy as jnp
-from jax import jit, lax, vmap
-
 from hironaka.jax.util import encode_one_hot, get_name
+from jax import jit, lax, vmap
 
 sub_2_2 = vmap(vmap(jnp.subtract, (None, 0), 0), (0, None), 0)  # (n, d) - (m, d) -> (n, m, d) subtract each vector
 default_key = jnp.array([0, 0], dtype=jnp.uint32)
@@ -25,8 +24,7 @@ default_key = jnp.array([0, 0], dtype=jnp.uint32)
 # ---------- Host functions ---------- #
 
 
-def random_host_fn(pts: jnp.ndarray, key=default_key, dtype=jnp.float32,
-                   **kwargs) -> jnp.ndarray:
+def random_host_fn(pts: jnp.ndarray, key=default_key, dtype=jnp.float32, **kwargs) -> jnp.ndarray:
     """
     Parameters:
         pts: points (batch_size, max_num_points, dimension)
@@ -36,7 +34,7 @@ def random_host_fn(pts: jnp.ndarray, key=default_key, dtype=jnp.float32,
         host action as one-hot array.
     """
     batch_size, max_num_points, dimension = pts.shape
-    cls_num = 2 ** dimension - dimension - 1
+    cls_num = 2**dimension - dimension - 1
     return jax.nn.one_hot(jax.random.randint(key, (batch_size,), 0, cls_num), cls_num, dtype=dtype)
 
 
@@ -49,7 +47,7 @@ def all_coord_host_fn(pts: jnp.ndarray, dtype=jnp.float32, **kwargs) -> jnp.ndar
         host action as one-hot array.
     """
     batch_size, max_num_points, dimension = pts.shape
-    cls_num = 2 ** dimension - dimension - 1
+    cls_num = 2**dimension - dimension - 1
     return jax.nn.one_hot(jnp.full((batch_size,), cls_num - 1), cls_num, dtype=dtype)
 
 
@@ -103,7 +101,7 @@ def zeillinger_fn_slice(pts: jnp.ndarray) -> jnp.ndarray:
     argmax = jnp.argmax(minimal_diff_vector)
     multi_bin = (jnp.arange(d) == argmin) | (jnp.arange(d) == argmax)
 
-    return jnp.where(argmin != argmax, encode_one_hot(multi_bin), jax.nn.one_hot(0, 2 ** d - d - 1))
+    return jnp.where(argmin != argmax, encode_one_hot(multi_bin), jax.nn.one_hot(0, 2**d - d - 1))
 
 
 def zeillinger_fn(pts: jnp.ndarray, dtype=jnp.float32, **kwargs) -> jnp.ndarray:
@@ -121,9 +119,7 @@ def get_host_with_flattened_obs(spec, func, dtype=jnp.float32) -> Callable:
 # ---------- Agent functions ---------- #
 
 
-def random_agent_fn(
-        pts: jnp.ndarray, spec: Tuple, key=default_key, dtype=jnp.float32, **kwargs
-) -> jnp.ndarray:
+def random_agent_fn(pts: jnp.ndarray, spec: Tuple, key=default_key, dtype=jnp.float32, **kwargs) -> jnp.ndarray:
     """
     Parameters:
         pts: flattened and concatenated points (batch_size, max_num_points * dimension + dimension)

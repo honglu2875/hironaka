@@ -1,27 +1,28 @@
 from functools import partial
 from typing import Callable, Tuple
 
+import mctx
+from mctx import PolicyOutput
+
 import jax
 import jax.numpy as jnp
-import mctx
 from jax import lax
-from mctx import PolicyOutput
 
 from .recurrent_fn import get_recurrent_fn_for_role
 
 
 def get_evaluation_loop(
-        role: str,
-        policy_fn: Callable,
-        opponent_fn: Callable,
-        reward_fn: Callable,
-        spec: Tuple,
-        num_evaluations: int,
-        max_depth: int,
-        max_num_considered_actions: int,
-        discount: float,
-        rescale_points: bool,
-        dtype=jnp.float32,
+    role: str,
+    policy_fn: Callable,
+    opponent_fn: Callable,
+    reward_fn: Callable,
+    spec: Tuple,
+    num_evaluations: int,
+    max_depth: int,
+    max_num_considered_actions: int,
+    discount: float,
+    rescale_points: bool,
+    dtype=jnp.float32,
 ) -> Callable:
     """
     The factory function of `evaluation_loop` which creates a new node and do one single (batched) MCTS search using
@@ -57,33 +58,31 @@ def get_evaluation_loop(
         role, policy_fn, opponent_fn, reward_fn, spec, discount=discount, rescale_points=rescale_points, dtype=dtype
     )
     # Compile the Gumbel MuZero policy function with parameters
-    muzero = jax.jit(
-        partial(
-            mctx.gumbel_muzero_policy,
-            recurrent_fn=recurrent_fn,
-            num_simulations=num_evaluations,
-            max_depth=max_depth,
-            max_num_considered_actions=max_num_considered_actions,
-        )
+    muzero = partial(
+        mctx.gumbel_muzero_policy,
+        recurrent_fn=recurrent_fn,
+        num_simulations=num_evaluations,
+        max_depth=max_depth,
+        max_num_considered_actions=max_num_considered_actions,
     )
 
-    def evaluation_loop(key: jnp.ndarray, root_states: jnp.ndarray, role_fn_args=(),
-                        opponent_fn_args=()) -> PolicyOutput:
+    def evaluation_loop(
+        key: jnp.ndarray, root_states: jnp.ndarray, role_fn_args=(), opponent_fn_args=(), invalid_actions=None
+    ) -> PolicyOutput:
         """
         Parameters:
             key: The PRNG key.
             root_states: (batch_size, *) a batch of observations as root states.
-            role_fn_args: (Optional) parameter for role function
-            opponent_fn_args: (Optional) parameter for opponent function
+            role_fn_args: (Optional) parameter for role function.
+            opponent_fn_args: (Optional) parameter for opponent function.
+            invalid_actions: (Optional) an optional mask at root node.
         Returns:
             `PolicyOutput` representing the search outcome.
         """
         policy_prior, value_prior = policy_fn(root_states, *role_fn_args)
         root = mctx.RootFnOutput(prior_logits=policy_prior, value=value_prior, embedding=root_states)
         policy_output = muzero(
-            params=(role_fn_args, opponent_fn_args),
-            rng_key=key,
-            root=root,
+            params=(role_fn_args, opponent_fn_args), rng_key=key, root=root, invalid_actions=invalid_actions
         )
 
         return policy_output
@@ -91,7 +90,7 @@ def get_evaluation_loop(
     return evaluation_loop
 
 
-def get_single_thread_simulation(role: str, evaluation_loop: Callable, config: dict, dtype=jnp.float32):
+def get_simulation(role: str, evaluation_loop: Callable, config: dict, dtype=jnp.float32):
     """
     A simulation process goes roughly as follows:
         0. Set up initial specs, generate a batch of random points.
@@ -108,9 +107,9 @@ def get_single_thread_simulation(role: str, evaluation_loop: Callable, config: d
     )
 
     input_dim = max_num_points * dimension if role == "host" else (max_num_points + 1) * dimension
-    action_num = 2 ** dimension - dimension - 1 if role == "host" else dimension
+    action_num = 2**dimension - dimension - 1 if role == "host" else dimension
 
-    def simulation(key: jnp.ndarray, root_state, role_fn_args=(), opponent_fn_args=()) -> Tuple:
+    def simulation(key: jnp.ndarray, root_state, role_fn_args=(), opponent_fn_args=(), invalid_actions=None) -> Tuple:
         """
         Returns a tuple (obs, policy_prior, value_prior).
         The returning sample size is `eval_batch_size * max_length_game`.
@@ -120,8 +119,9 @@ def get_single_thread_simulation(role: str, evaluation_loop: Callable, config: d
 
         def body_fn(i, keys_and_state):
             (key, subkey, loop_key), rollouts, state = keys_and_state
-            policy_output = evaluation_loop(loop_key, state, role_fn_args=role_fn_args,
-                                            opponent_fn_args=opponent_fn_args)
+            policy_output = evaluation_loop(
+                loop_key, state, role_fn_args=role_fn_args, opponent_fn_args=opponent_fn_args, invalid_actions=invalid_actions
+            )
 
             obs, policy, value = rollouts
             current_obs, current_policy, current_value = (
@@ -137,8 +137,7 @@ def get_single_thread_simulation(role: str, evaluation_loop: Callable, config: d
             action_idx = jnp.take_along_axis(
                 policy_output.search_tree.children_index[:, 0, :], policy_output.action[:, None], axis=1
             )
-            state = jnp.take_along_axis(policy_output.search_tree.embeddings[:, :, :], action_idx[:, None],
-                                        axis=1).squeeze(1)
+            state = jnp.take_along_axis(policy_output.search_tree.embeddings[:, :, :], action_idx[:, None], axis=1).squeeze(1)
 
             return jax.random.split(key, num=3), (obs, policy, value), state
 
@@ -147,11 +146,16 @@ def get_single_thread_simulation(role: str, evaluation_loop: Callable, config: d
         # `fori_loop` must return tracers of exactly the same shape
         rollout_obs_init = jnp.zeros((eval_batch_size, num_loops, input_dim), dtype=dtype)
         rollout_policy_init = jnp.zeros((eval_batch_size, num_loops, action_num), dtype=dtype)
-        rollout_value_init = jnp.zeros((eval_batch_size, num_loops,), dtype=dtype)
+        rollout_value_init = jnp.zeros(
+            (
+                eval_batch_size,
+                num_loops,
+            ),
+            dtype=dtype,
+        )
 
         _, rollouts, _ = lax.fori_loop(
-            0, num_loops, body_fn,
-            (starting_keys, (rollout_obs_init, rollout_policy_init, rollout_value_init), root_state)
+            0, num_loops, body_fn, (starting_keys, (rollout_obs_init, rollout_policy_init, rollout_value_init), root_state)
         )
 
         return rollouts

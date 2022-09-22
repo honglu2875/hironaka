@@ -1,9 +1,9 @@
 from functools import partial
 from typing import Callable, Tuple
 
-import jax.numpy as jnp
 import mctx
 
+import jax.numpy as jnp
 from hironaka.jax.util import (
     get_batch_decode,
     get_batch_decode_from_one_hot,
@@ -15,14 +15,14 @@ from hironaka.jax.util import (
 
 
 def get_recurrent_fn_for_role(
-        role: str,
-        role_fn: Callable,
-        opponent_action_fn: Callable,
-        reward_fn: Callable,
-        spec: Tuple[int, int],
-        discount=0.99,
-        dtype=jnp.float32,
-        rescale_points=True,
+    role: str,
+    role_fn: Callable,
+    opponent_action_fn: Callable,
+    reward_fn: Callable,
+    spec: Tuple[int, int],
+    discount=0.99,
+    dtype=jnp.float32,
+    rescale_points=True,
 ) -> Callable:
     """
     The factory function for the recurrent_fn corresponding to a role (host or agent).

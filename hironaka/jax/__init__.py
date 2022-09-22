@@ -1,3 +1,3 @@
 from .jax_trainer import JAXTrainer
 
-__all__ = ['JAXTrainer']
+__all__ = ["JAXTrainer"]

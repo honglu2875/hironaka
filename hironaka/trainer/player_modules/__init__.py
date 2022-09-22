@@ -1,7 +1,17 @@
 from .modules import (
-    DummyModule, ChooseFirstAgentModule, ChooseLastAgentModule, RandomAgentModule, RandomHostModule,
-    AllCoordHostModule
+    AllCoordHostModule,
+    ChooseFirstAgentModule,
+    ChooseLastAgentModule,
+    DummyModule,
+    RandomAgentModule,
+    RandomHostModule,
 )
 
-__all__ = ['DummyModule', 'ChooseFirstAgentModule', 'ChooseLastAgentModule', 'RandomAgentModule', 'RandomHostModule',
-           'AllCoordHostModule']
+__all__ = [
+    "DummyModule",
+    "ChooseFirstAgentModule",
+    "ChooseLastAgentModule",
+    "RandomAgentModule",
+    "RandomHostModule",
+    "AllCoordHostModule",
+]

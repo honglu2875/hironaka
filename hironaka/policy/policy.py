@@ -28,14 +28,14 @@ class Policy(abc.ABC):
 
     @abc.abstractmethod
     def __init__(
-            self,
-            mode: str,
-            max_num_points: int,
-            padding_value: Optional[float] = -1.0,
-            dimension: Optional[int] = 3,
-            device: Optional[Union[str, torch.device]] = "cpu",
-            dtype: Optional[Type] = torch.float32,
-            **kwargs,
+        self,
+        mode: str,
+        max_num_points: int,
+        padding_value: Optional[float] = -1.0,
+        dimension: Optional[int] = 3,
+        device: Optional[Union[str, torch.device]] = "cpu",
+        dtype: Optional[Type] = torch.float32,
+        **kwargs,
     ):
         self.logger = logging.getLogger(__class__.__name__)
 

@@ -1,7 +1,7 @@
 import abc
 import logging
 import random
-from typing import List, Union, Optional
+from typing import List, Optional, Union
 
 import numpy as np
 
@@ -32,8 +32,7 @@ class Agent(abc.ABC):
             if not hasattr(self, s) or getattr(self, s) is None:
                 raise NotImplementedError(f"Please specify {s} for the subclass.")
 
-    def move(self, points: Union[ListPoints, Points], coords: List, weights: Optional[List] = None,
-             inplace: bool = True):
+    def move(self, points: Union[ListPoints, Points], coords: List, weights: Optional[List] = None, inplace: bool = True):
         """
         Make moves on (the set of) points.
         Parameters:

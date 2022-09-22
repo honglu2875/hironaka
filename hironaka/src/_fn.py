@@ -173,7 +173,7 @@ def decode_action(code: int, dimension: int) -> np.ndarray:
 def mask_encoded_action(dimension: int):
     assert isinstance(dimension, int), f"Got {type(dimension)}."
 
-    result = np.ones(2 ** dimension)
+    result = np.ones(2**dimension)
     result[0] = 0
     for i in range(dimension):
         result[1 << i] = 0
@@ -198,8 +198,7 @@ def remove_repeated(points: torch.Tensor, padding_value: Optional[float] = -1.0)
     device = points.device
 
     # get the difference matrix for the second axis
-    difference = points.unsqueeze(2).repeat(1, 1, max_num_points, 1) - points.unsqueeze(1).repeat(1, max_num_points, 1,
-                                                                                                  1)
+    difference = points.unsqueeze(2).repeat(1, 1, max_num_points, 1) - points.unsqueeze(1).repeat(1, max_num_points, 1, 1)
 
     upper_tri = (
         ~torch.triu(torch.ones((max_num_points, max_num_points), device=device).type(torch.bool), diagonal=0)
@@ -255,12 +254,12 @@ class HostActionEncoder:
     def __init__(self, dim=3):
         self.dim = dim
         self.action_translate = []
-        for i in range(1, 2 ** self.dim):
+        for i in range(1, 2**self.dim):
             if not (i & (i - 1) == 0):  # Check if i is NOT a power of 2
                 self.action_translate.append(i)
 
-        self.binary_table = np.zeros((2 ** dim, dim))
-        for i in range(2 ** dim):
+        self.binary_table = np.zeros((2**dim, dim))
+        for i in range(2**dim):
             b = bin(i)[2:]
             for j in range(len(b) - 1, -1, -1):
                 if b[j] == "1":
@@ -277,7 +276,7 @@ class HostActionEncoder:
 
         action = 0
         for choice in coords:
-            action += 2 ** choice
+            action += 2**choice
 
         action = action - int(math.floor(math.log2(action))) - 2
 
@@ -299,7 +298,7 @@ class HostActionEncoder:
         """
         Given integer as action, return coords. Inverse function of encode.
         """
-        assert (action < 2 ** self.dim - self.dim - 1) and (action >= 0)
+        assert (action < 2**self.dim - self.dim - 1) and (action >= 0)
 
         action = self.action_translate[action]
         coords = []
@@ -317,7 +316,7 @@ class HostActionEncoder:
         E.g., turning [0, 1] -> torch.Tensor([[1, 1, 0], [1, 0, 1]])
         """
         assert len(actions.shape) == 1
-        assert all(actions.le(2 ** self.dim - self.dim - 2)) and all(actions.ge(0)), str(actions)
+        assert all(actions.le(2**self.dim - self.dim - 2)) and all(actions.ge(0)), str(actions)
         device = actions.device
         device_str = str(device)
         # Use cached binary table

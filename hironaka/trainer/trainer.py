@@ -11,13 +11,14 @@ from torch.nn import DataParallel
 from torch.utils.tensorboard import SummaryWriter
 
 from hironaka.core import TensorPoints
+
+from ..src import HostActionEncoder
 from .fused_game import FusedGame
 from .nets import AgentFeatureExtractor, HostFeatureExtractor, create_mlp
 from .player_modules import AllCoordHostModule, ChooseFirstAgentModule, DummyModule, RandomAgentModule, RandomHostModule
 from .replay_buffer import ReplayBuffer
 from .scheduler import ConstantScheduler, ExponentialERScheduler, ExponentialLRScheduler, InverseLRScheduler, Scheduler
 from .timer import Timer
-from ..src import HostActionEncoder
 
 
 class Trainer(abc.ABC):
@@ -60,8 +61,7 @@ class Trainer(abc.ABC):
     """
 
     optim_dict = {"adam": torch.optim.Adam, "sgd": torch.optim.SGD}
-    lr_scheduler_dict = {"constant": ConstantScheduler, "exponential": ExponentialLRScheduler,
-                         "inverse": InverseLRScheduler}
+    lr_scheduler_dict = {"constant": ConstantScheduler, "exponential": ExponentialLRScheduler, "inverse": InverseLRScheduler}
     er_scheduler_dict = {"constant": ConstantScheduler, "exponential": ExponentialERScheduler}
     replay_buffer_dict = {"base": ReplayBuffer}
 
@@ -71,15 +71,15 @@ class Trainer(abc.ABC):
     role_specific_hyperparameters = ["batch_size", "initial_rollout_size", "max_rollout_step"]
 
     def __init__(
-            self,
-            config: Union[Dict[str, Any], str],  # Either the config dict or the path to the YAML file
-            device_num: int = 0,  # For distributed training: the number of cuda device
-            host_net: Optional[nn.Module] = None,  # Pre-assigned host_net. Will ignore host config if set.
-            agent_net: Optional[nn.Module] = None,  # Pre-assigned agent_net. Will ignore agent config if set.
-            reward_func: Optional[Callable] = None,
-            point_cls: Optional[Type[TensorPoints]] = TensorPoints,  # the class to construct points
-            dtype: Optional[Union[Type, torch.dtype]] = torch.float32,
-            use_cuda_ids: Optional[List[int]] = None,  # list of cuda id to use. Used only when self.use_cuda==True.
+        self,
+        config: Union[Dict[str, Any], str],  # Either the config dict or the path to the YAML file
+        device_num: int = 0,  # For distributed training: the number of cuda device
+        host_net: Optional[nn.Module] = None,  # Pre-assigned host_net. Will ignore host config if set.
+        agent_net: Optional[nn.Module] = None,  # Pre-assigned agent_net. Will ignore agent config if set.
+        reward_func: Optional[Callable] = None,
+        point_cls: Optional[Type[TensorPoints]] = TensorPoints,  # the class to construct points
+        dtype: Optional[Union[Type, torch.dtype]] = torch.float32,
+        use_cuda_ids: Optional[List[int]] = None,  # list of cuda id to use. Used only when self.use_cuda==True.
     ):
         self.logger = logging.getLogger(__class__.__name__)
 
@@ -157,7 +157,7 @@ class Trainer(abc.ABC):
         # Initialize host and agent parameters
         heads = {"host": HostFeatureExtractor, "agent": AgentFeatureExtractor}
         input_dims = {"host": self.feature_dim, "agent": self.feature_dim + self.dimension}
-        output_dims = {"host": 2 ** self.dimension - self.dimension - 1, "agent": self.dimension}
+        output_dims = {"host": 2**self.dimension - self.dimension - 1, "agent": self.dimension}
         pretrained_nets = {"host": host_net, "agent": agent_net}
 
         # Set the reward function
@@ -276,8 +276,7 @@ class Trainer(abc.ABC):
 
         for _ in range(steps):
             if not points.ended:
-                exps.append(
-                    self.fused_game.step(points, role, scale_observation=self.scale_observation, exploration_rate=er))
+                exps.append(self.fused_game.step(points, role, scale_observation=self.scale_observation, exploration_rate=er))
         return exps
 
     @torch.inference_mode()
@@ -294,8 +293,7 @@ class Trainer(abc.ABC):
         result = []
         dummy_param = (self.dimension, self.max_num_points, self.device)
         hosts = [self.host_net] * 3 + [RandomHostModule(*dummy_param), AllCoordHostModule(*dummy_param)]
-        agents = [self.agent_net, RandomAgentModule(*dummy_param), ChooseFirstAgentModule(*dummy_param)] + [
-            self.agent_net] * 2
+        agents = [self.agent_net, RandomAgentModule(*dummy_param), ChooseFirstAgentModule(*dummy_param)] + [self.agent_net] * 2
 
         for host, agent in zip(hosts, agents):
             result.append(self.get_rho_for_pair(host, agent, num_samples, max_steps))
@@ -303,7 +301,7 @@ class Trainer(abc.ABC):
 
     @torch.inference_mode()
     def get_rho_for_pair(
-            self, host_candidate: nn.Module, agent_candidate: nn.Module, num_samples: int, max_steps: int
+        self, host_candidate: nn.Module, agent_candidate: nn.Module, num_samples: int, max_steps: int
     ) -> torch.Tensor:
         """
         Estimate the rho number for a pair of host and agent modules.
@@ -337,7 +335,7 @@ class Trainer(abc.ABC):
 
         rollouts = self.get_rollout(role, games, max_steps, er=er)
         if role == "host":
-            max_num = 2 ** self.dimension - self.dimension - 1
+            max_num = 2**self.dimension - self.dimension - 1
         elif role == "agent":
             max_num = self.dimension
         else:
@@ -381,8 +379,7 @@ class Trainer(abc.ABC):
         """
         Save replay buffers as a dict.
         """
-        saved = {"host_replay_buffer": self.get_replay_buffer("host"),
-                 "agent_replay_buffer": self.get_replay_buffer("agent")}
+        saved = {"host_replay_buffer": self.get_replay_buffer("host"), "agent_replay_buffer": self.get_replay_buffer("agent")}
         torch.save(saved, path)
 
     def load_replay_buffer(self, path: str):

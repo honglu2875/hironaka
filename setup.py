@@ -71,7 +71,7 @@ setup(
         "chex>=0.1.4",
         "optax>=0.1.3",
         "tensorboard",
-        "tensorflow-cpu"
+        "tensorflow-cpu",
     ],
     extras_require={
         "tests": [
@@ -106,7 +106,7 @@ setup(
     url="https://github.com/honglu2875/hironaka",
     author_email="honglu.math@gmail.com",
     keywords="reinforcement-learning machine-learning pure-mathematics algebraic geometry"
-             "mcts deep-q-learning alphazero python",
+    "mcts deep-q-learning alphazero python",
     license="MIT",
     long_description=long_description,
     long_description_content_type="text/markdown",

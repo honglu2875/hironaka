@@ -12,11 +12,11 @@ net_type: dense
 
 dimension: 3
 max_num_points: 5
-max_length_game: 5
+max_length_game: 20
 max_value: 20
 max_grad_norm: 1
 
-eval_batch_size: 2
+eval_batch_size: 1000
 num_evaluations: 10
 eval_on_cpu: false
 max_num_considered_actions: 10

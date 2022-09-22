@@ -73,8 +73,9 @@ def get_newton_polytope_lst(points: List[List[List[float]]], inplace=True) -> Li
     return result
 
 
-def shift_lst(points: List[List[List[float]]], coords: List[List[int]], axis: List[int],
-              inplace=True) -> List[List[List[float]]]:
+def shift_lst(
+    points: List[List[List[float]]], coords: List[List[int]], axis: List[int], inplace=True
+) -> List[List[List[float]]]:
     """
     Shift a set of points according to the rule of Hironaka game.
     """

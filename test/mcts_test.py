@@ -1,11 +1,11 @@
 from typing import List
 
 import torch
+from train.MCTS import trained_host
 
 from hironaka import host
 from hironaka.agent import ChooseFirstAgent
 from hironaka.validator import HironakaValidator
-from train.MCTS import trained_host
 
 ITERATIONS = 2
 

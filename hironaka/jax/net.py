@@ -2,10 +2,10 @@ from functools import partial
 from typing import Any, Callable, List, Tuple
 
 from flax import linen as nn
-from jax import numpy as jnp
-from jax import vmap
 
 from hironaka.jax.util import get_feature_fn
+from jax import numpy as jnp
+from jax import vmap
 
 ModuleDef = Any
 
