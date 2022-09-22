@@ -422,14 +422,14 @@ class JAXTrainer:
                 host_action = host(pts, key=host_keys)
                 coords = batch_decode(host_action).astype(self.dtype)
                 agent_obs = pmap(make_agent_obs)(pts, coords)
-                axis = jnp.argmax(agent(agent_obs, key=agent_keys), axis=2).astype(self.dtype)
+                axis = jnp.argmax(agent(agent_obs, key=agent_keys), axis=-1).astype(self.dtype)
                 pts = take_action(pts, coords, axis)
 
                 # Have to sync by summing results across devices. prev_done and done are single scalars.
                 prev_done, done = done, jnp.sum(pmap(get_dones)(p_reshape(pts, (-1, *spec))))  # Update the finished games
 
                 if write_tensorboard:
-                    collect_host_actions.append(np.array(jnp.ravel(np.argmax(host_action, axis=2))))
+                    collect_host_actions.append(np.array(jnp.ravel(np.argmax(host_action, axis=-1))))
                     collect_agent_actions.append(np.array(jnp.ravel(axis)))
 
             details[max_length - 1] += batch_size - done
@@ -571,14 +571,8 @@ class JAXTrainer:
         """
         if batch_size not in self.hosts_agents_for_validation or force_update:
             spec = (self.max_num_points, self.dimension)
-            host_policy_fn = pmap(action_wrapper(self.host_policy_fn, None))
-            agent_policy_fn = pmap(action_wrapper(self.agent_policy_fn, self.dimension))
-
-            def host_fn(x, **_):
-                return host_policy_fn(x, self.host_state.params)
-
-            def agent_fn(x, **_):
-                return agent_policy_fn(x, self.agent_state.params)
+            host_fn = action_wrapper(partial(jax.pmap(self.host_policy_fn), params=self.host_state.params), None)
+            agent_fn = action_wrapper(partial(jax.pmap(self.agent_policy_fn), params=self.agent_state.params), None)
 
             def expose_name(func):
                 if hasattr(func, "func"):

@@ -179,11 +179,17 @@ def calculate_value_using_reward_fn(
 def apply_agent_action_mask(agent_policy: Callable, dimension: int) -> Callable:
     """
     Apply a masked agent policy wrapper on top of an `agent_policy` function.
+    Assumption: the input x has shape (..., feature_dim), i.e., all features are flattened to the last axis.
     """
 
     def masked_agent_policy(x: jnp.ndarray, *args, **kwargs) -> Tuple:
-        batch_size, feature_num = x.shape
-        mask = lax.dynamic_slice(x, (0, feature_num - dimension), (batch_size, dimension)) > 0.5
+        feature_num = x.shape[-1]
+        # get the start and end for axis before the last one
+        start = (0,) * (len(x.shape) - 1)
+        end = x.shape[:-1]
+        # Extract the last `dimension` entries as our action mask, and apply it to the final action.
+        # Expect a 0/1 array, possibly float dtype. But to err on the safe side, we take a cut-off at 0.5.
+        mask = lax.dynamic_slice(x, (*start, feature_num - dimension), (*end, dimension)) > 0.5
         policy_prior, value_prior = agent_policy(x, *args, **kwargs)
         return policy_prior * mask - jnp.inf * (~mask), value_prior
 
@@ -200,7 +206,7 @@ def action_wrapper(policy_value_fn: Callable, dimension: Optional[Union[int]] = 
         policy_value_fn: the policy function that returns the (policy, value) pair.
         dimension: (Optional) the dimension of action output.
             if nonzero, will first extract the last `dimension` entries from the input and apply it as an action mask.
-            if None, will not apply actionmask.
+            if None, will not apply action mask.
     """
     masked_action = policy_value_fn if dimension is None else apply_agent_action_mask(policy_value_fn, dimension)
 
