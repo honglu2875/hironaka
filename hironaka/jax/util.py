@@ -5,7 +5,6 @@ from typing import Callable, Tuple, Union
 
 import jax
 from jax import jit, lax, numpy as jnp
-from jax import numpy as jnp
 from jax import vmap
 
 from hironaka.src import get_newton_polytope_jax, rescale_jax, shift_jax

@@ -124,15 +124,15 @@ class JAXTrainer:
 
         self.dtype = dtype
         self.loss_fn = loss_fn
-        self.host_feature_fn=host_feature_fn
-        self.agent_feature_fn=agent_feature_fn
+        self.host_feature_fn = host_feature_fn
+        self.agent_feature_fn = agent_feature_fn
 
         if not self.use_cuda:
             jax.config.update("jax_platform_name", "cpu")
         self.default_backend = jax.default_backend()
         self.device_num = len(jax.devices())
 
-        eval_batch_size, max_num_points, dimension = self.eval_batch_size, self.max_num_points, self.dimension
+        _, max_num_points, dimension = self.eval_batch_size, self.max_num_points, self.dimension
         self.input_dim = {"host": max_num_points * dimension, "agent": max_num_points * dimension + dimension}
         self.output_dim = {"host": 2 ** dimension - dimension - 1, "agent": dimension}
         sim_keys = {}
