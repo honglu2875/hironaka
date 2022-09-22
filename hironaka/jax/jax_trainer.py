@@ -153,7 +153,6 @@ class JAXTrainer:
 
             self.update_policy_fn(role)
 
-
         if self.config["tensorboard"]["use"]:
             self.log_string = (
                 f"{self.config['version_string']}_{datetime.now().year}_{datetime.now().month}"
