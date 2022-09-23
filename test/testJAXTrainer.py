@@ -1,5 +1,7 @@
+import logging
 import os
 import pathlib
+import sys
 import unittest
 from functools import partial
 
@@ -340,3 +342,8 @@ class TestJAXTrainer(unittest.TestCase):
         self.trainer.eval_batch_size = orig_size
         self.trainer.update_fns('host')
         self.trainer.update_fns('agent')
+
+    def test_validate(self):
+        self.trainer.logger.setLevel(logging.INFO)
+        self.trainer.logger.addHandler(logging.StreamHandler(sys.stdout))
+        self.trainer.validate()

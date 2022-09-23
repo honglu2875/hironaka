@@ -36,7 +36,7 @@ def get_done_from_flatten(obs: jnp.ndarray, role: str, dimension: int) -> jnp.nd
     return jnp.sum(obs >= 0, axis=-1) <= dimension + (role == "agent") * (2**dimension - dimension - 1)
 
 
-@functools.lru_cache
+@functools.lru_cache()
 def get_preprocess_fns(role: str, spec: Tuple[int, int]) -> Tuple[Callable, Callable]:
     """
     Parameters:
@@ -76,7 +76,7 @@ def get_preprocess_fns(role: str, spec: Tuple[int, int]) -> Tuple[Callable, Call
     return jit(obs_preprocess), jit(coords_preprocess)
 
 
-@functools.lru_cache
+@functools.lru_cache()
 def get_take_actions(role: str, spec: Tuple[int, int], rescale_points: bool = True) -> Callable:
     """
     Factory function that returns a `take_actions` function to perform observation update depending on the current role.
@@ -118,7 +118,7 @@ def get_take_actions(role: str, spec: Tuple[int, int], rescale_points: bool = Tr
     return take_actions
 
 
-@functools.lru_cache
+@functools.lru_cache()
 def get_reward_fn(role: str) -> Callable:
     """
     Parameters:
@@ -142,7 +142,7 @@ def get_reward_fn(role: str) -> Callable:
     return reward_fn
 
 
-@functools.lru_cache
+@functools.lru_cache()
 def get_feature_fn(role: str, spec: Tuple) -> Callable:
     """
     Get the feature function on (possibly flattened) observations.
@@ -327,7 +327,7 @@ def decode(cls: int, lookup_dict: jnp.ndarray) -> jnp.ndarray:
     return lookup_dict[cls]
 
 
-@functools.lru_cache
+@functools.lru_cache()
 def get_batch_decode(dimension: int) -> Callable:
     """
     The factory function of getting a batch decoder function with given dimension.
@@ -337,7 +337,7 @@ def get_batch_decode(dimension: int) -> Callable:
     return vmap(partial(decode, lookup_dict=dec_table[dimension]), 0, 0)
 
 
-@functools.lru_cache
+@functools.lru_cache()
 def get_batch_decode_from_one_hot(dimension: int) -> Callable:
     """
     The factory function of getting a batch decoder (from one-hot vectors) function with given dimension.

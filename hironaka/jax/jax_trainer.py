@@ -447,7 +447,7 @@ class JAXTrainer:
                     collect_host_actions.append(np.array(jnp.ravel(np.argmax(host_action, axis=-1))))
                     collect_agent_actions.append(np.array(jnp.ravel(axis)))
 
-            details[max_length - 1] += batch_size - done
+            details[max_length - 1] += batch_size * self.device_num - done
 
             if write_tensorboard:
                 self.summary_writer.add_histogram(
