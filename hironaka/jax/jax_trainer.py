@@ -179,7 +179,7 @@ class JAXTrainer:
 
         self.host_opponent_policy, self.agent_opponent_policy = None, None
         # Used in caching the lists of host and agent policy functions
-        self.hosts_agents_for_validation = {}
+        self.cached_hosts_agents_for_validation = {}
         # Used in self.simulate, only when mcts policy is used. Sometimes we want to use old compiled functions
         # ignoring the fact that they contain old parameters to avoid compilation overhead.
         self._cached_sim_fn = {}
@@ -340,7 +340,7 @@ class JAXTrainer:
         max_length = self.max_length_game if max_length is None else max_length
         metric_fn = self.compute_rho if metric_fn is None else metric_fn
 
-        hosts, agents = self.get_hosts_agents_for_validation(batch_size)
+        hosts, agents = self.get_cached_hosts_agents_for_validation(batch_size)
 
         # Pit host network against all and agent network against the rest.
         battle_schedule = [(0, i) for i in range(len(agents))] + [(i, 0) for i in range(1, len(hosts))]
@@ -430,7 +430,7 @@ class JAXTrainer:
             for step in range(max_length - 1):
                 keys = jax.random.split(key, num=2 * self.device_num + 1)
                 key = keys[0]
-                host_keys = keys[1 : self.device_num + 1]
+                host_keys = keys[1: self.device_num + 1]
                 agent_keys = keys[self.device_num + 1:]
 
                 details[step] += done - prev_done
@@ -605,7 +605,7 @@ class JAXTrainer:
             setattr(self, f"{role}_state", state)
         return state
 
-    def get_hosts_agents_for_validation(self, batch_size: int, force_update=False):
+    def get_cached_hosts_agents_for_validation(self, batch_size: int, force_update=False):
         """
         Get a set of host functions and a set of agent functions. They are policies of different strategies and will
             be used to fight against each other. We cache those functions after the first access.
@@ -615,10 +615,10 @@ class JAXTrainer:
         Returns:
             a list of host functions and a list of agent functions.
         """
-        if batch_size not in self.hosts_agents_for_validation or force_update:
+        if batch_size not in self.cached_hosts_agents_for_validation or force_update:
             spec = (self.max_num_points, self.dimension)
-            host_fn = action_wrapper(partial(jax.pmap(self.host_policy_fn), params=self.host_state.params), None)
-            agent_fn = action_wrapper(partial(jax.pmap(self.agent_policy_fn), params=self.agent_state.params), None)
+            host_fn_before_wrapper = jax.pmap(self.host_policy_fn)
+            agent_fn_before_wrapper = jax.pmap(self.agent_policy_fn)
 
             def expose_name(func):
                 if hasattr(func, "func"):
@@ -626,20 +626,23 @@ class JAXTrainer:
                 return func
 
             hosts = [
-                host_fn,
+                host_fn_before_wrapper,
                 jax.pmap(get_host_with_flattened_obs(spec, random_host_fn)),
                 jax.pmap(get_host_with_flattened_obs(spec, zeillinger_fn)),
                 jax.pmap(get_host_with_flattened_obs(spec, all_coord_host_fn)),
             ]
             agents = [
-                agent_fn,
+                agent_fn_before_wrapper,
                 jax.pmap(expose_name(partial(random_agent_fn, spec=spec))),
                 jax.pmap(expose_name(partial(choose_first_agent_fn, spec=spec))),
                 jax.pmap(expose_name(partial(choose_last_agent_fn, spec=spec))),
             ]
-            self.hosts_agents_for_validation[batch_size] = hosts, agents
+            self.cached_hosts_agents_for_validation[batch_size] = hosts, agents
 
-        return self.hosts_agents_for_validation[batch_size]
+        _cached_hosts, _cached_agents = self.cached_hosts_agents_for_validation[batch_size]
+        hosts = [action_wrapper(partial(_cached_hosts[0], params=self.host_state.params), None), *_cached_hosts[1:]]
+        agents = [action_wrapper(partial(_cached_agents[0], params=self.agent_state.params), None), *_cached_agents[1:]]
+        return hosts, agents
 
     # ---------- Below are either static methods or methods that set its members ---------- #
 

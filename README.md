@@ -79,7 +79,6 @@ There are 3 ways to start training:
   
     key, subkey = jax.random.split(key)
     trainer.train(subkey, role, 50, rollout, random_sampling=True, mask=mask)
-
     ```
 - When you are here in the project folder and `requirements.txt` are met (or create a venv and
   run `pip install -r requirements.txt`), try the following:
