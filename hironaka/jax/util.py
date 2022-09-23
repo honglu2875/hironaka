@@ -229,7 +229,7 @@ def mcts_wrapper(eval_loop: Callable) -> Callable:
     """
     def mcts_wrapped_policy(x: jnp.ndarray, params: FrozenDict, opp_params: FrozenDict, key: jnp.ndarray) -> jnp.ndarray:
         policy_output = eval_loop(key, x, (params,), (opp_params,))
-        return policy_output.action_weights, policy_output.search_tree.node_values[:, 0]
+        return jnp.log(policy_output.action_weights), policy_output.search_tree.node_values[:, 0]
     return mcts_wrapped_policy
 
 

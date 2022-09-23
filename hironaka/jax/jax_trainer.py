@@ -41,7 +41,7 @@ from hironaka.jax.util import (
     get_reward_fn,
     get_take_actions,
     make_agent_obs,
-    policy_value_loss, mcts_wrapper,
+    policy_value_loss, mcts_wrapper, get_feature_fn,
 )
 from jax import pmap
 
@@ -295,8 +295,8 @@ class JAXTrainer:
                 )
 
             sample = p_get_index(rollouts, sample_idx)
-
-            state, loss, grad = p_train_loop(state, sample, self.loss_fn, self.max_grad_norm)
+            apply_fn = self.get_apply_fn(role)
+            state, loss, grad = p_train_loop(state, sample, apply_fn, self.loss_fn, self.max_grad_norm)
 
             # Tensorboard logging
             if self.config["tensorboard"]["use"]:
@@ -569,6 +569,23 @@ class JAXTrainer:
     def get_sim_fn(self, role: str) -> Callable:
         return self.get_fns(role, "sim_fn")
 
+    def get_apply_fn(self, role: str) -> Callable:
+        """
+        Get the apply function that evaluates an input with given parameters using a neural net.
+        This is the raw version of neural net inference without any postprocessing and masking. It is used in
+            self.train.
+        """
+        if getattr(self, f"{role}_apply_fn", None) is None:
+            model = getattr(self, f"{role}_model")
+            feature_fn = getattr(self, f"{role}_feature_fn")
+            feature_fn = get_feature_fn(role, (self.max_num_points, self.dimension)) if feature_fn is None else feature_fn
+
+            def apply_fn(x, param, **kwargs):
+                return model.apply(param, feature_fn(x))
+
+            setattr(self, f"{role}_apply_fn", apply_fn)
+        return getattr(self, f"{role}_apply_fn")
+
     def get_state(self, role: str, key=None) -> TrainState:
         """
         TrainState is a pytree object. In our case, the tensors inside are already SharedDeviceArray where the first
@@ -733,11 +750,11 @@ class JAXTrainer:
             raise ValueError(f"role must be either host or agent. Got {role}.")
 
 
-@partial(pmap, axis_name="d", static_broadcasted_argnums=(2, 3))
+@partial(pmap, axis_name="d", static_broadcasted_argnums=(2, 3, 4))
 def p_train_loop(
-    state: TrainState, sample: jnp.ndarray, loss_fn: Callable, max_grad=1
+    state: TrainState, sample: jnp.ndarray, apply_fn: Callable, loss_fn: Callable, max_grad=1
 ) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    loss, grad = jax.value_and_grad(partial(compute_loss, loss_fn=loss_fn))(state.params, state.apply_fn, sample)
+    loss, grad = jax.value_and_grad(partial(compute_loss, loss_fn=loss_fn))(state.params, apply_fn, sample)
     grads = jax.tree_util.tree_map(partial(jnp.clip, a_max=max_grad), grad)
 
     loss, grad = jax.lax.pmean(loss, "d"), jax.lax.pmean(grad, "d")
