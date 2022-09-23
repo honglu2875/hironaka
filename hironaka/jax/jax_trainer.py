@@ -184,7 +184,7 @@ class JAXTrainer:
         # ignoring the fact that they contain old parameters to avoid compilation overhead.
         self._cached_sim_fn = {}
 
-    def simulate(self, key: jnp.ndarray, role: str, use_mcts_policy=False, use_cached_sim_fn=False) -> RollOut:
+    def simulate(self, key: jnp.ndarray, role: str, use_mcts_policy=False) -> RollOut:
         """
         Performing a simulation. The core is nothing but calling `{role}_sim_fn`
         Parameters:
@@ -200,20 +200,7 @@ class JAXTrainer:
             obs, target_policy, target_value
         """
         if use_mcts_policy:
-            if not use_cached_sim_fn:
-                opponent = self._get_opponent(role)
-                # Freeze the opponent parameters for the opponent's policy function (the invisible opponent moves which
-                #   is combined into every state transition).
-                # This could cause some cross-device sync overhead as we squash parameters into one DeviceArray.
-                policy_fn = self.get_policy_fn(role)
-                opp_policy_fn = partial(getattr(self, f"{opponent}_mcts_policy_fn"),
-                                        opp_params=flax.jax_utils.unreplicate(self.get_state(role).params))
-                _, sim_fn, _ = self.update_eval_sim_and_mcts_policy(role,
-                                                                    policy_fn,
-                                                                    opp_policy_fn,
-                                                                    return_function=True)
-                self._cached_sim_fn[role] = sim_fn
-            sim_fn = self._cached_sim_fn[role]
+            sim_fn = self.get_mcts_sim_fn(role)
         else:
             sim_fn = self.get_sim_fn(role)
         opponent = self._get_opponent(role)
@@ -248,7 +235,7 @@ class JAXTrainer:
         keys = jax.random.split(keys[0], num=self.device_num + 1)
 
         simulate_output = pmap(sim_fn)(
-            keys[1:], root_state, (role_train_state.params,), (opp_train_state.params,), invalid_action
+            keys[1:], root_state, (role_train_state.params,), (opp_train_state.params, role_train_state.params,), invalid_action
         )
         return pmap(self.rollout_postprocess, static_broadcasted_argnums=1)(simulate_output, role)
 
@@ -587,6 +574,20 @@ class JAXTrainer:
 
             setattr(self, f"{role}_apply_fn", apply_fn)
         return getattr(self, f"{role}_apply_fn")
+
+    def get_mcts_sim_fn(self, role: str) -> Callable:
+        if getattr(self, f"{role}_mcts_sim_fn", None) is None:
+            opponent = self._get_opponent(role)
+            policy_fn = self.get_policy_fn(role)
+            opp_policy_fn = getattr(self, f"{opponent}_mcts_policy_fn")
+            _, sim_fn, _ = self.update_eval_sim_and_mcts_policy(role,
+                                                                policy_fn,
+                                                                opp_policy_fn,
+                                                                return_function=True)
+
+            setattr(self, f"{role}_mcts_sim_fn", sim_fn)
+
+        return getattr(self, f"{role}_mcts_sim_fn")
 
     def get_state(self, role: str, key=None) -> TrainState:
         """

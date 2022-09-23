@@ -91,7 +91,7 @@ def get_apply_fn(role: str, model: nn.Module, spec: Tuple[int, int], feature_fn=
     if feature_fn is None:
         feature_fn = get_feature_fn(role, spec)
 
-    def apply_fn(x: jnp.ndarray, params, **kwargs) -> Tuple[jnp.ndarray, jnp.ndarray]:
+    def apply_fn(x: jnp.ndarray, params, *args, **kwargs) -> Tuple[jnp.ndarray, jnp.ndarray]:
         policy_prior, value_prior = model.apply(params, feature_fn(x))
         return policy_prior, value_prior.squeeze(-1)
 
