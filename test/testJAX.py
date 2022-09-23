@@ -295,7 +295,7 @@ class TestJAX(unittest.TestCase):
         agent_policy = get_apply_fn("agent", nnet, spec)
         reward_fn = get_reward_fn("agent")
 
-        def zeillinger_fn_flatten(obs):
+        def zeillinger_fn_flatten(obs, **_):
             return zeillinger_fn(obs_preprocess(obs))
 
         recurrent_fn = get_recurrent_fn_for_role(

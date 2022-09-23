@@ -33,6 +33,7 @@ from hironaka.jax.util import (
     calculate_value_using_reward_fn,
     compute_loss,
     flatten,
+    clip_log,
     generate_pts,
     get_batch_decode_from_one_hot,
     get_done_from_flatten,
@@ -123,6 +124,7 @@ class JAXTrainer:
             "version_string",
             "net_type",
             "num_evaluations",
+            "num_evaluations_as_opponent",
             "eval_on_cpu",
             "max_num_considered_actions",
             "discount",
@@ -498,7 +500,7 @@ class JAXTrainer:
         value = jnp.ravel(value).astype(value_dtype)
 
         obs = obs.reshape((-1, obs.shape[2]))
-        policy = policy.reshape((-1, policy.shape[2]))
+        policy = clip_log(policy).reshape((-1, policy.shape[2]))
 
         return obs, policy, value
 
@@ -654,7 +656,7 @@ class JAXTrainer:
                                         jitted=False,
                                         return_function=False) -> Any:
         """
-        Update `{role}_eval_loop`, `{role}_sim_fn`, and `{role}_mcts_policy_fn`.
+        Update `{role}_eval_loop`, '{role}_eval_loop_as_opp', `{role}_sim_fn`, and `{role}_mcts_policy_fn`.
         Parameters:
             role: host or agent.
             policy_fn: (Optional) the policy function used to generate simulations.
@@ -662,7 +664,7 @@ class JAXTrainer:
             jitted: (Optional) whether to jit the functions. (Might deprecate soon)
             return_function: (Optional) if true, return the functions.
         Returns:
-            If return_function is true, return the tuple of all three functions.
+            If return_function is true, return the tuple of all four functions.
             Otherwise, nothing.
         """
         opponent = self._get_opponent(role)
@@ -679,24 +681,35 @@ class JAXTrainer:
         policy_fn = getattr(self, f"{role}_policy_fn") if policy_fn is None else policy_fn
         opp_policy_fn = getattr(self, f"{opponent}_policy_fn") if opp_policy_fn is None else opp_policy_fn
 
+        config = {
+            'spec': (self.max_num_points, self.dimension),
+            'max_depth': self.max_length_game,
+            'max_num_considered_actions': self.max_num_considered_actions,
+            'discount': self.discount,
+            'rescale_points': self.scale_observation,
+            'dtype': self.dtype
+        }
         eval_loop = get_evaluation_loop(
             role,
             policy_fn,  # output policy logits and value estimates
             action_wrapper(opp_policy_fn, None),  # output definitive actions as one-hot array
             getattr(self, f"{role}_reward_fn"),
-            spec=(self.max_num_points, self.dimension),
             num_evaluations=self.num_evaluations,
-            max_depth=self.max_length_game,
-            max_num_considered_actions=self.max_num_considered_actions,
-            discount=self.discount,
-            rescale_points=self.scale_observation,
-            dtype=self.dtype,
+            **config
+        )
+        eval_loop_as_opp = get_evaluation_loop(
+            role,
+            policy_fn,  # output policy logits and value estimates
+            action_wrapper(opp_policy_fn, None),  # output definitive actions as one-hot array
+            getattr(self, f"{role}_reward_fn"),
+            num_evaluations=self.num_evaluations_as_opponent,
+            **config
         )
         sim_fn = maybe_jit(
             get_simulation(role, eval_loop, config=simulation_config, dtype=self.dtype),
             backend="cpu" if self.eval_on_cpu or not self.use_cuda else jax.default_backend(),
         )
-        mcts_policy_fn = mcts_wrapper(eval_loop)
+        mcts_policy_fn = mcts_wrapper(eval_loop_as_opp)
         if role == 'agent':
             mcts_policy_fn = apply_agent_action_mask(mcts_policy_fn, self.dimension)
 
@@ -704,6 +717,7 @@ class JAXTrainer:
             return eval_loop, sim_fn, mcts_policy_fn
         else:
             setattr(self, f"{role}_eval_loop", eval_loop)
+            setattr(self, f"{role}_eval_loop_as_opp", eval_loop_as_opp)
             setattr(self, f"{role}_sim_fn", sim_fn)
             setattr(self, f"{role}_mcts_policy_fn", mcts_policy_fn)
 

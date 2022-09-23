@@ -229,7 +229,7 @@ def mcts_wrapper(eval_loop: Callable) -> Callable:
     """
     def mcts_wrapped_policy(x: jnp.ndarray, params: FrozenDict, opp_params: FrozenDict, key: jnp.ndarray) -> jnp.ndarray:
         policy_output = eval_loop(key, x, (params,), (opp_params,))
-        return jnp.log(policy_output.action_weights), policy_output.search_tree.node_values[:, 0]
+        return clip_log(policy_output.action_weights), policy_output.search_tree.node_values[:, 0]
     return mcts_wrapped_policy
 
 
@@ -375,7 +375,7 @@ batch_encode = vmap(encode, 0, 0)
 batch_encode_one_hot = vmap(encode_one_hot, 0, 0)
 
 
-# ---------- Loss functions ---------- #
+# ---------- Loss functions and function helpers ---------- #
 
 
 def compute_loss(params, apply_fn, sample, loss_fn) -> jnp.ndarray:
@@ -400,3 +400,7 @@ def generate_pts(key: jnp.ndarray, shape: Tuple, max_value: int, dtype=jnp.float
     pts = jax.random.randint(key, shape, 0, max_value).astype(dtype)
     pts = jnp.where(rescale, rescale_jax(get_newton_polytope_jax(pts)), get_newton_polytope_jax(pts))
     return pts
+
+
+def clip_log(x: jnp.ndarray, a_min=1e-8) -> jnp.ndarray:
+    return jnp.log(jnp.clip(x, a_min=a_min))
