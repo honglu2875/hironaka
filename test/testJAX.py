@@ -287,7 +287,7 @@ class TestJAX(unittest.TestCase):
         recurrent_fn = get_recurrent_fn_for_role(
             "host", host_policy, partial(choose_first_agent_fn, spec=spec), reward_fn, spec, dtype=jnp.float32
         )
-        print(recurrent_fn(((parameters,), ()), None, host_actions, host_obs))
+        print(recurrent_fn(((parameters,), ()), key, host_actions, host_obs))
         # Test agent `recurrent_fn`
         obs_preprocess, coords_preprocess = get_preprocess_fns("host", spec)
         nnet = DResNet18(3)
@@ -301,7 +301,7 @@ class TestJAX(unittest.TestCase):
         recurrent_fn = get_recurrent_fn_for_role(
             "agent", agent_policy, zeillinger_fn_flatten, reward_fn, spec, dtype=jnp.float32
         )
-        print(recurrent_fn(((parameters,), ()), None, agent_actions, agent_obs))
+        print(recurrent_fn(((parameters,), ()), key, agent_actions, agent_obs))
 
     def test_mcts_search(self):
         key = jax.random.PRNGKey(42)
@@ -355,7 +355,7 @@ class TestJAX(unittest.TestCase):
         obs_preprocess, coords_preprocess = get_preprocess_fns("host", spec)
         reward_fn = get_reward_fn("agent")
 
-        def zeillinger_fn_flatten(obs):
+        def zeillinger_fn_flatten(obs, **_):
             return zeillinger_fn(obs_preprocess(obs))
 
         recurrent_fn = get_recurrent_fn_for_role(
