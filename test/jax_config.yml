@@ -16,7 +16,7 @@ max_length_game: 20
 max_value: 20
 max_grad_norm: 1
 
-eval_batch_size: 1000
+eval_batch_size: 100
 num_evaluations: 10
 num_evaluations_as_opponent: 5
 eval_on_cpu: false

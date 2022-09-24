@@ -194,8 +194,6 @@ class JAXTrainer:
                 - Note that this is the real key of AlphaZero style MCTS. But we default to False first as the resource
                     consumption is massive for every simulation. If one only uses policy network output, the result
                     is in fact pretty good. It is worth to compare or mix the two ways.
-            use_cached_sim_fn: (Optional) effective only when use_mcts_policy is True. It uses a cached version
-                of simulation function which might contain old weights of networks.
         Returns:
             obs, target_policy, target_value
         """

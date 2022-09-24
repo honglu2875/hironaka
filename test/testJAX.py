@@ -426,7 +426,7 @@ class TestJAX(unittest.TestCase):
             discount=0.99,
             rescale_points=True,
         )
-
+        #jax.config.update('jax_disable_jit', True)
         pkey = jax.random.split(key, num=len(jax.devices()))
         root_state = generate_pts(pkey, (batch_size, max_num_points, dimension), config["max_value"], jnp.float32, True)
         sim = get_simulation("host", eval_loop, config=config, dtype=jnp.float32)
