@@ -460,8 +460,3 @@ class TestJAX(unittest.TestCase):
             flatten(get_newton_polytope_jax(
                 shift_jax(host_obs, agent_obs["coords"], jnp.ones(2, dtype=jnp.float32)))) == out
         )
-
-    def test_illegal_action(self):
-        # There is supposed to be an assert statement in shift, and we test it here:
-        with self.assertRaises(jax._src.errors.ConcretizationTypeError) as context:
-            shift_jax(jnp.array([[[1, 2, 3], [2, 3, 4], [-1, -1, -1]]]), jnp.array([[0, 1, 1]]), jnp.array([0]))
