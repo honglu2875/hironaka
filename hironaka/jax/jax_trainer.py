@@ -542,7 +542,7 @@ class JAXTrainer:
                 setattr(self, f"{role}_state", state)
                 self.update_fns(role)
 
-    # ---------- Below are getter functions for functions that are cached inside the class after first call ---------- #
+    # ---------- Below are getter functions that require caching after their first calls ---------- #
 
     def get_fns(self, role: str, name: str) -> Callable:
         if not hasattr(self, f"{role}_{name}") or getattr(self, f"{role}_{name}") is None:

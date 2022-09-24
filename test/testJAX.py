@@ -266,7 +266,8 @@ class TestJAX(unittest.TestCase):
     def test_recurrent_fn(self):
         spec = (4, 3)
         host_obs = (
-            jnp.array([[[1, 2, 3], [2, 3, 4], [0, 9, 0], [-1, -1, -1]], [[4, 2, 2], [-1, -1, -1], [0, 0, 1], [-1, -1, -1]]])
+            jnp.array(
+                [[[1, 2, 3], [2, 3, 4], [0, 9, 0], [-1, -1, -1]], [[4, 2, 2], [-1, -1, -1], [0, 0, 1], [-1, -1, -1]]])
             .reshape(-1, spec[0] * spec[1])
             .astype(jnp.float32)
         )
@@ -315,7 +316,7 @@ class TestJAX(unittest.TestCase):
         )
 
         # host
-        action_dim = 2**dimension - dimension - 1
+        action_dim = 2 ** dimension - dimension - 1
         nnet = DResNetMini(action_dim)
         parameters = nnet.init(key, jnp.ones((1, 4 * 3)))
         host_policy = get_apply_fn("host", nnet, spec)
@@ -407,7 +408,7 @@ class TestJAX(unittest.TestCase):
             "scale_observation": True,
         }
 
-        action_dim = 2**dimension - dimension - 1
+        action_dim = 2 ** dimension - dimension - 1
         nnet = DResNetMini(action_dim)
         parameters = flax.jax_utils.replicate(nnet.init(key, jnp.ones((1, 10 * 3))))
         host_policy = get_apply_fn("host", nnet, spec)
@@ -447,7 +448,8 @@ class TestJAX(unittest.TestCase):
         out = take_actions(host_obs.reshape(2, -1), agent_obs["coords"], jnp.ones(2, dtype=jnp.float32))
         assert jnp.all(
             flatten(
-                rescale_jax(get_newton_polytope_jax(shift_jax(host_obs, agent_obs["coords"], jnp.ones(2, dtype=jnp.float32))))
+                rescale_jax(
+                    get_newton_polytope_jax(shift_jax(host_obs, agent_obs["coords"], jnp.ones(2, dtype=jnp.float32))))
             )
             == out
         )
@@ -455,5 +457,11 @@ class TestJAX(unittest.TestCase):
         take_actions = get_take_actions("agent", (4, 3), rescale_points=False)
         out = take_actions(combined, jnp.ones(2, dtype=jnp.float32), jnp.ones(2, dtype=jnp.float32))
         assert jnp.all(
-            flatten(get_newton_polytope_jax(shift_jax(host_obs, agent_obs["coords"], jnp.ones(2, dtype=jnp.float32)))) == out
+            flatten(get_newton_polytope_jax(
+                shift_jax(host_obs, agent_obs["coords"], jnp.ones(2, dtype=jnp.float32)))) == out
         )
+
+    def test_illegal_action(self):
+        # There is supposed to be an assert statement in shift, and we test it here:
+        with self.assertRaises(jax._src.errors.ConcretizationTypeError) as context:
+            shift_jax(jnp.array([[[1, 2, 3], [2, 3, 4], [-1, -1, -1]]]), jnp.array([[0, 1, 1]]), jnp.array([0]))

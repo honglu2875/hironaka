@@ -1,5 +1,6 @@
 from functools import partial
 
+import chex
 import jax.numpy as jnp
 from jax import lax, vmap
 
@@ -73,9 +74,11 @@ def get_newton_polytope_jax(points: jnp.ndarray, padding_value: float = -1.0):
 
 
 def shift_single_batch(points_slice: jnp.ndarray, coord_slice: jnp.ndarray, axis_slice: int) -> jnp.ndarray:
-    max_num_points, dimension = points_slice.shape
+    _, dimension = points_slice.shape
     dtype = points_slice.dtype
     axis_binary = jnp.arange(dimension) == axis_slice
+    # Make sure there is no illegal actions such as coord: [0, 1, 1], and axis 0 (with axis_binary=[1, 0, 0])
+    chex.assert_equal(jnp.all(coord_slice >= axis_binary), True)
     # Get the raw computation of linear transformation
     return mul_kronecker(
         jnp.sum(mul_2_1(points_slice, coord_slice.astype(dtype)), axis=1), axis_binary.astype(dtype)
