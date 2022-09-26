@@ -337,7 +337,6 @@ class JAXTrainer:
                         self.logger.info(f"Rhos:\n{rhos}\nGame length histogram:\n{details}")
                     self.summary_writer.flush()  # Force writing to file after each validation.
 
-
     def validate(
         self,
         metric_fn: Optional[Callable] = None,
@@ -515,7 +514,7 @@ class JAXTrainer:
         value = jnp.ravel(value).astype(value_dtype)
 
         obs = obs.reshape((-1, obs.shape[2]))
-        policy = clip_log(policy).reshape((-1, policy.shape[2]))
+        policy = policy.reshape((-1, policy.shape[2]))
 
         return obs, policy, value
 

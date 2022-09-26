@@ -182,7 +182,7 @@ def get_simulation(role: str, evaluation_loop: Callable, config: dict, dtype=jnp
             0, num_loops, body_fn, (starting_keys, (rollout_obs_init, rollout_policy_init, rollout_value_init), root_state)
         )
 
-        return rollouts[0], rollouts[1], rollouts[2]
+        return rollouts[0], jnp.log(rollouts[1]), rollouts[2]
     """
     if hasattr(evaluation_loop, 'role_agnostic') and evaluation_loop.role_agnostic:
         # Apply masks across policy logits if
