@@ -31,22 +31,52 @@ from hironaka.jax.util import (
     action_wrapper,
     apply_agent_action_mask,
     calculate_value_using_reward_fn,
-    compute_loss,
     flatten,
-    clip_log,
     generate_pts,
-    get_batch_decode_from_one_hot,
     get_done_from_flatten,
     get_dones,
     get_name,
     get_reward_fn,
     get_take_actions,
     make_agent_obs,
-    policy_value_loss, mcts_wrapper, get_feature_fn,
+    mcts_wrapper, get_feature_fn,
 )
+from hironaka.jax.host_action_preprocess import get_batch_decode_from_one_hot
+from hironaka.jax.loss import compute_loss, policy_value_loss, clip_log
 from jax import pmap
 
 RollOut = Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]
+
+
+# A helper function that selects the indices of the 3-item tuple
+#   (used in the selection of training data of the (observation, policy, value)-tuple)
+p_get_index = pmap(lambda x, y: (x[0][y, :], x[1][y, :], x[2][y]))
+
+
+@partial(pmap, axis_name="d", static_broadcasted_argnums=(2, 3, 4))
+def p_train_loop(
+    state: TrainState, sample: jnp.ndarray, apply_fn: Callable, loss_fn: Callable, max_grad=1
+) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    """
+    A pmap compiled training loop. Note that the last 3 arguments are statically broadcasted, and the first two are
+        already spread to each device.
+    Parameters:
+        state: the TrainState object including the parameters and the optimizer. Entries copied to each device.
+        sample: the self-play samples. (observation, policy, value), pmapped on each element.
+        apply_fn: the apply function of the network. Will apply parameters in `state` on `sample`.
+        loss_fn: the loss function.
+        max_grad: maximum norm of a gradient. Used in clipping.
+    Returns:
+        (new_state, loss, grads)
+    """
+    loss, grad = jax.value_and_grad(partial(compute_loss, loss_fn=loss_fn))(state.params, apply_fn, sample)
+    grads = jax.tree_util.tree_map(partial(jnp.clip, a_max=max_grad), grad)
+    # Use pmean to sync loss and grad on each device.
+    loss, grad = jax.lax.pmean(loss, "d"), jax.lax.pmean(grad, "d")
+    # Simultaneously update parameters on each device by the same gradient. In some cases slightly better than reducing
+    #   gradient to one device, calculate, and then broadcast again.
+    state = state.apply_gradients(grads=grad)
+    return state, loss, grads
 
 
 class JAXTrainer:
@@ -78,7 +108,6 @@ class JAXTrainer:
     max_value: int
     max_grad_norm: float
     scale_observation: bool
-
     # If use_cuda is True, we try to map to all available GPUs.
     use_cuda: bool
 
@@ -222,18 +251,18 @@ class JAXTrainer:
             batch_decode_from_one_hot = get_batch_decode_from_one_hot(self.dimension)
             coordinate_mask = pmap(batch_decode_from_one_hot)(coords)
             root_state = jnp.concatenate([pmap(flatten)(root_state), coordinate_mask], axis=-1)
-            invalid_action = ~coordinate_mask.astype(bool)
+            #invalid_action = ~coordinate_mask.astype(bool)
         elif role == "host":
             # Host observations are merely flattened arrays
             root_state = pmap(flatten)(root_state)
-            invalid_action = None
+            #invalid_action = None
         else:
             raise ValueError(f"role must be either host or agent. Got {role}.")
 
         keys = jax.random.split(keys[0], num=self.device_num + 1)
 
         simulate_output = pmap(sim_fn)(
-            keys[1:], root_state, (role_train_state.params,), (opp_train_state.params, role_train_state.params,), invalid_action
+            keys[1:], root_state, (role_train_state.params,), (opp_train_state.params, role_train_state.params,)#, invalid_action
         )
         return pmap(self.rollout_postprocess, static_broadcasted_argnums=1)(simulate_output, role)
 
@@ -285,6 +314,9 @@ class JAXTrainer:
             apply_fn = self.get_apply_fn(role)
             state, loss, grad = p_train_loop(state, sample, apply_fn, self.loss_fn, self.max_grad_norm)
 
+            # Save the state
+            setattr(self, f"{role}_state", state)
+
             # Tensorboard logging
             if self.config["tensorboard"]["use"]:
                 if state.step[0] % self.config["tensorboard"]["log_interval"] == 0:
@@ -305,8 +337,6 @@ class JAXTrainer:
                         self.logger.info(f"Rhos:\n{rhos}\nGame length histogram:\n{details}")
                     self.summary_writer.flush()  # Force writing to file after each validation.
 
-        # Save the state
-        setattr(self, f"{role}_state", state)
 
     def validate(
         self,
@@ -764,20 +794,3 @@ class JAXTrainer:
             return "host"
         else:
             raise ValueError(f"role must be either host or agent. Got {role}.")
-
-
-@partial(pmap, axis_name="d", static_broadcasted_argnums=(2, 3, 4))
-def p_train_loop(
-    state: TrainState, sample: jnp.ndarray, apply_fn: Callable, loss_fn: Callable, max_grad=1
-) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    loss, grad = jax.value_and_grad(partial(compute_loss, loss_fn=loss_fn))(state.params, apply_fn, sample)
-    grads = jax.tree_util.tree_map(partial(jnp.clip, a_max=max_grad), grad)
-
-    loss, grad = jax.lax.pmean(loss, "d"), jax.lax.pmean(grad, "d")
-    state = state.apply_gradients(grads=grad)
-    return state, loss, grads
-
-
-# A helper function that selects the indices of the 3-item tuple
-#   (used in the selection of training data of the (observation, policy, value)-tuple)
-p_get_index = pmap(lambda x, y: (x[0][y, :], x[1][y, :], x[2][y]))

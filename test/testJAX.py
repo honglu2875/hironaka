@@ -6,9 +6,10 @@ import mctx
 
 import jax
 import jax.numpy as jnp
+from flax.jax_utils import replicate, unreplicate
 from hironaka.core import JAXPoints
 from hironaka.jax import JAXTrainer
-from hironaka.jax.net import DResNet18, DResNetMini, get_apply_fn
+from hironaka.jax.net import DResNetMini, get_apply_fn
 from hironaka.jax.players import (
     all_coord_host_fn,
     choose_first_agent_fn,
@@ -16,25 +17,23 @@ from hironaka.jax.players import (
     random_agent_fn,
     random_host_fn,
     zeillinger_fn,
-    zeillinger_fn_slice,
+    zeillinger_fn_slice, get_host_with_flattened_obs,
 )
-from hironaka.jax.recurrent_fn import get_recurrent_fn_for_role
+from hironaka.jax.recurrent_fn import get_recurrent_fn_for_role, get_unified_recurrent_fn
 from hironaka.jax.simulation_fn import get_evaluation_loop, get_simulation
 from hironaka.jax.util import (
     apply_agent_action_mask,
-    batch_encode,
-    batch_encode_one_hot,
-    decode_table,
     flatten,
     generate_pts,
-    get_batch_decode,
-    get_batch_decode_from_one_hot,
     get_feature_fn,
     get_preprocess_fns,
     get_reward_fn,
     get_take_actions,
     make_agent_obs,
+    rollout_sanity_tests
 )
+from hironaka.jax.host_action_preprocess import decode_table, get_batch_decode, get_batch_decode_from_one_hot, \
+    batch_encode, batch_encode_one_hot
 from hironaka.src import get_newton_polytope_jax, reposition_jax, rescale_jax, shift_jax
 
 
@@ -271,7 +270,7 @@ class TestJAX(unittest.TestCase):
             .reshape(-1, spec[0] * spec[1])
             .astype(jnp.float32)
         )
-        host_actions = jnp.array([3, 4])
+        host_actions = jnp.array([2, 3])
         batch_decode = get_batch_decode(spec[1])
         agent_obs = make_agent_obs(host_obs, batch_decode(host_actions))
         agent_actions = jnp.array([1, 0], dtype=jnp.float32)
@@ -281,7 +280,7 @@ class TestJAX(unittest.TestCase):
 
         key = jax.random.PRNGKey(42)
         # Test host `recurrent_fn`
-        nnet = DResNet18(4)
+        nnet = DResNetMini(4)
         parameters = nnet.init(key, jnp.ones((1, 4 * 3)))
         host_policy = get_apply_fn("host", nnet, spec)
         reward_fn = get_reward_fn("host")
@@ -291,7 +290,7 @@ class TestJAX(unittest.TestCase):
         print(recurrent_fn(((parameters,), ()), key, host_actions, host_obs))
         # Test agent `recurrent_fn`
         obs_preprocess, coords_preprocess = get_preprocess_fns("host", spec)
-        nnet = DResNet18(3)
+        nnet = DResNetMini(3)
         parameters = nnet.init(key, jnp.ones((1, 4 * 3 + 3)))
         agent_policy = get_apply_fn("agent", nnet, spec)
         reward_fn = get_reward_fn("agent")
@@ -408,16 +407,20 @@ class TestJAX(unittest.TestCase):
             "scale_observation": True,
         }
 
-        action_dim = 2 ** dimension - dimension - 1
+        action_dim = dimension
         nnet = DResNetMini(action_dim)
-        parameters = flax.jax_utils.replicate(nnet.init(key, jnp.ones((1, 10 * 3))))
-        host_policy = get_apply_fn("host", nnet, spec)
-        reward_fn = get_reward_fn("host")
+        nnet_host = DResNetMini(2 ** dimension - dimension - 1)
+        parameters = flax.jax_utils.replicate(nnet.init(key, jnp.ones((1, 10 * 3 + 3))))
+        host_params = flax.jax_utils.replicate(nnet_host.init(key, jnp.ones((1, 10 * 3))))
+        agent_policy = apply_agent_action_mask(get_apply_fn("agent", nnet, spec), dimension)
+        host_policy = get_apply_fn("host", nnet_host, spec)
 
+        reward_fn = get_reward_fn("agent")
+        all_coord_flattened = get_host_with_flattened_obs(spec, all_coord_host_fn)
         eval_loop = get_evaluation_loop(
-            "host",
-            host_policy,
-            partial(choose_first_agent_fn, spec=spec),
+            "agent",
+            agent_policy,
+            partial(all_coord_flattened, spec=spec),
             reward_fn,
             spec=spec,
             num_evaluations=10,
@@ -426,11 +429,19 @@ class TestJAX(unittest.TestCase):
             discount=0.99,
             rescale_points=True,
         )
-        #jax.config.update('jax_disable_jit', True)
         pkey = jax.random.split(key, num=len(jax.devices()))
+
         root_state = generate_pts(pkey, (batch_size, max_num_points, dimension), config["max_value"], jnp.float32, True)
-        sim = get_simulation("host", eval_loop, config=config, dtype=jnp.float32)
-        jax.pmap(sim)(pkey, jax.pmap(flatten)(root_state), role_fn_args=(parameters,), opponent_fn_args=())
+        coords, _ = jax.pmap(host_policy)(replicate(root_state), host_params)
+        batch_decode_from_one_hot = get_batch_decode_from_one_hot(dimension)
+        coordinate_mask = jax.pmap(batch_decode_from_one_hot)(coords)
+        root_state = jnp.concatenate([jax.pmap(flatten)(root_state), coordinate_mask], axis=-1)
+
+        #jax.config.update('jax_disable_jit', True)
+        sim = get_simulation("agent", eval_loop, config=config, dtype=jnp.float32)
+        rollout = jax.pmap(sim)(pkey, jax.pmap(flatten)(root_state), role_fn_args=(parameters,), opponent_fn_args=())
+
+        assert rollout_sanity_tests(rollout, spec)
 
     def test_jax_util(self):
         obs = jnp.ones((32, 60), dtype=jnp.float32)
@@ -460,3 +471,106 @@ class TestJAX(unittest.TestCase):
             flatten(get_newton_polytope_jax(
                 shift_jax(host_obs, agent_obs["coords"], jnp.ones(2, dtype=jnp.float32)))) == out
         )
+
+    def test_uniform_recurrent_fn(self):
+        spec = (4, 3)
+        batch_size, max_num_points, dimension = 2, 4, 3
+
+        host_obs = (
+            jnp.array(
+                [[[1, 2, 3], [2, 3, 4], [0, 9, 0], [-1, -1, -1]], [[4, 2, 2], [-1, -1, -1], [0, 0, 1], [-1, -1, -1]]])
+            .reshape(-1, spec[0] * spec[1])
+            .astype(jnp.float32)
+        )
+        host_obs = jnp.concatenate([host_obs, jnp.zeros((2, 3))], axis=-1)
+        host_actions = jnp.array([2, 3])
+
+        key = jax.random.PRNGKey(42)
+
+        nnet = DResNetMini(4)
+        nnet_a = DResNetMini(3)
+        host_parameters = nnet.init(key, jnp.ones((1, 4 * 3)))
+        agent_parameters = nnet_a.init(key, jnp.ones((1, 4 * 3 + 3)))
+        host_fn = get_apply_fn("host", nnet, spec)
+
+        def host_fn_truncate_input(x, param, *args, **kwargs):
+            return host_fn(x[:, :-dimension], param, *args, **kwargs)
+
+        agent_fn = apply_agent_action_mask(get_apply_fn("agent", nnet_a, spec), 3)
+        reward_fn = get_reward_fn("host")
+        recurrent_fn = get_unified_recurrent_fn(
+            host_fn_truncate_input, agent_fn, reward_fn, spec, dtype=jnp.float32
+        )
+        output, next_obs = recurrent_fn(((host_parameters,), (agent_parameters,)), key, host_actions, host_obs)
+        output2, next_obs2 = recurrent_fn(((host_parameters,), (agent_parameters,)), key, host_actions, next_obs)
+
+        # Agent action is padded to the length of host action by -jnp.inf
+        assert jnp.all(output.prior_logits[:, -1] == -jnp.inf)
+        # When it comes back to host node, the last three coordinates of observations are padded with 0
+        assert jnp.all(jnp.isclose(next_obs2[:, -3:], 0))
+
+        muzero = partial(
+                mctx.gumbel_muzero_policy,
+                recurrent_fn=recurrent_fn,
+                num_simulations=10,
+                max_depth=20,
+                max_num_considered_actions=10,
+            )
+
+        # Host search
+        policy, value = host_fn(host_obs[:, :4*3], host_parameters)
+        root = mctx.RootFnOutput(
+            prior_logits=policy,
+            value=value,
+            embedding=host_obs,
+        )
+        policy_output = muzero(
+            params=((host_parameters,), (agent_parameters,)),
+            rng_key=key,
+            root=root,
+        )
+        # Agent search
+        policy, value = agent_fn(next_obs, agent_parameters)
+        policy = jnp.pad(policy, ((0, 0), (0, 1)), mode='constant', constant_values=(0, -jnp.inf))
+        root = mctx.RootFnOutput(
+            prior_logits=policy,
+            value=value,
+            embedding=next_obs,
+        )
+        policy_output = muzero(
+            params=((host_parameters,), (agent_parameters,)),
+            rng_key=key,
+            root=root,
+        )
+        # The last action weight must be zero: it is only padded to be of the same length as host.
+        assert jnp.all(jnp.isclose(policy_output.action_weights[:, -1], 0))
+
+        # ----- below it continues to test eval_loop and sim_fn ----- #
+        eval_loop = get_evaluation_loop(
+            "host",
+            host_fn_truncate_input,
+            agent_fn,
+            reward_fn,
+            spec=spec,
+            num_evaluations=10,
+            max_depth=10,
+            max_num_considered_actions=10,
+            discount=0.99,
+            role_agnostic=True,  # <-- this is for the unified MC search tree.
+            rescale_points=True,
+        )
+
+        config = {
+            "eval_batch_size": batch_size,
+            "max_num_points": max_num_points,
+            "dimension": dimension,
+            "max_value": 20,
+            "max_length_game": 20,
+            "scale_observation": True,
+        }
+        #jax.config.update('jax_disable_jit', True)
+        sim = get_simulation("host", eval_loop, config=config, dtype=jnp.float32)
+        rollout = sim(key, host_obs, role_fn_args=(host_parameters,), opponent_fn_args=(agent_parameters,))
+        assert rollout_sanity_tests(rollout, spec)
+        rollout = sim(key, rollout[0][:, 1], role_fn_args=(host_parameters,), opponent_fn_args=(agent_parameters,))
+        assert rollout_sanity_tests(rollout, spec)

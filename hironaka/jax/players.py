@@ -15,7 +15,8 @@ from typing import Callable, Tuple
 
 import jax
 import jax.numpy as jnp
-from hironaka.jax.util import encode_one_hot, get_name
+from hironaka.jax.util import get_name
+from hironaka.jax.host_action_preprocess import encode_one_hot
 from jax import jit, lax, vmap
 
 sub_2_2 = vmap(vmap(jnp.subtract, (None, 0), 0), (0, None), 0)  # (n, d) - (m, d) -> (n, m, d) subtract each vector
@@ -110,11 +111,10 @@ def zeillinger_fn(pts: jnp.ndarray, dtype=jnp.float32, **kwargs) -> jnp.ndarray:
 
 def get_host_with_flattened_obs(spec, func, dtype=jnp.float32) -> Callable:
     def func_flatten(pts, dtype=dtype, **kwargs):
-        return func(pts.reshape(-1, *spec), dtype=dtype, **kwargs)
+        return func(pts.reshape(*pts.shape[:-1], *spec), dtype=dtype, **kwargs)
 
     func_flatten.__name__ = get_name(func)
     return func_flatten
-
 
 # ---------- Agent functions ---------- #
 

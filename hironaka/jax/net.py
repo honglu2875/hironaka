@@ -66,7 +66,7 @@ class DenseResNet(nn.Module):
 
 
 DenseNet = partial(DenseResNet, block_cls=DenseBlock)
-CustomNet = DenseResNet
+CustomNet = DenseResNet  # Placeholder for a future network design
 
 DResNetMini = partial(DenseResNet, net_arch=[32] * 2)
 DResNet18 = partial(DenseResNet, net_arch=[256] * 18)
