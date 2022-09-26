@@ -203,7 +203,7 @@ class JAXTrainer:
             self.update_eval_sim_and_mcts_policy(role)
 
             # get_state will initialize '{role}_state'
-            key, subkey = jax.random.PRNGKey(key)
+            key, subkey = jax.random.split(key)
             self.get_state(role, subkey)
 
         self.host_opponent_policy, self.agent_opponent_policy = None, None
