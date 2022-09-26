@@ -14,7 +14,7 @@ os.environ['XLA_FLAGS'] = '--xla_force_host_platform_device_count=2'
 import jax
 import jax.numpy as jnp
 from hironaka.jax import JAXTrainer
-from hironaka.jax.util import select_sample_after_sim, action_wrapper
+from hironaka.jax.util import select_sample_after_sim, action_wrapper, rollout_sanity_tests
 
 
 def same_dict(d1, d2) -> bool:
@@ -46,7 +46,11 @@ class TestJAXTrainer(unittest.TestCase):
 
             # Test both simplified simulation and mcts simulation
             exp = self.trainer.simulate(subkey, role)
+            #assert rollout_sanity_tests(exp, (self.trainer.max_length_game, self.trainer.dimension))
+
             exp = self.trainer.simulate(subkey, role, use_mcts_policy=True)
+            assert rollout_sanity_tests(exp, (self.trainer.max_length_game, self.trainer.dimension))
+            print(exp)
 
             assert exp[0].shape[1] == self.trainer.eval_batch_size * self.trainer.max_length_game
             # Test the post-selection of rollouts (prevent the dataset from being dominated by terminal states)
