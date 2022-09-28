@@ -766,7 +766,7 @@ class JAXTrainer:
             'host',
             get_host_with_flattened_obs(config['spec'], self.host_policy_fn, truncate_input=True),
             self.agent_policy_fn,
-            self.host_reward_fn,
+            self.agent_reward_fn,  # there is an off-by-one-step problem in rewards depending on your perspectives...
             num_evaluations=self.num_evaluations,
             role_agnostic=True,  # <-- this is for the unified MC search tree.
             **config
