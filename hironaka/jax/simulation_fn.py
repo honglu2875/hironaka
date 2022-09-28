@@ -80,6 +80,7 @@ def get_evaluation_loop(
         num_simulations=num_evaluations,
         max_depth=max_depth,
         max_num_considered_actions=max_num_considered_actions,
+        gumbel_scale=0.0
     )
 
     def evaluation_loop(
