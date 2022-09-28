@@ -55,10 +55,10 @@ p_get_index = pmap(lambda x, y: (x[0][y, :], x[1][y, :], x[2][y]))
 
 @partial(pmap, axis_name="d", static_broadcasted_argnums=(2, 3, 4))
 def p_train_loop(
-    state: TrainState, sample: jnp.ndarray, apply_fn: Callable, loss_fn: Callable, max_grad=1
+    state: TrainState, sample: jnp.ndarray, apply_fn: Callable, loss_fn: Callable, max_grad=1.0
 ) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """
-    A pmap compiled training loop. Note that the last 3 arguments are statically broadcasted, and the first two are
+    A pmap compiled training loop. Note that the last 3 arguments are statically broadcast, and the first two are
         already spread to each device.
     Parameters:
         state: the TrainState object including the parameters and the optimizer. Entries copied to each device.
@@ -282,7 +282,7 @@ class JAXTrainer:
         simulate_output = pmap(sim_fn)(
             keys[1:], root_state, role_fn_args, opp_fn_args
         )
-        return pmap(self.rollout_postprocess, static_broadcasted_argnums=1)(simulate_output, role)
+        return pmap(self.rollout_postprocess, static_broadcasted_argnums=(1, 2))(simulate_output, role, use_unified_tree)
 
     def train(
         self,
@@ -505,7 +505,7 @@ class JAXTrainer:
         rho = sum(details[1:]) / sum([i * num for i, num in enumerate(details)])
         return rho, details
 
-    def rollout_postprocess(self, rollouts: RollOut, role: str) -> RollOut:
+    def rollout_postprocess(self, rollouts: RollOut, role: str, use_unified_tree=True) -> RollOut:
         """
         Perform postprocessing on the rollout samples. In this default postprocessing, we replace the value_prior
             from the MCTS tree by the ground-truth value depending on the game win/lose.
@@ -515,6 +515,8 @@ class JAXTrainer:
                 - policy (b, max_length_game, dimension)
                 - value (b, max_length_game)
             role: the current role (agent value is the negative of host value)
+            use_unified_tree: (Optional) in simulation function, the unified MC search tree is used (in which case,
+                the host observation is zero padded at the end).
         Returns:
             the processed rollouts. The return shapes are below.
                 - obs (b * max_length_game, input_dim)
@@ -526,7 +528,12 @@ class JAXTrainer:
         value_dtype = value.dtype
 
         reward_fn = getattr(self, f"{role}_reward_fn")
-        done = get_done_from_flatten(obs, role, self.dimension)  # (b, max_length_game)
+        if use_unified_tree:
+            # if the unified tree is used, host observations are zero-padded and should use the same agent-criteria
+            #   to identify states that are terminal.
+            done = get_done_from_flatten(obs, 'agent', self.dimension)  # (b, max_length_game)
+        else:
+            done = get_done_from_flatten(obs, role, self.dimension)  # (b, max_length_game)
         prev_done = jnp.concatenate([jnp.zeros((batch_size, 1), dtype=bool), done[:, :-1]], axis=1)
         value = calculate_value_using_reward_fn(done, prev_done, self.discount, max_length_game, reward_fn)
         value = jnp.ravel(value).astype(value_dtype)
