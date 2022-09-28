@@ -46,11 +46,14 @@ class TestJAXTrainer(unittest.TestCase):
 
             # Test both simplified simulation and mcts simulation
             exp = self.trainer.simulate(subkey, role)
-            #assert rollout_sanity_tests(exp, (self.trainer.max_length_game, self.trainer.dimension))
+            assert rollout_sanity_tests(exp, (self.trainer.max_length_game, self.trainer.dimension))
+
+            exp = self.trainer.simulate(subkey, role, use_unified_tree=True)
+            assert rollout_sanity_tests(exp, (self.trainer.max_length_game, self.trainer.dimension))
+            print(exp[0].shape, exp[1], exp[2])
 
             exp = self.trainer.simulate(subkey, role, use_mcts_policy=True)
             assert rollout_sanity_tests(exp, (self.trainer.max_length_game, self.trainer.dimension))
-            print(exp)
 
             assert exp[0].shape[1] == self.trainer.eval_batch_size * self.trainer.max_length_game
             # Test the post-selection of rollouts (prevent the dataset from being dominated by terminal states)

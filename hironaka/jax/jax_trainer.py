@@ -213,7 +213,7 @@ class JAXTrainer:
         # ignoring the fact that they contain old parameters to avoid compilation overhead.
         self._cached_sim_fn = {}
 
-    def simulate(self, key: jnp.ndarray, role: str, use_mcts_policy=False) -> RollOut:
+    def simulate(self, key: jnp.ndarray, role: str, use_mcts_policy=False, use_unified_tree=False) -> RollOut:
         """
         Performing a simulation. The core is nothing but calling `{role}_sim_fn`
         Parameters:
@@ -223,17 +223,27 @@ class JAXTrainer:
                 - Note that this is the real key of AlphaZero style MCTS. But we default to False first as the resource
                     consumption is massive for every simulation. If one only uses policy network output, the result
                     is in fact pretty good. It is worth to compare or mix the two ways.
+            use_unified_tree: (Optional) use the unified MC tree search. In this case, role will be disregarded. Also,
+                the host observation will be padded to the same length as agent (the last `dimension`-entries),
+                and the agent action number will be padded to the host's number (`2**dimension-dimension-1`) with
+                by -jnp.inf in terms of action logits.
         Returns:
             obs, target_policy, target_value
         """
         if use_mcts_policy:
             sim_fn = self.get_mcts_sim_fn(role)
+        elif use_unified_tree:
+            sim_fn = self.unified_sim_fn
         else:
             sim_fn = self.get_sim_fn(role)
         opponent = self._get_opponent(role)
 
-        role_train_state = self.get_state(role)
-        opp_train_state = self.get_state(opponent)
+        if use_unified_tree:
+            role_train_state = self.get_state('host')
+            opp_train_state = self.get_state('agent')
+        else:
+            role_train_state = self.get_state(role)
+            opp_train_state = self.get_state(opponent)
 
         # Generate root state
         keys = jax.random.split(key, num=self.device_num + 1)
@@ -247,22 +257,30 @@ class JAXTrainer:
 
         if role == "agent":
             # Get host coordinates, flatten and concatenate to make agent observations
-            coords, _ = pmap(self.get_policy_fn("host"))(root_state, opp_train_state.params)
+            coords, _ = pmap(self.get_policy_fn("host"))(root_state, self.get_state('host').params)
             batch_decode_from_one_hot = get_batch_decode_from_one_hot(self.dimension)
             coordinate_mask = pmap(batch_decode_from_one_hot)(coords)
             root_state = jnp.concatenate([pmap(flatten)(root_state), coordinate_mask], axis=-1)
-            #invalid_action = ~coordinate_mask.astype(bool)
         elif role == "host":
             # Host observations are merely flattened arrays
             root_state = pmap(flatten)(root_state)
-            #invalid_action = None
+            if use_unified_tree:
+                # Pad zeros to the length of agent observation
+                root_state = jnp.concatenate(
+                    [
+                        root_state,
+                        flax.jax_utils.replicate(jnp.zeros((self.eval_batch_size, self.dimension)))
+                    ], axis=-1
+                )
         else:
             raise ValueError(f"role must be either host or agent. Got {role}.")
 
         keys = jax.random.split(keys[0], num=self.device_num + 1)
 
+        role_fn_args = (role_train_state.params,)
+        opp_fn_args = (opp_train_state.params,) if use_unified_tree else (opp_train_state.params, role_train_state.params)
         simulate_output = pmap(sim_fn)(
-            keys[1:], root_state, (role_train_state.params,), (opp_train_state.params, role_train_state.params,)#, invalid_action
+            keys[1:], root_state, role_fn_args, opp_fn_args
         )
         return pmap(self.rollout_postprocess, static_broadcasted_argnums=1)(simulate_output, role)
 
@@ -687,7 +705,8 @@ class JAXTrainer:
                                         jitted=False,
                                         return_function=False) -> Any:
         """
-        Update `{role}_eval_loop`, '{role}_eval_loop_as_opp', `{role}_sim_fn`, and `{role}_mcts_policy_fn`.
+        Update `{role}_eval_loop`, '{role}_eval_loop_as_opp', `{role}_sim_fn`, `{role}_mcts_policy_fn`,
+            `unified_eval_loop` and `unified_sim_fn`.
         Parameters:
             role: host or agent.
             policy_fn: (Optional) the policy function used to generate simulations.
@@ -736,8 +755,21 @@ class JAXTrainer:
             num_evaluations=self.num_evaluations_as_opponent,
             **config
         )
+        unified_eval_loop = get_evaluation_loop(
+            'host',
+            get_host_with_flattened_obs(config['spec'], self.host_policy_fn, truncate_input=True),
+            self.agent_policy_fn,
+            self.host_reward_fn,
+            num_evaluations=self.num_evaluations,
+            role_agnostic=True,  # <-- this is for the unified MC search tree.
+            **config
+        )
         sim_fn = maybe_jit(
             get_simulation(role, eval_loop, config=simulation_config, dtype=self.dtype),
+            backend="cpu" if self.eval_on_cpu or not self.use_cuda else jax.default_backend(),
+        )
+        unified_sim_fn = maybe_jit(
+            get_simulation('host', unified_eval_loop, config=simulation_config, dtype=self.dtype),
             backend="cpu" if self.eval_on_cpu or not self.use_cuda else jax.default_backend(),
         )
         mcts_policy_fn = mcts_wrapper(eval_loop_as_opp)
@@ -751,6 +783,9 @@ class JAXTrainer:
             setattr(self, f"{role}_eval_loop_as_opp", eval_loop_as_opp)
             setattr(self, f"{role}_sim_fn", sim_fn)
             setattr(self, f"{role}_mcts_policy_fn", mcts_policy_fn)
+            if not hasattr(self, "unified_eval_loop") or not hasattr(self, "unified_sim_fn"):
+                setattr(self, "unified_eval_loop", unified_eval_loop)
+                setattr(self, "unified_sim_fn", unified_sim_fn)
 
     def update_policy_fn(self, role: str, return_function=False) -> Any:
         """

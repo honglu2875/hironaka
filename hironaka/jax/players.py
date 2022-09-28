@@ -109,9 +109,29 @@ def zeillinger_fn(pts: jnp.ndarray, dtype=jnp.float32, **kwargs) -> jnp.ndarray:
     return vmap(zeillinger_fn_slice, 0, 0)(pts).astype(dtype)
 
 
-def get_host_with_flattened_obs(spec, func, dtype=jnp.float32) -> Callable:
-    def func_flatten(pts, dtype=dtype, **kwargs):
-        return func(pts.reshape(*pts.shape[:-1], *spec), dtype=dtype, **kwargs)
+def get_host_with_flattened_obs(spec: Tuple, func: Callable, truncate_input=False, dtype=jnp.float32) -> Callable:
+    """
+    Wrapper function. When the input observation is a flattened array, this pre-composes a reshape on the host function.
+        In some cases host observations are also padded at the last `dimension` entries (unified MC tree search). In
+        that case, `truncate_input` switch should be turned on.
+    Parameters:
+        spec: (max_num_points, dimension)
+        func: the host function
+        truncate_input: (Optional) whether to truncate out the last `dimension` entries.
+        dtype: (Optional) the data type.
+    Returns:
+        a wrapped host function that handles flattened (and maybe padded) input.
+    """
+    if truncate_input:
+        def maybe_truncate(pts):
+            return pts[..., :-spec[1]]
+    else:
+        def maybe_truncate(pts):
+            return pts
+
+    def func_flatten(pts, *args, dtype=dtype, **kwargs):
+        pts = maybe_truncate(pts)
+        return func(pts.reshape(*pts.shape[:-1], *spec), *args, dtype=dtype, **kwargs)
 
     func_flatten.__name__ = get_name(func)
     return func_flatten
