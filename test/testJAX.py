@@ -113,18 +113,10 @@ class TestJAX(unittest.TestCase):
         s_sorted = jnp.array(
             [
                 [
-                    0.84210527,
-                    0.8947368,
-                    1.0,
-                    0.10526316,
-                    0.2631579,
-                    0.47368422,
-                    0.10526316,
-                    0.21052632,
-                    0.15789473,
-                    0.0,
-                    0.05263158,
-                    0.0,
+                    0.10526316, 0.21052632, 1.0,
+                    0.84210527, 0.05263158, 0.47368422,
+                    0.0, 0.8947368, 0.15789473,
+                    0.10526316, 0.2631579, 0.0,
                     -1.0,
                     -1.0,
                     -1.0,
@@ -149,6 +141,12 @@ class TestJAX(unittest.TestCase):
             ]
         )
         assert jnp.all(shift_jax(s, jnp.array([[0, 1, 1]]), jnp.array([1])) == sr)
+
+        # An additional test for agent features
+        p = jnp.array([[1, 2, 3, -1, -1, -1, 2, 3, 4, 0, 1, 1], [-1, -1, -1, 0, 0, 1, 0, 1, 1, 1, 0, 1]])
+        sp = jnp.array([[2, 3, 4, 1, 2, 3, -1, -1, -1, 0, 1, 1], [0, 1, 1, 0, 0, 1, -1, -1, -1, 1, 0, 1]])
+        feature_fn = get_feature_fn("agent", (3, 3))
+        assert jnp.all(feature_fn(p) == sp)
 
     def test_points_jax(self):
         p = jnp.array(
@@ -437,7 +435,7 @@ class TestJAX(unittest.TestCase):
         coordinate_mask = jax.pmap(batch_decode_from_one_hot)(coords)
         root_state = jnp.concatenate([jax.pmap(flatten)(root_state), coordinate_mask], axis=-1)
 
-        #jax.config.update('jax_disable_jit', True)
+        # jax.config.update('jax_disable_jit', True)
         sim = get_simulation("agent", eval_loop, config=config, dtype=jnp.float32)
         rollout = jax.pmap(sim)(pkey, jax.pmap(flatten)(root_state), role_fn_args=(parameters,), opponent_fn_args=())
 
@@ -510,15 +508,15 @@ class TestJAX(unittest.TestCase):
         assert jnp.all(jnp.isclose(next_obs2[:, -3:], 0))
 
         muzero = partial(
-                mctx.gumbel_muzero_policy,
-                recurrent_fn=recurrent_fn,
-                num_simulations=10,
-                max_depth=20,
-                max_num_considered_actions=10,
-            )
+            mctx.gumbel_muzero_policy,
+            recurrent_fn=recurrent_fn,
+            num_simulations=10,
+            max_depth=20,
+            max_num_considered_actions=10,
+        )
 
         # Host search
-        policy, value = host_fn(host_obs[:, :4*3], host_parameters)
+        policy, value = host_fn(host_obs[:, :4 * 3], host_parameters)
         root = mctx.RootFnOutput(
             prior_logits=policy,
             value=value,
@@ -568,7 +566,7 @@ class TestJAX(unittest.TestCase):
             "max_length_game": 20,
             "scale_observation": True,
         }
-        #jax.config.update('jax_disable_jit', True)
+        # jax.config.update('jax_disable_jit', True)
         sim = get_simulation("host", eval_loop, config=config, dtype=jnp.float32)
         rollout = sim(key, host_obs, role_fn_args=(host_parameters,), opponent_fn_args=(agent_parameters,))
         assert rollout_sanity_tests(rollout, spec)
