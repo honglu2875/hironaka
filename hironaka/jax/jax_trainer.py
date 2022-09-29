@@ -592,6 +592,7 @@ class JAXTrainer:
                     )
                 )
                 setattr(self, f"{role}_state", state)
+                self.logger.info(f"Successfully loaded {file_path}.")
                 self.update_fns(role)
 
     # ---------- Below are getter functions that require caching after their first calls ---------- #
