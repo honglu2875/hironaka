@@ -6,12 +6,12 @@ def compute_loss(params, apply_fn, sample, loss_fn, weight=None) -> jnp.ndarray:
     obs, target_policy_logits, target_value = sample
     weight = jnp.ones_like(target_value) if weight is None else weight
     policy_logits, value = apply_fn(obs, params)
-    return loss_fn(policy_logits, value, target_policy_logits, target_value, weight=weight)
+    return loss_fn(policy_logits, value, target_policy_logits, target_value, weight=weight, params=params)
 
 
 def policy_value_loss(
         policy_logit: jnp.ndarray, value: jnp.ndarray, target_policy: jnp.ndarray, target_value: jnp.ndarray,
-        weight=None) -> jnp.ndarray:
+        weight=None, **kwargs) -> jnp.ndarray:
     # Shapes:
     # policy_logit, target_policy: (B, action)
     # value_logit, target_value: (B,)

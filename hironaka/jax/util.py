@@ -5,6 +5,7 @@ from typing import Callable, Tuple, Union, Optional
 
 import jax
 from flax.core import FrozenDict
+from jax.example_libraries.optimizers import l2_norm
 
 from hironaka.jax.host_action_preprocess import decode_table, _MAX_DIM, dec_table
 from hironaka.jax.loss import clip_log
@@ -374,3 +375,10 @@ def rollout_sanity_tests(rollout: Rollout, spec: Tuple[int, int]) -> bool:
         return False
 
     return True
+
+
+def safe_clip_grads(grad_tree, max_norm):
+    norm = l2_norm(grad_tree)
+    eps = 1e-9
+    normalize = lambda g: jnp.where(norm < max_norm, g, g * max_norm / (norm + eps))
+    return jax.tree_util.tree_map(normalize, grad_tree)

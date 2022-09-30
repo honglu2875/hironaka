@@ -40,6 +40,7 @@ from hironaka.jax.util import (
     get_take_actions,
     make_agent_obs,
     mcts_wrapper, get_feature_fn,
+    safe_clip_grads,
 )
 from hironaka.jax.host_action_preprocess import get_batch_decode_from_one_hot
 from hironaka.jax.loss import compute_loss, policy_value_loss, clip_log
@@ -70,13 +71,13 @@ def p_train_loop(
         (new_state, loss, grads)
     """
     loss, grad = jax.value_and_grad(partial(compute_loss, loss_fn=loss_fn))(state.params, apply_fn, sample)
-    grads = jax.tree_util.tree_map(partial(jnp.clip, a_max=max_grad), grad)
+    grad = safe_clip_grads(grad, max_grad)
     # Use pmean to sync loss and grad on each device.
     loss, grad = jax.lax.pmean(loss, "d"), jax.lax.pmean(grad, "d")
     # Simultaneously update parameters on each device by the same gradient. In some cases slightly better than reducing
     #   gradient to one device, calculate, and then broadcast again.
     state = state.apply_gradients(grads=grad)
-    return state, loss, grads
+    return state, loss, grad
 
 
 class JAXTrainer:
@@ -584,7 +585,7 @@ class JAXTrainer:
             avg_lst.append(jnp.mean(grads))
         return avg_lst
 
-    def save_checkpoint(self, path: str, roles: Optional[List[str]] = None):
+    def save_checkpoint(self, path: str, roles: Optional[Union[List[str], str]] = None):
         roles = ['host', 'agent'] if roles is None else roles
         if isinstance(roles, str):
             roles = [roles]

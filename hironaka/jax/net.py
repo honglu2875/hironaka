@@ -47,7 +47,7 @@ class DenseBlock(nn.Module):
 class DenseResNet(nn.Module):
     output_size: int
     net_arch: List[int]
-    norm: ModuleDef = nn.LayerNorm
+    norm: ModuleDef = partial(nn.GroupNorm, num_groups=32)
     block_cls: ModuleDef = DenseResidueBlock
     dtype: jnp.dtype = jnp.float32
     activation: Callable = nn.relu

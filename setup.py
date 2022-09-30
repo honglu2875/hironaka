@@ -56,6 +56,7 @@ setup(
     packages=[package for package in find_packages() if package.startswith("hironaka")],
     package_data={"hironaka": ["version.txt"]},
     install_requires=[
+        "absl-py",
         "numpy",
         "treelib",
         "gym==0.21",
