@@ -54,14 +54,18 @@ def main(key=None):
             offset = dimension if role == 'host' else 0
             num_epoch = 50 if role == 'host' else 10
 
-            rollout = rollout[0][:, ::2, :-offset], rollout[1][:, ::2], rollout[2][:, ::2]
-            test_set = test_set[0][:, ::2, :-offset], test_set[1][:, ::2], test_set[2][:, ::2]
+            rollout = rollout[0][:, ::2, :], rollout[1][:, ::2], rollout[2][:, ::2]
+            test_set = test_set[0][:, ::2, :], test_set[1][:, ::2], test_set[2][:, ::2]
 
             # put mask on non-terminal states. `device_keys` are not used since we turn random selection off.
             mask = jax.pmap(select_sample_after_sim, static_broadcasted_argnums=(0, 2, 3))(
                 role, rollout, dimension, False, device_keys)
             mask_for_test = jax.pmap(select_sample_after_sim, static_broadcasted_argnums=(0, 2, 3))(
                 role, test_set, dimension, False, device_keys)
+
+            # Cutting the observation. (Note: doing it earlier will affect the correctness of masks)
+            rollout = rollout[0][...:-offset], rollout[1], rollout[2]
+            test_set = test_set[0][...:-offset], test_set[1], test_set[2]
 
             apply_fn = trainer.get_apply_fn(role)
 

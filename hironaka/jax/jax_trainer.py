@@ -584,7 +584,7 @@ class JAXTrainer:
             avg_lst.append(jnp.mean(grads))
         return avg_lst
 
-    def save_checkpoint(self, path: str, roles: Optional[List[str]] = None):
+    def save_checkpoint(self, path: str, roles: Optional[Union[List[str], str]] = None):
         roles = ['host', 'agent'] if roles is None else roles
         if isinstance(roles, str):
             roles = [roles]
