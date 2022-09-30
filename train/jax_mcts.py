@@ -64,8 +64,8 @@ def main(key=None):
                 role, test_set, dimension, False, device_keys)
 
             # Cutting the observation. (Note: doing it earlier will affect the correctness of masks)
-            rollout = rollout[0][...:-offset], rollout[1], rollout[2]
-            test_set = test_set[0][...:-offset], test_set[1], test_set[2]
+            rollout = rollout[0][..., :-offset], rollout[1], rollout[2]
+            test_set = test_set[0][..., :-offset], test_set[1], test_set[2]
 
             apply_fn = trainer.get_apply_fn(role)
 
