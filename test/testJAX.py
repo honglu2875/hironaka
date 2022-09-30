@@ -9,6 +9,7 @@ import jax.numpy as jnp
 from flax.jax_utils import replicate, unreplicate
 from hironaka.core import JAXPoints
 from hironaka.jax import JAXTrainer
+from hironaka.jax.loss import policy_value_loss
 from hironaka.jax.net import DResNetMini, get_apply_fn
 from hironaka.jax.players import (
     all_coord_host_fn,
@@ -213,6 +214,17 @@ class TestJAX(unittest.TestCase):
         assert jnp.all(batch_encode_one_hot(encode_in) == jnp.array(encode_one_hot_out))
         assert jnp.all(batch_decode_from_one_hot(encode_one_hot_out) == encode_in)
         assert jnp.all(batch_decode(encode_out) == encode_in)
+
+    def test_loss(self):
+        pi = jnp.array([[jnp.exp(1), jnp.exp(2)], [jnp.exp(3), jnp.exp(4)]])
+        v = jnp.array([5.0, 6.0])
+        t_pi = jnp.array([[1.0, 0.0], [0.0, 1.0]])
+        t_v = jnp.array([1.0, -1.0])
+        assert jnp.isclose(policy_value_loss(pi, v, t_pi, t_v), 38.8529)
+        # Masked. They add up the the sum above.
+        assert jnp.isclose(policy_value_loss(pi, v, t_pi, t_v, jnp.array([1.0, 0.0])), 9.711966)
+        assert jnp.isclose(policy_value_loss(pi, v, t_pi, t_v, jnp.array([0.0, 1.0])), 29.140936)
+
 
     def test_hosts(self):
         obs = jnp.array([[[1, 2, 3], [2, 3, 4]], [[0, 1, 2], [-1, -1, -1]]])

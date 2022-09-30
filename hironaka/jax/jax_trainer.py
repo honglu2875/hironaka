@@ -212,6 +212,8 @@ class JAXTrainer:
         # Used in self.simulate, only when mcts policy is used. Sometimes we want to use old compiled functions
         # ignoring the fact that they contain old parameters to avoid compilation overhead.
         self._cached_sim_fn = {}
+        # Used when the training needs to save the best performing player
+        self.best_against_choose_first, self.best_against_choose_last, self.best_against_zeillinger = 0, 0, jnp.inf
 
     def simulate(self, key: jnp.ndarray, role: str, use_mcts_policy=False, use_unified_tree=False) -> RollOut:
         """
@@ -289,10 +291,11 @@ class JAXTrainer:
         key: jnp.ndarray,
         role: str,
         gradient_steps: int,
-        rollouts: jnp.ndarray,
+        rollouts: RollOut,
         mask=None,
         random_sampling=False,
         verbose=0,
+        save_best=True,
     ):
         """
         Trains the neural network with a collection of samples ('rollouts', supposedly collected from simulation).
@@ -304,7 +307,10 @@ class JAXTrainer:
             mask: (Optional) the mask on rollout, so that we ignore some samples. Must be of the shape
                 (device_num, sample_size) with bool entries.
             random_sampling: (Optional) whether to do random sampling or cut out contiguous batches in the rollouts.
-            verbose: (Optional) whether to print out the loss
+            verbose: (Optional) whether to print out the loss.
+            save_best: (Optional) whether to save the best model. Update only if
+                host - both higher against choose-first and choose-last,
+                agent - higher against zeillinger.
         """
         # On each device, choose `batch_size` amount of rollouts out of `sample_size`, and perform regression.
         batch_size = self.config[role]["batch_size"]
@@ -353,6 +359,15 @@ class JAXTrainer:
                     rhos, details = self.validate(write_tensorboard=True)
                     if verbose:
                         self.logger.info(f"Rhos:\n{rhos}\nGame length histogram:\n{details}")
+                    if save_best:
+                        if rhos[2] > self.best_against_choose_first and rhos[3] > self.best_against_choose_last:
+                            self.save_checkpoint(f'{self.version_string}/best_host', roles='host')
+                            self.best_against_choose_first = rhos[2]
+                            self.best_against_choose_last = rhos[3]
+                        if rhos[5] < self.best_against_zeillinger:
+                            self.save_checkpoint(f'{self.version_string}/best_agent', roles='agent')
+                            self.best_against_zeillinger = rhos[5]
+
                     self.summary_writer.flush()  # Force writing to file after each validation.
 
     def validate(
@@ -569,8 +584,11 @@ class JAXTrainer:
             avg_lst.append(jnp.mean(grads))
         return avg_lst
 
-    def save_checkpoint(self, path: str):
-        for role in ["host", "agent"]:
+    def save_checkpoint(self, path: str, roles: Optional[List[str]] = None):
+        roles = ['host', 'agent'] if roles is None else roles
+        if isinstance(roles, str):
+            roles = [roles]
+        for role in roles:
             state = self.get_state(role)
             checkpoints.save_checkpoint(
                 ckpt_dir=path, prefix=f"{role}_", overwrite=True, target=flax.jax_utils.unreplicate(state), step=state.step[0]
