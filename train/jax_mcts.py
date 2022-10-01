@@ -1,3 +1,7 @@
+"""
+JAX Training script. Ran on Google Cloud TPU VM v3-8.
+"""
+
 from absl import flags
 from absl import app
 import logging
@@ -12,18 +16,12 @@ from hironaka.jax import JAXTrainer
 from hironaka.jax.loss import compute_loss
 from hironaka.jax.util import select_sample_after_sim
 
-model_path = 'models'
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string('config', 'jax_mcts.yml', 'The config file.')
+flags.DEFINE_string('model_path', 'models', 'The model path.')
 flags.DEFINE_integer('key', 42, 'The random seed.')
 flags.DEFINE_bool('early_stop', False, 'Whether to stop training early when signs of overfitting are observed.')
-
-
-# Flag names are globally defined!  So in general, we need to be
-# careful to pick names that are unlikely to be used by other libraries.
-# If there is a conflict, we'll get an error at import time.
-flags.DEFINE_string('name', 'Jane Random', 'Your name.')
 
 
 @partial(jax.pmap, static_broadcasted_argnums=(1, 3), axis_name='d')
@@ -39,13 +37,13 @@ def main(argv):
 
     trainer.summary_writer.add_scalar('learning_rate', trainer.config['host']['optim']['args']['learning_rate'], 0)
     trainer.summary_writer.add_scalar('batch_size', trainer.config['host']['batch_size'], 0)
-    trainer.load_checkpoint(model_path)
+    trainer.load_checkpoint(FLAGS.model_path)
 
     logger = trainer.logger
     logger.setLevel(logging.INFO)
     if not logger.hasHandlers():
         logger.addHandler(logging.StreamHandler(sys.stdout))
-        logger.addHandler(logging.FileHandler(trainer.config['version_string']))
+        logger.addHandler(logging.FileHandler(trainer.version_string + '.log'))
 
     logger.info(f"learning rate: {trainer.config['host']['optim']['args']['learning_rate']}")
     logger.info(f"training batch size: {trainer.config['host']['batch_size']}")
@@ -114,7 +112,7 @@ def main(argv):
                 trainer.train(subkey, role, num_steps, rollout, random_sampling=True, mask=mask, save_best=True)
 
         if i % 40 == 0:
-            trainer.save_checkpoint(model_path)
+            trainer.save_checkpoint(FLAGS.model_path)
             logger.info('--------------------')
             logger.info(f'Checkpoint saved at loop {i}.')
             logger.info(f'Best against choose first: {trainer.best_against_choose_first}.')
