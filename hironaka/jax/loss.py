@@ -11,7 +11,7 @@ def compute_loss(params, apply_fn, sample, loss_fn, weight=None) -> jnp.ndarray:
 
 def policy_value_loss(
         policy_logit: jnp.ndarray, value: jnp.ndarray, target_policy: jnp.ndarray, target_value: jnp.ndarray,
-        weight=None) -> jnp.ndarray:
+        weight=None, **kwargs) -> jnp.ndarray:
     # Shapes:
     # policy_logit, target_policy: (B, action)
     # value_logit, target_value: (B,)
