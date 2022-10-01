@@ -25,7 +25,7 @@ def expand_net_list(net_arch: List[Any]) -> List[Any]:
 
 
 def create_mlp(
-        head: nn.Module, net_arch: List[Any], input_dim: int, output_dim: int, activation_fn: Type[nn.Module] = nn.ReLU
+    head: nn.Module, net_arch: List[Any], input_dim: int, output_dim: int, activation_fn: Type[nn.Module] = nn.ReLU
 ) -> nn.Module:
     """
     A basic MLP network will be constructed according to `head` followed by `net_arch`.

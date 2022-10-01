@@ -43,7 +43,7 @@ demonstration of some key classes in this repo.
 
 ## Reinforcement Learning
 
-There are 2 ways to start a proper Reinforcement Learning training:
+There are 3 ways to start training:
 
 - (TL;DR, clone
   this [Google Colab file](https://colab.research.google.com/drive/1nVnVA6cyg0GT5qTadJTJH7aU6smgopLm?usp=sharing),
@@ -59,6 +59,27 @@ There are 2 ways to start a proper Reinforcement Learning training:
   Of course, for this to work you need to
     - set up the system path so that Python can import those stuff;
     - copy the config file `dqn_config_test.yml` from `.test/` to your running folder.
+- Use the JAX implementation of AlphaZero-style MCTS + neural net approach. It runs with more lines but with fine-grained controls (the sample code trains hosts, but can be modified to agent without extra changes):
+    ```python
+    import jax
+    from hironaka.jax import JAXTrainer
+    from hironaka.jax.util import select_sample_after_sim
+    key = jax.random.PRNGKey(42)
+    trainer = JAXTrainer(key, 'jax_config.yml')
+  
+    role = 'host'
+    keys = jax.random.split(key, num=len(jax.devices()) + 2)
+    key, subkey = keys[0], keys[1]
+    device_keys = keys[2:]
+  
+    rollout = trainer.simulate(subkey, role, use_mcts_policy=True)
+    # Filter out a certain amount of finished games(terminal state), in order to prevent samples from being concentrated with terminal states. But this step can be ignored if you wish.
+    mask = jax.pmap(select_sample_after_sim, static_broadcasted_argnums=(0, 2, 3))(
+        role, rollout, 3, True, device_keys)
+  
+    key, subkey = jax.random.split(key)
+    trainer.train(subkey, role, 50, rollout, random_sampling=True, mask=mask)
+    ```
 - When you are here in the project folder and `requirements.txt` are met (or create a venv and
   run `pip install -r requirements.txt`), try the following:
     ```bash

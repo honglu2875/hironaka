@@ -1,14 +1,18 @@
 import functools
 import time
 from functools import partial
-from typing import Callable, Tuple, Union
+from typing import Callable, Tuple, Union, Optional
 
 import jax
-from jax import jit, lax, numpy as jnp
+from flax.core import FrozenDict
+from jax.example_libraries.optimizers import l2_norm
+
+from hironaka.jax.host_action_preprocess import decode_table, _MAX_DIM, dec_table
+from hironaka.jax.loss import clip_log
+from hironaka.src import get_newton_polytope_jax, rescale_jax, shift_jax
+from jax import jit, lax
 from jax import numpy as jnp
 from jax import vmap
-
-from hironaka.src import get_newton_polytope_jax, rescale_jax, shift_jax
 
 Rollout = Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]  # observations, policy logits, values
 
@@ -32,10 +36,10 @@ def get_dones(pts: jnp.ndarray) -> jnp.ndarray:
 
 
 def get_done_from_flatten(obs: jnp.ndarray, role: str, dimension: int) -> jnp.ndarray:
-    return jnp.sum(obs >= 0, axis=-1) <= dimension + (role == "agent") * (2 ** dimension - dimension - 1)
+    return jnp.sum(obs >= 0, axis=-1) <= dimension + (role == "agent") * (2**dimension - dimension - 1)
 
 
-@functools.lru_cache
+@functools.lru_cache()
 def get_preprocess_fns(role: str, spec: Tuple[int, int]) -> Tuple[Callable, Callable]:
     """
     Parameters:
@@ -75,7 +79,7 @@ def get_preprocess_fns(role: str, spec: Tuple[int, int]) -> Tuple[Callable, Call
     return jit(obs_preprocess), jit(coords_preprocess)
 
 
-@functools.lru_cache
+@functools.lru_cache()
 def get_take_actions(role: str, spec: Tuple[int, int], rescale_points: bool = True) -> Callable:
     """
     Factory function that returns a `take_actions` function to perform observation update depending on the current role.
@@ -111,14 +115,13 @@ def get_take_actions(role: str, spec: Tuple[int, int], rescale_points: bool = Tr
         points = obs_preprocess(observations)
         coords = coords_preprocess(observations, actions)
         shifted_pts = get_newton_polytope_jax(shift_jax(points, coords, axis))
-        maybe_rescaled = jnp.where(rescale_points, rescale_jax(shifted_pts), shifted_pts).reshape(
-            (-1, spec[0] * spec[1]))
+        maybe_rescaled = jnp.where(rescale_points, rescale_jax(shifted_pts), shifted_pts).reshape((-1, spec[0] * spec[1]))
         return maybe_rescaled
 
     return take_actions
 
 
-@functools.lru_cache
+@functools.lru_cache()
 def get_reward_fn(role: str) -> Callable:
     """
     Parameters:
@@ -142,21 +145,39 @@ def get_reward_fn(role: str) -> Callable:
     return reward_fn
 
 
-@functools.lru_cache
+@functools.lru_cache()
 def get_feature_fn(role: str, spec: Tuple) -> Callable:
     """
     Get the feature function on (possibly flattened) observations.
+    Parameters:
+        role: host or agent.
+        spec: (max_num_points, dimension).
+    Returns:
+        the feature function that extract the features from a batch of point states
     """
+    assert len(spec) == 2
+
+    def order(x: jnp.ndarray) -> jnp.ndarray:
+        """
+        Assume x fits into shape (-1, *spec), it will
+        - reshape x into (-1, spec[0], spec[1])
+        - for each slice on the 0-th axis, order the spec[0] rows (*, *, :spec[1]) from high to low lexicographically.
+        - flatten the resulting (-1, *spec) array into (-1, spec[0]*spec[1]) and return
+        """
+        x_reshaped = x.reshape(-1, *spec)
+        idx = vmap(partial(jnp.lexsort, axis=-1), 0, 0)(-x_reshaped.transpose((0, 2, 1)))
+        return flatten(jnp.take_along_axis(x_reshaped, idx[:, :, None], axis=1))
+
     if role == "host":
 
         def feature_fn(observations: jnp.ndarray) -> jnp.ndarray:
-            return -flatten(vmap(partial(jnp.sort, axis=0), 0, 0)(-observations.reshape(-1, *spec)))
+            return order(observations)
 
     elif role == "agent":
         obs_preprocess, coords_preprocess = get_preprocess_fns("agent", spec)
 
         def feature_fn(observations: jnp.ndarray) -> jnp.ndarray:
-            points = -flatten(vmap(partial(jnp.sort, axis=0), 0, 0)(-obs_preprocess(observations)))
+            points = order(obs_preprocess(observations))
             coords = coords_preprocess(observations, None)
             return make_agent_obs(points, coords)
 
@@ -166,12 +187,56 @@ def get_feature_fn(role: str, spec: Tuple) -> Callable:
     return feature_fn
 
 
+@functools.lru_cache()
+def get_dynamic_policy_fn(spec: Tuple[int, int], host_fn: Callable, agent_fn: Callable) -> Callable:
+    """
+    Get a dynamic policy function:
+        - the input dimension is always (batch_size, (max_num_points + 1) * dimension).
+        - it will determine whether it is a host or agent state based on the last `dimension` entries.
+            host state will have them padded with 0.
+            agent state will have a proper action mask.
+        - it will then select the correct policy (host_fn or agent_fn) and evaluate on the input.
+    The Dynamic policy function is used when we unify host/agent nodes in an MC tree search (when the `role_agnostic`
+        switch is on in get_evaluation_loop and get_simulation functions).
+    Parameters:
+        spec: (max_num_points, dimension)
+        host_fn: the host function that takes in a point state and returns (policy, value) pair.
+        agent_fn: the agent function that has similar input/output as above.
+    Returns:
+        a function that takes in:
+            - a uniformized point state of shape (batch_size, (max_num_points + 1) * dimension),
+            - a pair of (host_args, agent_args), where each of them usually contains the model parameters.
+            - and the rest of *args, **kwargs.
+            and it applies host_fn or agent_fn dynamically.
+        Note: the agent action space will be padded to the same length as host: 2**dimension-dimension-1 by -jnp.inf.
+    """
+    obs_preprocess, coords_preprocess = get_preprocess_fns('agent', spec)
+    extra_action_dim = 2 ** spec[1] - 2 * spec[1] - 1
+
+    def use_policy_fn(state):
+        coord = coords_preprocess(state, None)
+        return jnp.any(jnp.all(jnp.isclose(coord, 0), axis=-1), axis=None)
+
+    def agent_padded(*args, **kwargs) -> Tuple[jnp.ndarray, jnp.ndarray]:
+        policy, value = agent_fn(*args, **kwargs)
+        return jnp.pad(policy, ((0, 0), (0, extra_action_dim)),
+                       mode='constant', constant_values=(0, -jnp.inf)), value
+
+    def dynamic_policy_fn(state, host_and_agent_args, *args, **kwargs):
+        host_args, agent_args = host_and_agent_args
+        return lax.cond(use_policy_fn(state),
+                        lambda x: host_fn(x, *host_args, *args, **kwargs),
+                        lambda x: agent_padded(x, *agent_args, *args, **kwargs),
+                        state)
+    return dynamic_policy_fn
+
+
 def calculate_value_using_reward_fn(
-        done: jnp.ndarray, prev_done: jnp.ndarray, discount: float, max_length_game: int, reward_fn: Callable
+    done: jnp.ndarray, prev_done: jnp.ndarray, discount: float, max_length_game: int, reward_fn: Callable
 ) -> jnp.ndarray:
     reward = vmap(reward_fn, (0, 0), 0)(done, prev_done)
     diff = jnp.arange(max_length_game).reshape((1, -1)) - jnp.arange(max_length_game).reshape((-1, 1))
-    discount_table = (discount ** diff) * (diff >= 0)
+    discount_table = (discount**diff) * (diff >= 0)
     discounted_value = vmap(jnp.matmul, (None, 0), 0)(discount_table, reward)
     return discounted_value
 
@@ -179,11 +244,17 @@ def calculate_value_using_reward_fn(
 def apply_agent_action_mask(agent_policy: Callable, dimension: int) -> Callable:
     """
     Apply a masked agent policy wrapper on top of an `agent_policy` function.
+    Assumption: the input x has shape (..., feature_dim), i.e., all features are flattened to the last axis.
     """
 
     def masked_agent_policy(x: jnp.ndarray, *args, **kwargs) -> Tuple:
-        batch_size, feature_num = x.shape
-        mask = lax.dynamic_slice(x, (0, feature_num - dimension), (batch_size, dimension)) > 0.5
+        feature_num = x.shape[-1]
+        # get the start and end for axis before the last one
+        start = (0,) * (len(x.shape) - 1)
+        end = x.shape[:-1]
+        # Extract the last `dimension` entries as our action mask, and apply it to the final action.
+        # Expect a 0/1 array, possibly float dtype. But to err on the safe side, we take a cut-off at 0.5.
+        mask = lax.dynamic_slice(x, (*start, feature_num - dimension), (*end, dimension)) > 0.5
         policy_prior, value_prior = agent_policy(x, *args, **kwargs)
         return policy_prior * mask - jnp.inf * (~mask), value_prior
 
@@ -191,19 +262,40 @@ def apply_agent_action_mask(agent_policy: Callable, dimension: int) -> Callable:
     return masked_agent_policy
 
 
-def action_wrapper(policy_value_fn: Callable, dimension: Union[int, None]) -> Callable:
+def action_wrapper(policy_value_fn: Callable, dimension: Optional[Union[int]] = None) -> Callable:
     """
     Turns a policy function (returning (policy_logits, value)) into a function that returns one-hot actions.
+    Depending on the value of `dimension`, it can apply action mask based on the last `dimension` entries in the input
+        tensor. Used in the inference of agent actions.
+    Parameters:
+        policy_value_fn: the policy function that returns the (policy, value) pair.
+        dimension: (Optional) the dimension of action output.
+            if nonzero, will first extract the last `dimension` entries from the input and apply it as an action mask.
+            if None, will not apply action mask.
     """
     masked_action = policy_value_fn if dimension is None else apply_agent_action_mask(policy_value_fn, dimension)
 
     def wrapped_action_fn(x: jnp.ndarray, *args, **kwargs) -> jnp.ndarray:
         out, _ = masked_action(x, *args, **kwargs)
-        action_dim = out.shape[1]
-        return jax.nn.one_hot(jnp.argmax(out, axis=1), action_dim)
+        action_dim = out.shape[-1]
+        return jax.nn.one_hot(jnp.argmax(out, axis=-1), action_dim)
 
     wrapped_action_fn.__name__ = get_name(policy_value_fn)
     return wrapped_action_fn
+
+
+def mcts_wrapper(eval_loop: Callable) -> Callable:
+    """
+    Wrap around an eval loop to turn it into a function that returns policy logits and value.
+    Parameters:
+        eval_loop: the original eval loop that returns the MCTS output.
+    Returns:
+        a function that returns (policy, value) pair.
+    """
+    def mcts_wrapped_policy(x: jnp.ndarray, params: FrozenDict, opp_params: FrozenDict, key: jnp.ndarray) -> jnp.ndarray:
+        policy_output = eval_loop(key, x, (params,), (opp_params,))
+        return clip_log(policy_output.action_weights), policy_output.search_tree.node_values[:, 0]
+    return mcts_wrapped_policy
 
 
 def get_name(obj):
@@ -213,8 +305,7 @@ def get_name(obj):
         return get_name(obj.func)
 
 
-def select_sample_after_sim(role: str, rollout: Rollout, dimension: int,
-                            mix_random_terminal_states=True, key=None) -> Rollout:
+def select_sample_after_sim(role: str, rollout: Rollout, dimension: int, mix_random_terminal_states=True, key=None) -> Rollout:
     """
     After samples are generated by simulations, some states are still of ongoing games, and some states are terminal.
     We select those that are unfinished, plus optionally a random collection of terminal states in the following way:
@@ -234,144 +325,60 @@ def select_sample_after_sim(role: str, rollout: Rollout, dimension: int,
     """
     key = jnp.where(key is None, jax.random.PRNGKey(time.time_ns()), key)
     size = rollout[0].shape[0]
-    offset = jnp.where(role == 'agent', 2 ** dimension - dimension - 1, 0)
+    offset = jnp.where(role == "agent", 2**dimension - dimension - 1, 0)
 
-    undone_idx = jnp.sum(rollout[0] >= 0, axis=-1) > dimension + offset
+    undone_idx = jnp.sum(rollout[0] >= 0, axis=-1) > (dimension + offset)
     # jit does not allow variable array size (like this `undone_sum`). So this is a work-around to sample exactly
     #   `undone_num` indices and set them to True in the final result.
     if mix_random_terminal_states:
         undone_num = jnp.sum(undone_idx)
         random_idx = jax.random.choice(key, jnp.arange(size), (size,), False)
-        selected_idx = random_idx & (jnp.arange(size) < undone_num)
+        selected_idx = undone_idx | (random_idx < undone_num)
     else:
         selected_idx = undone_idx
     return selected_idx
 
 
-# ---------- Encode/decode host actions ---------- #
-
-
-def decode_table(dimension: int) -> dict:
-    """
-    Return a decoding table. The i-th row is the corresponding multi-binary vector.
-    """
-    res = []
-    for i in range(2 ** dimension):
-        if i == 0 or i & (i - 1) == 0:
-            continue
-        binary_str = bin(i)[2:]
-        binary_vector = []
-        for j in range(dimension):
-            if j >= len(binary_str):
-                binary_vector.append(0)
-            else:
-                binary_vector.append(int(binary_str[-j - 1]))
-        res.append(jnp.array(binary_vector).astype(jnp.int32))
-    return jnp.array(res)
-
-
-_MAX_DIM = 11
-dec_table = {0: None, 1: None}
-# The decoding table will be generated the first time running functions in this file.
-# Remark: When `_MAX_DIM` goes up, the computation and memory become very very costly.
-#   To scale up further, the only way is to predict multi-binary vectors instead of
-#   having discrete action of size 2**dim-dim-1.
-#   Thus, for performance reason, we recommend to cap _MAX_DIM at 10.
-for i in range(2, _MAX_DIM):
-    dec_table[i] = decode_table(i)
-
-
-def decode_from_one_hot(one_hot: jnp.ndarray, lookup_dict: jnp.ndarray) -> jnp.ndarray:
-    """
-    Decode a single one hot vector into a multi-binary vector, assuming a look-up dict is given (yes, I am cheating).
-    The `lookup_dict` will be locked up as static when jitted with a factory function.
-    E.g., [0, 0, 1, 0] is decoded into [0, 1, 1].
-    """
-    cls = jnp.argmax(one_hot)
-    return lookup_dict[cls]
-
-
-def decode(cls: int, lookup_dict: jnp.ndarray) -> jnp.ndarray:
-    """
-    Decode a single encoded host action number into a multi-binary vector, assuming a look-up dict is given.
-    The `lookup_dict` will be locked up as static when jitted with a factory function.
-    E.g., cls=2, dimension=3 is decoded into [0, 1, 1].
-    """
-
-    return lookup_dict[cls]
-
-
-@functools.lru_cache
-def get_batch_decode(dimension: int) -> Callable:
-    """
-    The factory function of getting a batch decoder function with given dimension.
-    """
-    if dimension >= _MAX_DIM:
-        raise ValueError(f"Dimension is capped at {_MAX_DIM}. Got {dimension}.")
-    return vmap(partial(decode, lookup_dict=dec_table[dimension]), 0, 0)
-
-
-@functools.lru_cache
-def get_batch_decode_from_one_hot(dimension: int) -> Callable:
-    """
-    The factory function of getting a batch decoder (from one-hot vectors) function with given dimension.
-    """
-    if dimension >= _MAX_DIM:
-        raise ValueError(f"Dimension is capped at {_MAX_DIM}. Got {dimension}.")
-    return vmap(partial(decode_from_one_hot, lookup_dict=dec_table[dimension]), 0, 0)
-
-
-def encode(multi_binary: jnp.ndarray) -> int:
-    """
-    Encode a multi-binary vector into compressed class number.
-    E.g., [1,0,1] is turned into 1 (second in the permissible actions: 3, 5, 6, 7).
-    Return:
-        int
-    """
-    dimension = multi_binary.shape[0]
-    naive_binary = jnp.sum(2 ** jnp.arange(dimension) * multi_binary)
-    return naive_binary - jnp.floor(jnp.log2(naive_binary)) - 2
-
-
-def encode_one_hot(multi_binary: jnp.ndarray) -> jnp.ndarray:
-    """
-    Encode a multi-binary vector into the one-hot vector of compressed class.
-    E.g. [1,0,1] is turned into [0,1,0,0].
-    Return:
-        jnp.ndarray with type jnp.float32
-    """
-    dimension = multi_binary.shape[0]
-    class_num = 2 ** dimension - dimension - 1
-    return (jnp.arange(class_num) == encode(multi_binary)).astype(jnp.float32)
-
-
-batch_encode = vmap(encode, 0, 0)
-batch_encode_one_hot = vmap(encode_one_hot, 0, 0)
-
-
-# ---------- Loss functions ---------- #
-
-
-def compute_loss(params, apply_fn, sample, loss_fn) -> jnp.ndarray:
-    obs, target_policy_logits, target_value = sample
-    policy_logits, value = apply_fn(obs, params)
-    return loss_fn(policy_logits, value, target_policy_logits, target_value)
-
-
-def policy_value_loss(
-        policy_logit: jnp.ndarray, value: jnp.ndarray, target_policy: jnp.ndarray, target_value: jnp.ndarray
-) -> jnp.ndarray:
-    # Shapes:
-    # policy_logit, target_policy: (B, action)
-    # value_logit, target_value: (B,)
-    policy_loss = jnp.sum(-jax.nn.softmax(target_policy, axis=-1) * jax.nn.log_softmax(policy_logit, axis=-1), axis=1)
-    value_loss = jnp.square(value - target_value)
-    return jnp.mean(policy_loss + value_loss)
-
-
 @partial(jax.pmap, static_broadcasted_argnums=(1, 2, 3, 4))
 def generate_pts(key: jnp.ndarray, shape: Tuple, max_value: int, dtype=jnp.float32, rescale=True) -> jnp.ndarray:
     pts = jax.random.randint(key, shape, 0, max_value).astype(dtype)
-    pts = jnp.where(rescale, rescale_jax(get_newton_polytope_jax(pts)),
-                    get_newton_polytope_jax(pts))
+    pts = jnp.where(rescale, rescale_jax(get_newton_polytope_jax(pts)), get_newton_polytope_jax(pts))
     return pts
+
+
+def rollout_sanity_tests(rollout: Rollout, spec: Tuple[int, int]) -> bool:
+    """
+    Given a rollout (observation, policy, value), this tests a few things:
+        - whether the action masks are properly applied.
+        - whether the policy *MIGHT* already be the softmax (all added up to 1 and between [0, 1]).
+    Parameters:
+        rollout: the rollout.
+        spec: (max_num_points, dimension)
+    Returns:
+        True if it passes the sanity test.
+    """
+    obs, policy, value = rollout
+    # Check masks.
+    if obs.shape[-1] == (spec[0] + 1) * spec[1]:
+        mask = obs[..., -spec[1]:] > 0.5
+        # In unified states, host observations are padded by 0 which is impossible for agent states to have.
+        is_host = jnp.expand_dims(jnp.all(jnp.isclose(mask, 0.0), axis=-1), axis=-1)
+        # Sometimes, the action space is padded to certain length. Mark the extra dimensions to be False in the mask.
+        mask = jnp.concatenate([mask + is_host, jnp.repeat(is_host, policy.shape[-1] - spec[1], axis=-1)], axis=-1)
+
+        if jnp.any((policy * ~mask - mask * jnp.inf) != -jnp.inf):
+            return False
+
+    # Check softmax policy.
+    # You need to have God's blessing to have logits that add up to 1 and all between 0, 1 for all states in a batch.
+    if jnp.all(jnp.isclose(jnp.sum(policy, axis=-1), 1.0)) and jnp.all((policy <= 1.0) & (policy >= 0.0)):
+        return False
+
+    return True
+
+
+def safe_clip_grads(grad_tree, max_norm):
+    norm = l2_norm(grad_tree)
+    eps = 1e-9
+    normalize = lambda g: jnp.where(norm < max_norm, g, g * max_norm / (norm + eps))
+    return jax.tree_util.tree_map(normalize, grad_tree)

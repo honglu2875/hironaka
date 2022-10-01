@@ -12,8 +12,7 @@ class NNPolicy(Policy):
     The basic policy that uses neural network to predict an action.
     """
 
-    def __init__(self, model: torch.nn.Module, masked: Optional[bool] = True, eval_mode: Optional[bool] = False,
-                 **kwargs):
+    def __init__(self, model: torch.nn.Module, masked: Optional[bool] = True, eval_mode: Optional[bool] = False, **kwargs):
         super().__init__(**kwargs)
         self.model = model.to(self.device)
         self.masked = masked

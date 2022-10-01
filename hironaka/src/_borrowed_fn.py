@@ -23,9 +23,9 @@ def zip_equal(*iterables):
 
 
 def polyak_update(
-        params: Iterable[torch.nn.Parameter],
-        target_params: Iterable[torch.nn.Parameter],
-        tau: float,
+    params: Iterable[torch.nn.Parameter],
+    target_params: Iterable[torch.nn.Parameter],
+    tau: float,
 ) -> None:
     """
     Perform a Polyak average update on ``target_params`` using ``params``:

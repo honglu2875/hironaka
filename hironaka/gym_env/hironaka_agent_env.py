@@ -5,6 +5,7 @@ from gym import spaces
 
 from hironaka.agent import Agent
 from hironaka.src import decode_action
+
 from .hironaka_base import HironakaBase
 
 
@@ -14,12 +15,12 @@ class HironakaAgentEnv(HironakaBase):
     """
 
     def __init__(
-            self,
-            agent: Agent,
-            use_discrete_actions_for_host: Optional[bool] = False,
-            compressed_host_output: Optional[bool] = True,
-            config_kwargs: Optional[Dict[str, Any]] = None,
-            **kwargs
+        self,
+        agent: Agent,
+        use_discrete_actions_for_host: Optional[bool] = False,
+        compressed_host_output: Optional[bool] = True,
+        config_kwargs: Optional[Dict[str, Any]] = None,
+        **kwargs
     ):
         config = kwargs if config_kwargs is None else {**kwargs, **config_kwargs}
         super().__init__(**config)
@@ -31,9 +32,9 @@ class HironakaAgentEnv(HironakaBase):
         self.observation_space = self.point_observation_space
         if self.use_discrete_actions_for_host:
             if self.compressed_host_output:
-                self.action_space = spaces.Discrete(2 ** self.dimension - self.dimension - 1)
+                self.action_space = spaces.Discrete(2**self.dimension - self.dimension - 1)
             else:
-                self.action_space = spaces.Discrete(2 ** self.dimension)
+                self.action_space = spaces.Discrete(2**self.dimension)
         else:
             self.action_space = spaces.MultiBinary(self.dimension)
 

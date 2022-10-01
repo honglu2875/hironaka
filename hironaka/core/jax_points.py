@@ -1,13 +1,14 @@
 from functools import partial
 from typing import List, Optional, Tuple, Type, Union
 
-import jax
-import jax.numpy as jnp
 import jaxlib
 import numpy as np
+
+import jax
+import jax.numpy as jnp
+from hironaka.src import get_batched_padded_array, get_newton_polytope_jax, reposition_jax, rescale_jax, shift_jax
 from jax import vmap
 
-from hironaka.src import get_batched_padded_array, get_newton_polytope_jax, reposition_jax, rescale_jax, shift_jax
 from .points_base import PointsBase
 
 
@@ -16,14 +17,14 @@ class JAXPoints(PointsBase):
     running_attributes = ["distinguished_points"]
 
     def __init__(
-            self,
-            points: Union[jnp.ndarray, List[List[List[float]]], np.ndarray],
-            value_threshold: Optional[float] = 1e8,
-            device: Optional[jaxlib.xla_extension.Device] = None,
-            padding_value: Optional[float] = -1.0,
-            distinguished_points: Optional[List[int]] = None,
-            dtype: Optional[Type] = jnp.float32,
-            **kwargs,
+        self,
+        points: Union[jnp.ndarray, List[List[List[float]]], np.ndarray],
+        value_threshold: Optional[float] = 1e8,
+        device: Optional[jaxlib.xla_extension.Device] = None,
+        padding_value: Optional[float] = -1.0,
+        distinguished_points: Optional[List[int]] = None,
+        dtype: Optional[Type] = jnp.float32,
+        **kwargs,
     ):
         self.value_threshold = value_threshold
         assert padding_value <= 0.0, f"'padding_value' must be a non-positive number. Got {padding_value} instead."
@@ -71,7 +72,7 @@ class JAXPoints(PointsBase):
         self.points = self.points.astype(t)
 
     def _shift(
-            self, points: jnp.ndarray, coords: jnp.ndarray, axis: jnp.ndarray, inplace: Optional[bool] = True, **kwargs
+        self, points: jnp.ndarray, coords: jnp.ndarray, axis: jnp.ndarray, inplace: Optional[bool] = True, **kwargs
     ) -> jnp.ndarray:
         new_pts = shift_jax(points, coords, axis, padding_value=self.padding_value)
         if inplace:

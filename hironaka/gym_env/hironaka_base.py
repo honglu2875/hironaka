@@ -36,19 +36,19 @@ class HironakaBase(gym.Env, abc.ABC):
 
     @abc.abstractmethod
     def __init__(
-            self,
-            dimension: Optional[int] = 3,
-            max_num_points: Optional[int] = 10,
-            max_value: Optional[int] = 10,
-            padding_value: Optional[float] = -1.0,
-            value_threshold: Optional[float] = None,
-            step_threshold: Optional[int] = 1000,
-            fixed_penalty_crossing_threshold: Optional[int] = None,
-            stop_at_threshold: Optional[bool] = True,
-            improve_efficiency: Optional[bool] = False,
-            scale_observation: Optional[bool] = True,
-            reward_based_on_point_reduction: Optional[bool] = False,
-            **kwargs
+        self,
+        dimension: Optional[int] = 3,
+        max_num_points: Optional[int] = 10,
+        max_value: Optional[int] = 10,
+        padding_value: Optional[float] = -1.0,
+        value_threshold: Optional[float] = None,
+        step_threshold: Optional[int] = 1000,
+        fixed_penalty_crossing_threshold: Optional[int] = None,
+        stop_at_threshold: Optional[bool] = True,
+        improve_efficiency: Optional[bool] = False,
+        scale_observation: Optional[bool] = True,
+        reward_based_on_point_reduction: Optional[bool] = False,
+        **kwargs
     ):
         self.dimension = dimension
         self.max_num_points = max_num_points
@@ -89,8 +89,7 @@ class HironakaBase(gym.Env, abc.ABC):
 
         if points is None:
             self._points = ListPoints(
-                [generate_points(self.max_num_points, **self.config_for_generate_points)],
-                value_threshold=self.value_threshold
+                [generate_points(self.max_num_points, **self.config_for_generate_points)], value_threshold=self.value_threshold
             )
         else:
             self._points = ListPoints(points, **self.config_for_points)

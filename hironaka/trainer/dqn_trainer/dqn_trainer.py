@@ -43,16 +43,16 @@ class DQNTrainer(Trainer):
             self._update_target_net(q_net, q_net_target, 1)
 
     def _fit_network(
-            self,
-            q_net: nn.Module,
-            q_net_target: nn.Module,
-            optimizer: torch.optim.Optimizer,
-            replay_buffer: ReplayBuffer,
-            batch_size: int,
-            gamma: int,
-            log_prefix: str = "",
-            current_step: int = 0,
-            **kwargs,
+        self,
+        q_net: nn.Module,
+        q_net_target: nn.Module,
+        optimizer: torch.optim.Optimizer,
+        replay_buffer: ReplayBuffer,
+        batch_size: int,
+        gamma: int,
+        log_prefix: str = "",
+        current_step: int = 0,
+        **kwargs,
     ) -> int:
         """
         Update the q_net and q_net_target. Adopted from stable-baselines3.
@@ -60,13 +60,11 @@ class DQNTrainer(Trainer):
             loss: int (only for logging purpose)
         """
         # Sample replay buffer
-        with Timer(log_prefix + "-sample_replay_buffer_total", self.time_log, active=self.log_time,
-                   use_cuda=self.use_cuda):
+        with Timer(log_prefix + "-sample_replay_buffer_total", self.time_log, active=self.log_time, use_cuda=self.use_cuda):
             replay_data = replay_buffer.sample(batch_size, device=self.device)
             observations, actions, rewards, dones, next_observations = replay_data
 
-        with Timer(log_prefix + "-get_target_q_value_total", self.time_log, active=self.log_time,
-                   use_cuda=self.use_cuda):
+        with Timer(log_prefix + "-get_target_q_value_total", self.time_log, active=self.log_time, use_cuda=self.use_cuda):
             with torch.no_grad():
                 # Compute the next Q-values using the target network
                 next_q_values = q_net_target(next_observations)
@@ -107,8 +105,7 @@ class DQNTrainer(Trainer):
                 if self.layerwise_logging:
                     for j, layer in enumerate(q_net.parameters()):
                         self.tb_writer.add_scalar(
-                            f"{log_prefix}/model/layer-{j}/avg_wt", layer.mean().item(),
-                            self.total_num_steps + current_step
+                            f"{log_prefix}/model/layer-{j}/avg_wt", layer.mean().item(), self.total_num_steps + current_step
                         )
                         self.tb_writer.add_scalar(
                             f"{log_prefix}/model/layer-{j}/std", layer.std().item(), self.total_num_steps + current_step
@@ -128,8 +125,7 @@ class DQNTrainer(Trainer):
         return loss
 
     def _train(
-            self, steps: int, evaluation_interval: int = 1000, players: Iterable[str] = ("host", "agent"),
-            prefix: str = ""
+        self, steps: int, evaluation_interval: int = 1000, players: Iterable[str] = ("host", "agent"), prefix: str = ""
     ):
         losses = []
         param = {}
@@ -143,8 +139,7 @@ class DQNTrainer(Trainer):
                 return
 
         for role in players:
-            net_param[role] = self.get_net(role), self.get_net_target(role), self.get_optim(
-                role), self.get_replay_buffer(role)
+            net_param[role] = self.get_net(role), self.get_net_target(role), self.get_optim(role), self.get_replay_buffer(role)
             param[role] = self.get_all_role_specific_param(role)
         model_prefix = f"{prefix}-{self.version_string}-{self.device_num}"
 
@@ -158,12 +153,10 @@ class DQNTrainer(Trainer):
 
                 with Timer(f"fit_{role}_net_total", self.time_log, active=self.log_time, use_cuda=self.use_cuda):
                     losses.append(
-                        self._fit_network(*net_param[role], **param[role], log_prefix=f"{role}-{model_prefix}",
-                                          current_step=i)
+                        self._fit_network(*net_param[role], **param[role], log_prefix=f"{role}-{model_prefix}", current_step=i)
                     )
 
-                with Timer(f"collect_{role}_rollouts_total", self.time_log, active=self.log_time,
-                           use_cuda=self.use_cuda):
+                with Timer(f"collect_{role}_rollouts_total", self.time_log, active=self.log_time, use_cuda=self.use_cuda):
                     if (self.total_num_steps + i) % param[role]["steps_before_rollout"] == 0:
                         with self.inference_mode():
                             self.collect_rollout(role, param[role]["rollout_size"])

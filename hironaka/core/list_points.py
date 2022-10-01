@@ -11,6 +11,7 @@ from hironaka.src import (
     scale_points,
     shift_lst,
 )
+
 from .points_base import PointsBase
 
 PointsAsNestedLists = List[List[List[Any]]]
@@ -26,12 +27,12 @@ class ListPoints(PointsBase):
     running_attributes = ["distinguished_points"]
 
     def __init__(
-            self,
-            points: Union[PointsAsNestedLists, List[List[float]], np.ndarray],
-            value_threshold: Optional[float] = 1e8,
-            use_precise_newton_polytope: Optional[bool] = False,
-            distinguished_points: Optional[Union[List[int], None]] = None,
-            **kwargs
+        self,
+        points: Union[PointsAsNestedLists, List[List[float]], np.ndarray],
+        value_threshold: Optional[float] = 1e8,
+        use_precise_newton_polytope: Optional[bool] = False,
+        distinguished_points: Optional[Union[List[int], None]] = None,
+        **kwargs
     ):
         """
         Parameters:
@@ -75,18 +76,15 @@ class ListPoints(PointsBase):
         return [len(batch) for batch in self.points]
 
     def _shift(
-            self, points: PointsAsNestedLists, coords: List[List[int]], axis: List[int],
-            inplace: Optional[bool] = True, **kwargs
+        self, points: PointsAsNestedLists, coords: List[List[int]], axis: List[int], inplace: Optional[bool] = True, **kwargs
     ) -> PointsAsNestedLists:
         return shift_lst(points, coords, axis, inplace=inplace)
 
-    def _reposition(
-            self, points: PointsAsNestedLists, inplace: Optional[bool] = True, **kwargs
-    ) -> PointsAsNestedLists:
+    def _reposition(self, points: PointsAsNestedLists, inplace: Optional[bool] = True, **kwargs) -> PointsAsNestedLists:
         return reposition_lst(points, inplace=inplace)
 
     def _get_newton_polytope(
-            self, points: PointsAsNestedLists, inplace: Optional[bool] = True, **kwargs
+        self, points: PointsAsNestedLists, inplace: Optional[bool] = True, **kwargs
     ) -> PointsAsNestedLists:
         # Mark distinguished points
         if self.distinguished_points is not None:
@@ -120,9 +118,7 @@ class ListPoints(PointsBase):
     def _get_shape(self, points: PointsAsNestedLists) -> Tuple[int, int, int]:
         return get_shape(points)
 
-    def _rescale(
-            self, points: PointsAsNestedLists, inplace: Optional[bool] = True, **kwargs
-    ) -> PointsAsNestedLists:
+    def _rescale(self, points: PointsAsNestedLists, inplace: Optional[bool] = True, **kwargs) -> PointsAsNestedLists:
         return scale_points(points, inplace=inplace)
 
     def _add_batch_axis(self, points: PointsAsNestedLists) -> PointsAsNestedLists:

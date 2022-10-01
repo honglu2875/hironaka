@@ -15,12 +15,12 @@ class Game(abc.ABC):
 
     @abc.abstractmethod
     def __init__(
-            self,
-            state: Union[ListPoints, Points, None],
-            host: Host,
-            agent: Agent,
-            scale_observation: Optional[bool] = True,
-            **kwargs,
+        self,
+        state: Union[ListPoints, Points, None],
+        host: Host,
+        agent: Agent,
+        scale_observation: Optional[bool] = True,
+        **kwargs,
     ):
         """
         state: initial state
@@ -128,8 +128,7 @@ class GameMorin(Game):
 
     def __init__(self, state: Union[ListPoints, Points, None], host: Host, agent: Agent, **kwargs):
         super().__init__(state, host, agent, **kwargs)
-        self.weights = [[1] * self.state.dimension for _ in range(self.state.batch_size)] \
-            if self.state is not None else None
+        self.weights = [[1] * self.state.dimension for _ in range(self.state.batch_size)] if self.state is not None else None
 
     def step(self, verbose: int = 0) -> bool:
         if self.stopped:
