@@ -16,7 +16,7 @@ model_path = 'models'
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string('config', 'jax_mcts.yml', 'The config file.')
-flags.DEFINE_int('key', 42, 'The random seed.')
+flags.DEFINE_integer('key', 42, 'The random seed.')
 flags.DEFINE_bool('early_stop', False, 'Whether to stop training early when signs of overfitting are observed.')
 
 
@@ -32,7 +32,7 @@ def p_compute_loss(params, apply_fn, sample, loss_fn, weight):
 
 
 def main(argv):
-    key = jax.random.PRNGKey(time.time_ns()) if FLAGS.key is None else FLAGS.key
+    key = jax.random.PRNGKey(time.time_ns() if FLAGS.key is None else FLAGS.key)
     key, subkey = jax.random.split(key)
 
     trainer = JAXTrainer(subkey, FLAGS.config)
