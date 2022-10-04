@@ -2,15 +2,20 @@
 Utility functions for the actual game playing or tree searching.
 """
 from collections import deque, namedtuple
+from functools import partial
 from typing import Optional, Any, Callable, List, Tuple
 
 from dataclasses import dataclass
+
+import jax
 import pygraphviz as pgv
 import jax.numpy as jnp
+from flax.jax_utils import unreplicate
 
+from hironaka.jax import JAXTrainer
 from hironaka.jax.host_action_preprocess import decode_from_one_hot, get_batch_decode_from_one_hot
 from hironaka.jax.players import get_host_with_flattened_obs, zeillinger_fn
-from hironaka.jax.util import get_take_actions, get_preprocess_fns, get_done_from_flatten
+from hironaka.jax.util import get_take_actions, get_preprocess_fns, get_done_from_flatten, mcts_wrapper, action_wrapper
 from hironaka.src import rescale_jax
 
 
@@ -57,7 +62,8 @@ class TreeNode:
             graph.add_edge(parent_id, id, label=edge_label)
 
 
-def search_tree_fix_host(node: TreeNode, spec: Tuple, host: Callable, depth: int, scale_observation=True) -> TreeNode:
+def search_tree_fix_host(node: TreeNode, spec: Tuple, host: Callable,
+                         depth: int, key: jnp.ndarray, scale_observation=True, max_depth=1000) -> TreeNode:
     """
     Node data is assumed to be 1d with length (max_num_points + 1) * dimension.
     Parameters:
@@ -65,13 +71,15 @@ def search_tree_fix_host(node: TreeNode, spec: Tuple, host: Callable, depth: int
         spec: (max_num_points, dimension).
         host: the host function that outputs policy logits (not converted to multi-binaries yet).
         depth: the depth of the node.
+        key: the PRNGKey
         scale_observation: (Optional) whether to scale the observation.
+        max_depth: (Optional) the maximal depth.
     """
     decode = get_batch_decode_from_one_hot(spec[1])
     if node.children is None:
         node.children = []
 
-    if get_done_from_flatten(node.data, 'agent', spec[1])[0]:
+    if get_done_from_flatten(node.data, 'agent', spec[1])[0] or depth > max_depth:
         return node
 
     # Truncate the observation to (1, max_num_points * dimension)
@@ -80,7 +88,9 @@ def search_tree_fix_host(node: TreeNode, spec: Tuple, host: Callable, depth: int
     take_action = get_take_actions('host', spec, rescale_points=False)
 
     # Make inference and decode into a multi-binary array showing host's choice of axis
-    multi_bin = decode(host(node.data, axis=0))  # shape: (1, dimension)
+    key, subkey = jax.random.split(key)
+    print(node.data)
+    multi_bin = decode(host(node.data, key=subkey))  # shape: (1, dimension)
 
     for i in range(spec[1]):
         if multi_bin[0, i] > 0.5:
@@ -88,8 +98,9 @@ def search_tree_fix_host(node: TreeNode, spec: Tuple, host: Callable, depth: int
                                     multi_bin.astype(jnp.float32),
                                     jnp.array([i], dtype=jnp.float32))
             new_obs = jnp.concatenate([new_state, jnp.zeros((1, spec[1]))], axis=-1)
+            key, subkey = jax.random.split(key)
             new_node = search_tree_fix_host(TreeNode(parent=node, action_from_parent=i, data=new_obs),
-                                            spec, host, depth+1, scale_observation)
+                                            spec, host, depth+1, subkey, scale_observation, max_depth)
             node.children.append(new_node)
 
     return node
@@ -97,17 +108,29 @@ def search_tree_fix_host(node: TreeNode, spec: Tuple, host: Callable, depth: int
 
 if __name__ == '__main__':
     #pt = jnp.array([[3, 0, 0, 0, 5, 0, 0, 0, 2, 0, 0, 0]])  # E8-singularity
-    pt = jnp.array([[2, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0]])  # D4-singularity
+    #pt = jnp.array([[2, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0]])  # D4-singularity
+    pt = jnp.array([[2, 0, 0, 0, 3, 0, 0, 0, 3] + [-1] * 51 + [0, 0, 0]], dtype=jnp.float32)
     root = TreeNode(parent=None, action_from_parent=None, data=pt)
-    spec = (3, 3)
-    zeillinger_flattened = get_host_with_flattened_obs(spec, zeillinger_fn, truncate_input=True)
-    search_tree_fix_host(root, spec, zeillinger_flattened, 0, scale_observation=True)
+    spec = (20, 3)
+    #zeillinger_flattened = get_host_with_flattened_obs(spec, zeillinger_fn, truncate_input=True)
+
+    # ------------ Get the MCTS policy functions ------------ #
+    trainer = JAXTrainer(jax.random.PRNGKey(42), 'train/jax_mcts.yml')
+    trainer.load_checkpoint('train/models')
+    host_fn = mcts_wrapper(trainer.unified_eval_loop)
+
+    host = jax.jit(action_wrapper(
+        partial(host_fn,
+                params=unreplicate(trainer.host_state.params),
+                opp_params=unreplicate(trainer.agent_state.params))))
+
+    search_tree_fix_host(root, spec, host, 0, jax.random.PRNGKey(42), scale_observation=True, max_depth=10)
 
     def label_fn(node):
         points = node.data[:, :-spec[1]].reshape(spec)
         points = points[points[:, 0] >= 0]
         return str(points)
 
-    graph = root.to_graphviz(100, label_fn=label_fn)
+    graph = root.to_graphviz(10, label_fn=label_fn)
     graph.layout('dot')
     graph.draw('runs/tree.png')

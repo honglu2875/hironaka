@@ -144,9 +144,12 @@ class TestJAX(unittest.TestCase):
         assert jnp.all(shift_jax(s, jnp.array([[0, 1, 1]]), jnp.array([1])) == sr)
 
         # An additional test for agent features
-        p = jnp.array([[1, 2, 3, -1, -1, -1, 2, 3, 4, 0, 1, 1], [-1, -1, -1, 0, 0, 1, 0, 1, 1, 1, 0, 1]])
-        sp = jnp.array([[2, 3, 4, 1, 2, 3, -1, -1, -1, 0, 1, 1], [0, 1, 1, 0, 0, 1, -1, -1, -1, 1, 0, 1]])
-        feature_fn = get_feature_fn("agent", (3, 3))
+        p = jnp.array([[1, 2, 3, -1, -1, -1, 2, 3, 4, 0, 1, 1], [-1, -1, -1, 0, 0, 1, 0, 1, 1, 1, 0, 1]], dtype=jnp.float32)
+        sp = jnp.array([[2, 3, 4, 1, 2, 3, -1, -1, -1, 0, 1, 1], [0, 1, 1, 0, 0, 1, -1, -1, -1, 1, 0, 1]], dtype=jnp.float32)
+        feature_fn = get_feature_fn("agent", (3, 3), scale_observation=False)
+        assert jnp.all(feature_fn(p) == sp)
+        feature_fn = get_feature_fn("agent", (3, 3), scale_observation=True)
+        sp = jnp.array([[0.5, 0.75, 1., 0.25, 0.5, 0.75, -1, -1, -1, 0, 1, 1], [0, 1, 1, 0, 0, 1, -1, -1, -1, 1, 0, 1]], dtype=jnp.float32)
         assert jnp.all(feature_fn(p) == sp)
 
     def test_points_jax(self):
