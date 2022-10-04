@@ -36,7 +36,7 @@ def get_dones(pts: jnp.ndarray) -> jnp.ndarray:
 
 
 def get_done_from_flatten(obs: jnp.ndarray, role: str, dimension: int) -> jnp.ndarray:
-    return jnp.sum(obs >= 0, axis=-1) <= dimension + (role == "agent") * (2**dimension - dimension - 1)
+    return jnp.sum(obs >= 0, axis=-1) <= dimension + (role == "agent") * dimension
 
 
 @functools.lru_cache()
@@ -146,38 +146,41 @@ def get_reward_fn(role: str) -> Callable:
 
 
 @functools.lru_cache()
-def get_feature_fn(role: str, spec: Tuple) -> Callable:
+def get_feature_fn(role: str, spec: Tuple, scale_observation=True) -> Callable:
     """
     Get the feature function on (possibly flattened) observations.
     Parameters:
         role: host or agent.
         spec: (max_num_points, dimension).
+        scale_observation: (Optional) normalize the points.
     Returns:
         the feature function that extract the features from a batch of point states
     """
     assert len(spec) == 2
+    maybe_rescale = rescale_jax if scale_observation else lambda x: x
 
-    def order(x: jnp.ndarray) -> jnp.ndarray:
+    def order_and_rescale(x: jnp.ndarray) -> jnp.ndarray:
         """
         Assume x fits into shape (-1, *spec), it will
-        - reshape x into (-1, spec[0], spec[1])
+        - reshape x into (-1, spec[0], spec[1]).
+        - (possibly) rescale the points.
         - for each slice on the 0-th axis, order the spec[0] rows (*, *, :spec[1]) from high to low lexicographically.
-        - flatten the resulting (-1, *spec) array into (-1, spec[0]*spec[1]) and return
+        - flatten the resulting (-1, *spec) array into (-1, spec[0]*spec[1]) and return.
         """
-        x_reshaped = x.reshape(-1, *spec)
+        x_reshaped = maybe_rescale(x.reshape(-1, *spec))
         idx = vmap(partial(jnp.lexsort, axis=-1), 0, 0)(-x_reshaped.transpose((0, 2, 1)))
         return flatten(jnp.take_along_axis(x_reshaped, idx[:, :, None], axis=1))
 
     if role == "host":
 
         def feature_fn(observations: jnp.ndarray) -> jnp.ndarray:
-            return order(observations)
+            return order_and_rescale(observations)
 
     elif role == "agent":
         obs_preprocess, coords_preprocess = get_preprocess_fns("agent", spec)
 
         def feature_fn(observations: jnp.ndarray) -> jnp.ndarray:
-            points = order(obs_preprocess(observations))
+            points = order_and_rescale(obs_preprocess(observations))
             coords = coords_preprocess(observations, None)
             return make_agent_obs(points, coords)
 

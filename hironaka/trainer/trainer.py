@@ -583,6 +583,8 @@ class Trainer(abc.ABC):
             er_scheduler = ConstantScheduler(er)
         setattr(self, f"{role}_er_scheduler", er_scheduler)
 
+    # -------- static helper functions -------- #
+
     @staticmethod
     def _create_network(head: nn.Module, net_arch: list, input_dim: int, output_dim: int) -> nn.Module:
         return create_mlp(head, net_arch, input_dim, output_dim)
@@ -596,8 +598,6 @@ class Trainer(abc.ABC):
         if self.scale_observation:
             points.rescale()
         return points
-
-    # -------- Public static helpers -------- #
 
     @staticmethod
     def load_yaml(file_path: str) -> dict:

@@ -164,8 +164,11 @@ class JAXTrainer:
 
         self.dtype = dtype
         self.loss_fn = loss_fn
-        self.host_feature_fn = host_feature_fn
-        self.agent_feature_fn = agent_feature_fn
+
+        self.host_feature_fn = host_feature_fn if host_feature_fn is not None else \
+            get_feature_fn('host', (self.max_num_points, self.dimension), scale_observation=self.scale_observation)
+        self.agent_feature_fn = agent_feature_fn if agent_feature_fn is not None else \
+            get_feature_fn('agent', (self.max_num_points, self.dimension), scale_observation=self.scale_observation)
 
         if not self.use_cuda:
             jax.config.update("jax_platform_name", "cpu")
@@ -249,13 +252,14 @@ class JAXTrainer:
             opp_train_state = self.get_state(opponent)
 
         # Generate root state
+        # - note: rescale is set to False as rescaling is put into feature functions.
         keys = jax.random.split(key, num=self.device_num + 1)
         root_state = generate_pts(
             keys[1:],
             (self.eval_batch_size, self.max_num_points, self.dimension),
             self.max_value,
             self.dtype,
-            self.scale_observation,
+            False,
         )
 
         if role == "agent":
@@ -478,8 +482,10 @@ class JAXTrainer:
             keys = jax.random.split(key, num=1 + self.device_num)
             key = keys[0]
 
+            # Generate new sets of points.
+            # - note: rescale is always set to False since we put rescaling into feature functions
             pts = generate_pts(
-                keys[1:], (batch_size, self.max_num_points, self.dimension), self.max_value, self.dtype, self.scale_observation
+                keys[1:], (batch_size, self.max_num_points, self.dimension), self.max_value, self.dtype, False
             )
 
             prev_done, done = 0, jnp.sum(pmap(get_dones)(pts))  # Calculate the finished games
@@ -639,7 +645,6 @@ class JAXTrainer:
         if getattr(self, f"{role}_apply_fn", None) is None:
             model = getattr(self, f"{role}_model")
             feature_fn = getattr(self, f"{role}_feature_fn")
-            feature_fn = get_feature_fn(role, (self.max_num_points, self.dimension)) if feature_fn is None else feature_fn
 
             def apply_fn(x, param, **kwargs):
                 return model.apply(param, feature_fn(x))
@@ -752,7 +757,7 @@ class JAXTrainer:
             "dimension": self.dimension,
             "max_length_game": self.max_length_game,
             "max_value": self.max_value,
-            "scale_observation": self.scale_observation,
+            "scale_observation": False,  # The burden of rescaling is put to feature functions
         }
 
         policy_fn = getattr(self, f"{role}_policy_fn") if policy_fn is None else policy_fn
@@ -763,7 +768,7 @@ class JAXTrainer:
             'max_depth': self.max_length_game,
             'max_num_considered_actions': self.max_num_considered_actions,
             'discount': self.discount,
-            'rescale_points': self.scale_observation,
+            'rescale_points': False,  # The burden of rescaling is put to feature functions
             'dtype': self.dtype
         }
         eval_loop = get_evaluation_loop(
