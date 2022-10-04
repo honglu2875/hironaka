@@ -73,6 +73,7 @@ setup(
         "optax>=0.1.3",
         "tensorboard",
         "tensorflow-cpu",
+        "pygraphviz"
     ],
     extras_require={
         "tests": [

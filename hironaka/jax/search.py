@@ -96,12 +96,18 @@ def search_tree_fix_host(node: TreeNode, spec: Tuple, host: Callable, depth: int
 
 
 if __name__ == '__main__':
-    pt = jnp.array([[3, 0, 0, 0, 5, 0, 0, 0, 2, 0, 0, 0]])
+    #pt = jnp.array([[3, 0, 0, 0, 5, 0, 0, 0, 2, 0, 0, 0]])  # E8-singularity
+    pt = jnp.array([[2, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0]])  # D4-singularity
     root = TreeNode(parent=None, action_from_parent=None, data=pt)
     spec = (3, 3)
     zeillinger_flattened = get_host_with_flattened_obs(spec, zeillinger_fn, truncate_input=True)
     search_tree_fix_host(root, spec, zeillinger_flattened, 0, scale_observation=True)
 
-    graph = root.to_graphviz(100)
+    def label_fn(node):
+        points = node.data[:, :-spec[1]].reshape(spec)
+        points = points[points[:, 0] >= 0]
+        return str(points)
+
+    graph = root.to_graphviz(100, label_fn=label_fn)
     graph.layout('dot')
     graph.draw('runs/tree.png')
