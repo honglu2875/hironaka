@@ -493,7 +493,7 @@ class JAXTrainer:
         max_num_points, dimension = self.max_num_points, self.dimension
         spec = (max_num_points, dimension)
 
-        take_action = pmap(get_take_actions(role="host", spec=spec, rescale_points=self.scale_observation))
+        take_action = pmap(get_take_actions(role="host", spec=spec, rescale_points=False))
         batch_decode = pmap(get_batch_decode_from_one_hot(dimension))
         p_reshape = pmap(jnp.reshape, static_broadcasted_argnums=1)
 

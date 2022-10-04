@@ -1,6 +1,8 @@
 """
 Utility functions for the actual game playing or tree searching.
 """
+import logging
+import sys
 from collections import deque, namedtuple
 from functools import partial
 from typing import Optional, Any, Callable, List, Tuple
@@ -115,8 +117,17 @@ if __name__ == '__main__':
 
     # ------------ Get the MCTS policy functions ------------ #
     trainer = JAXTrainer(jax.random.PRNGKey(42), 'train/jax_mcts.yml')
+    logger = trainer.logger
+    logger.setLevel(logging.INFO)
+    if not logger.hasHandlers():
+        logger.addHandler(logging.StreamHandler(sys.stdout))
     trainer.load_checkpoint('train/models')
     host_fn = mcts_wrapper(trainer.unified_eval_loop)
+
+    """
+    def fn(obs, *args, **kwargs):
+        return host_fn(obs[:, :-spec[1]], *args, **kwargs)
+    """
 
     host = jax.jit(action_wrapper(
         partial(host_fn,

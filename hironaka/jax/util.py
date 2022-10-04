@@ -80,7 +80,7 @@ def get_preprocess_fns(role: str, spec: Tuple[int, int]) -> Tuple[Callable, Call
 
 
 @functools.lru_cache()
-def get_take_actions(role: str, spec: Tuple[int, int], rescale_points: bool = True) -> Callable:
+def get_take_actions(role: str, spec: Tuple[int, int], rescale_points: bool = False) -> Callable:
     """
     Factory function that returns a `take_actions` function to perform observation update depending on the current role.
     Parameters:
