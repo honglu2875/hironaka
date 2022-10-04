@@ -328,7 +328,7 @@ def select_sample_after_sim(role: str, rollout: Rollout, dimension: int, mix_ran
     """
     key = jnp.where(key is None, jax.random.PRNGKey(time.time_ns()), key)
     size = rollout[0].shape[0]
-    offset = jnp.where(role == "agent", 2**dimension - dimension - 1, 0)
+    offset = jnp.where(role == "agent", dimension, 0)
 
     undone_idx = jnp.sum(rollout[0] >= 0, axis=-1) > (dimension + offset)
     # jit does not allow variable array size (like this `undone_sum`). So this is a work-around to sample exactly
