@@ -89,7 +89,6 @@ def search_tree_fix_host(node: TreeNode, spec: Tuple, host: Callable,
 
     # Make inference and decode into a multi-binary array showing host's choice of axis
     key, subkey = jax.random.split(key)
-    print(node.data)
     multi_bin = decode(host(node.data, key=subkey))  # shape: (1, dimension)
 
     for i in range(spec[1]):
@@ -124,7 +123,7 @@ if __name__ == '__main__':
                 params=unreplicate(trainer.host_state.params),
                 opp_params=unreplicate(trainer.agent_state.params))))
 
-    search_tree_fix_host(root, spec, host, 0, jax.random.PRNGKey(42), scale_observation=True, max_depth=10)
+    search_tree_fix_host(root, spec, host, 0, jax.random.PRNGKey(422), scale_observation=True, max_depth=4)
 
     def label_fn(node):
         points = node.data[:, :-spec[1]].reshape(spec)

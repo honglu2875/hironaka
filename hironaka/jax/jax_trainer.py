@@ -5,6 +5,7 @@ from functools import partial
 from typing import Any, Callable, List, Optional, Tuple, Union
 
 import flax
+import flax.linen as nn
 import numpy as np
 import optax
 import yaml
@@ -122,6 +123,25 @@ class JAXTrainer:
 
     optim_dict = {"adam": optax.adam, "adamw": optax.adamw, "sgd": optax.sgd}
     net_dict = {"dense_resnet": DenseResNet, "dense": DenseNet, "custom": CustomNet}
+
+    host_model: nn.Module
+    agent_model: nn.MOdule
+    host_reward_fn: Callable
+    agent_reward_fn: Callable
+    host_feature_fn: Callable
+    agent_feature_fn: Callable
+    host_state: TrainState
+    agent_state: TrainState
+    host_eval_loop: Callable
+    agent_eval_loop: Callable
+    host_eval_loop_as_opp: Callable
+    agent_eval_loop_as_opp: Callable
+    host_sim_fn: Callable
+    agent_sim_fn: Callable
+    host_mcts_policy: Callable
+    agent_mcts_policy: Callable
+    unified_eval_loop: Callable
+    unified_sim_fn: Callable
 
     def __init__(
         self,
