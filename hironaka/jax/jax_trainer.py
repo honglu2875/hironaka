@@ -125,7 +125,7 @@ class JAXTrainer:
     net_dict = {"dense_resnet": DenseResNet, "dense": DenseNet, "custom": CustomNet}
 
     host_model: nn.Module
-    agent_model: nn.MOdule
+    agent_model: nn.Module
     host_reward_fn: Callable
     agent_reward_fn: Callable
     host_feature_fn: Callable
