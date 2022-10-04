@@ -21,7 +21,7 @@ class TreeNode:
     action_from_parent: Optional[int] = None
     data: Any = None
 
-    def to_graphviz(self, max_depth: int = None, label_fn:Optional[Callable] = None) -> pgv.AGraph:
+    def to_graphviz(self, max_depth: Optional[int] = None, label_fn: Optional[Callable] = None) -> pgv.AGraph:
         """
         Convert the subtree from the current node into a pygraphviz graph.
         Use BFS so that the depth can be controlled.
@@ -101,4 +101,7 @@ if __name__ == '__main__':
     spec = (3, 3)
     zeillinger_flattened = get_host_with_flattened_obs(spec, zeillinger_fn, truncate_input=True)
     search_tree_fix_host(root, spec, zeillinger_flattened, 0, scale_observation=True)
-    print(root)
+
+    graph = root.to_graphviz(100)
+    graph.layout('dot')
+    graph.draw('runs/tree.png')
