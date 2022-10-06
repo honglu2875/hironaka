@@ -2,32 +2,53 @@
 
 This module contains all the components needed for training with [JAX](https://github.com/google/jax)
 and [mctx](https://github.com/deepmind/mctx).
-We break down component into (factory) functions included in:
+We break down components into (factory) functions included in:
 
 - [.net](net.py)
 - [.players](players.py)
 - [.recurrent_fn](recurrent_fn.py)
 - [.simulation_fn](simulation_fn.py)
 - [.util](util.py)
+- [.loss](loss.py)
+- [.host_action_preprocess](host_action_preprocess.py)
 
-and package the whole process in the class [`JAXTrainer`](jax_trainer.py). But feel free to use the functions for
+and package the whole process in the class [`JAXTrainer`](jax_trainer.py). But feel free to use the functions for more
 fine-grained modifications.
 JAX is ultimately built under functional programming concepts. It is easier to maintain key parts as individual
 functions than sophisticated hierarchies of classes.
-Also, because of this, I separate the whole JAX support from [`hironaka.trainer`](../trainer) module which has quite a
-different design.
+Because of this, I separate the whole JAX facilities from [`hironaka.trainer`](../trainer) module which has been using 
+OOP very extensively.
 
 # Architecture
 
 MCTS-based RL algorithms tend to have the following general architecture:
 
-Given functions of priors $\pi, v$ that map observations to policy logits and values, it goes through loops whose bodies
+Given functions of policy priors and values $\pi, v$, it goes through loops whose bodies
 looks like the following:
 
 ![architect](img/MCTS.png)
 
 The library [mctx](https://github.com/deepmind/mctx) already provided components that can be built to handle the first
 block. Here, we build the rest.
+
+## .JAXTrainer
+
+This is a package of all the functions into a training/validating process. It initializes based on a config file (e.g., `jax_config.yml`).
+
+A sample usage:
+
+```python
+import jax
+from hironaka.jax import JAXTrainer
+
+key = jax.random.PRNGKey(42)
+trainer = JAXTrainer(key, "jax_config.yml")
+
+for role in ['host', 'agent']:
+    key, subkey = jax.random.split(key)
+    rollout = trainer.simulate(subkey, role)
+    trainer.train(subkey, role, 10, rollout, random_sampling=True)
+```
 
 ## .net
 
@@ -59,23 +80,17 @@ are standard output for an environment. Thus, a `recurrent_fn` is a combination 
 
 This provides functions to simulate from the root and generate roll-outs.
 
-## .JAXTrainer
+## .loss
 
-This is a package of all the above and initialize based on a config file (like `jax_config.yml`).
+It contains several helper functions related to the computation of the loss.
 
-A sample usage:
+## .host_action_preprocess
 
-```python
-import jax
-from hironaka.jax import JAXTrainer
+It has several helper functions regarding the conversion of host discrete actions into multi-binary encoding. For example, when dimension is 3, the host can make choices in coordinate 0, 1, and 2, as long as 2 or more are chose.
+The most obvious way to encode this action is by a multi-binary array:
+- E.g., the choice of 0 and 1 would become (1., 1., 0.)
 
-key = jax.random.PRNGKey(42)
-trainer = JAXTrainer(key, "jax_config.yml")
+But regarding all the choices as discrete actions, one may also try to label them as one-hot encoding over the number of all coordinate subsets.
+- E.g., we can say (1., 1., 0.) is the action 0, (1., 0., 1.) is the action 1, (0., 1., 1.) is the action 2 and (1., 1., 1.) is the action 3. In this convention, (1., 1., 0.) corresponds to the one-hot encoding (1., 0., 0., 0.).
 
-for role in ['host', 'agent']:
-    key, subkey = jax.random.split(key)
-    rollout = trainer.simulate(subkey, role)
-    trainer.train(subkey, role, 10, rollout, random_sampling=True)
-```
-
-There are many little things and we recommend to check out the doc in the code. 
+Some simple encode-decode helper functions are necessary for this purpose. We use a look-up table to make the query constant time (for a fixed dimension).
