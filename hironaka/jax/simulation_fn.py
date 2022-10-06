@@ -80,7 +80,10 @@ def get_evaluation_loop(
         num_simulations=num_evaluations,
         max_depth=max_depth,
         max_num_considered_actions=max_num_considered_actions,
-        gumbel_scale=0.0
+        gumbel_scale=0.0,
+        qtransform=partial(
+            mctx.qtransform_completed_by_mix_value,
+            use_mixed_value=True),
     )
 
     def evaluation_loop(

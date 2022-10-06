@@ -69,15 +69,18 @@ def main(argv):
             test_set = test_set[0][:, ::2, :], test_set[1][:, ::2], test_set[2][:, ::2]
 
             # Put mask on non-terminal states. `device_keys` are not used since we turn random selection off.
+            # Since we use unified MC search tree, observations are padded. The game ending criteria is like 'agent'.
             mask = jax.pmap(select_sample_after_sim, static_broadcasted_argnums=(0, 2, 3))(
-                role, rollout, dimension, False, device_keys)
+                'agent', rollout, dimension, False, device_keys)
             mask_for_test = jax.pmap(select_sample_after_sim, static_broadcasted_argnums=(0, 2, 3))(
-                role, test_set, dimension, False, device_keys)
+                'agent', test_set, dimension, False, device_keys)
 
             # Cutting the observation sizes. (Note: doing it earlier will affect the correctness of masks)
             rollout = rollout[0][..., :offset], rollout[1][..., :p_offset], rollout[2]
             test_set = test_set[0][..., :offset], test_set[1][..., :p_offset], test_set[2]
 
+            logger.info(f"{role} rollout finished.")
+            logger.info(f"Non-terminal states/number of all samples: {jnp.sum(mask)}/{rollout[0].shape[0] * rollout[0].shape[1]}")
             apply_fn = trainer.get_apply_fn(role)
 
             if FLAGS.early_stop:

@@ -22,7 +22,7 @@ def get_recurrent_fn_for_role(
     spec: Tuple[int, int],
     discount=0.99,
     dtype=jnp.float32,
-    rescale_points=True,
+    rescale_points=False,
 ) -> Callable:
     """
     The factory function for the recurrent_fn corresponding to a role (host or agent).
@@ -126,7 +126,7 @@ def get_unified_recurrent_fn(
     spec: Tuple[int, int],
     discount=0.99,
     dtype=jnp.float32,
-    rescale_points=True,
+    rescale_points=False,
 ) -> Callable:
     """
     This is a unified recurrent function which generates an MC search tree without distinctions of the player roles.
