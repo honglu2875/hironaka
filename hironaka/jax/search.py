@@ -108,26 +108,26 @@ def search_tree_fix_host(node: TreeNode, spec: Tuple, host: Callable,
 
 
 if __name__ == '__main__':
-    #pt = jnp.array([[3, 0, 0, 0, 5, 0, 0, 0, 2, 0, 0, 0]])  # E8-singularity
-    #pt = jnp.array([[2, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0]])  # D4-singularity
-    pt = jnp.array([[2, 0, 0, 0, 3, 0, 0, 0, 3] + [-1] * 51 + [0, 0, 0]], dtype=jnp.float32)
-    root = TreeNode(parent=None, action_from_parent=None, data=pt)
-    spec = (20, 3)
-    #zeillinger_flattened = get_host_with_flattened_obs(spec, zeillinger_fn, truncate_input=True)
+    # zeillinger_flattened = get_host_with_flattened_obs(spec, zeillinger_fn, truncate_input=True)
 
     # ------------ Get the MCTS policy functions ------------ #
     trainer = JAXTrainer(jax.random.PRNGKey(42), 'train/jax_mcts.yml')
+    spec = (trainer.max_num_points, trainer.dimension)
+    assert spec[1] == 3  # Below we run search for a few A,D,E singularities.
+    # pt = jnp.array([[3, 0, 0, 0, 5, 0, 0, 0, 2] + [-1] * (spec[0]-3) * spec[1] + [0, 0, 0]], dtype=jnp.float32)
+    # pt = jnp.array([[2, 0, 0, 0, 3, 0, 0, 0, 3] + [-1] * (spec[0]-3) * spec[1] + [0, 0, 0]], dtype=jnp.float32)
+    # pt = jnp.array([[2, 0, 0, 0, 3, 0, 0, 0, 4] + [-1] * (spec[0]-3) * spec[1] + [0, 0, 0]], dtype=jnp.float32)
+    # pt = jnp.array([[2, 0, 0, 0, 2, 1, 0, 0, 5] + [-1] * (spec[0]-3) * spec[1] + [0, 0, 0]], dtype=jnp.float32)
+    # pt = jnp.array([[2, 0, 0, 0, 2, 0, 0, 0, 4] + [-1] * (spec[0]-3) * spec[1] + [0, 0, 0]], dtype=jnp.float32)
+    pt = jnp.array([[3, 0, 0, 0, 5, 0, 0, 2, 2] + [-1] * (spec[0] - 3) * spec[1] + [0, 0, 0]], dtype=jnp.float32)
+    root = TreeNode(parent=None, action_from_parent=None, data=pt)
+
     logger = trainer.logger
     logger.setLevel(logging.INFO)
     if not logger.hasHandlers():
         logger.addHandler(logging.StreamHandler(sys.stdout))
     trainer.load_checkpoint('train/models')
     host_fn = mcts_wrapper(trainer.unified_eval_loop)
-
-    """
-    def fn(obs, *args, **kwargs):
-        return host_fn(obs[:, :-spec[1]], *args, **kwargs)
-    """
 
     host = jax.jit(action_wrapper(
         partial(host_fn,
