@@ -109,6 +109,8 @@ class JAXTrainer:
     max_value: int
     max_grad_norm: float
     scale_observation: bool
+    # Apply reposition at the end of shifting (-> ignore exceptional divisors)
+    reposition: bool
     gumbel_scale: float
     # If use_cuda is True, we try to map to all available GPUs.
     use_cuda: bool
@@ -170,6 +172,7 @@ class JAXTrainer:
             "max_value",
             "max_grad_norm",
             "scale_observation",
+            "reposition",
             "gumbel_scale",
             "use_cuda",
             "version_string",
@@ -281,6 +284,7 @@ class JAXTrainer:
             self.max_value,
             self.dtype,
             False,
+            self.reposition
         )
 
         if role == "agent":
@@ -510,7 +514,8 @@ class JAXTrainer:
             # Generate new sets of points.
             # - note: rescale is always set to False since we put rescaling into feature functions
             pts = generate_pts(
-                keys[1:], (batch_size, self.max_num_points, self.dimension), self.max_value, self.dtype, False
+                keys[1:], (batch_size, self.max_num_points, self.dimension), self.max_value, self.dtype,
+                False, self.reposition
             )
 
             prev_done, done = 0, jnp.sum(pmap(get_dones)(pts))  # Calculate the finished games
@@ -672,7 +677,7 @@ class JAXTrainer:
             opponent = self._get_opponent(role)
             policy_fn = self.get_policy_fn(role)
             opp_policy_fn = getattr(self, f"{opponent}_mcts_policy_fn")
-            _, sim_fn, _ = self.update_eval_sim_and_mcts_policy(role,
+            _, _, sim_fn, _, _, _ = self.update_eval_sim_and_mcts_policy(role,
                                                                 policy_fn,
                                                                 opp_policy_fn,
                                                                 return_function=True)
@@ -789,6 +794,7 @@ class JAXTrainer:
             'max_num_considered_actions': self.max_num_considered_actions,
             'discount': self.discount,
             'rescale_points': False,  # The burden of rescaling is now put to feature functions
+            'reposition': self.reposition,
             'dtype': self.dtype
         }
         eval_loop_with_gumbel = get_evaluation_loop(

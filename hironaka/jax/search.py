@@ -64,6 +64,12 @@ class TreeNode:
             graph.add_edge(parent_id, id, label=edge_label)
 
 
+def default_label_fn(node):
+    points = node.data[:, :-spec[1]].reshape(spec)
+    points = points[points[:, 0] >= 0]
+    return str(points)
+
+
 def search_tree_fix_host(node: TreeNode, spec: Tuple, host: Callable,
                          depth: int, key: jnp.ndarray, scale_observation=True, max_depth=1000) -> TreeNode:
     """
@@ -136,11 +142,6 @@ if __name__ == '__main__':
 
     search_tree_fix_host(root, spec, host, 0, jax.random.PRNGKey(422), scale_observation=True, max_depth=4)
 
-    def label_fn(node):
-        points = node.data[:, :-spec[1]].reshape(spec)
-        points = points[points[:, 0] >= 0]
-        return str(points)
-
-    graph = root.to_graphviz(10, label_fn=label_fn)
+    graph = root.to_graphviz(10, label_fn=default_label_fn)
     graph.layout('dot')
     graph.draw('runs/tree.png')

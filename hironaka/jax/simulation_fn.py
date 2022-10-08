@@ -26,6 +26,7 @@ def get_evaluation_loop(
         max_num_considered_actions: int,
         discount: float,
         rescale_points: bool,
+        reposition: bool,
         role_agnostic: Optional[bool] = None,
         gumbel_scale: Optional[float] = 0.3,
         dtype=jnp.float32,
@@ -52,6 +53,7 @@ def get_evaluation_loop(
         max_depth: maximal depth of the MCTS tree.
         max_num_considered_actions: The maximum number of actions expanded at the root.
         rescale_points: Whether to rescale the point.
+        reposition: Whether to reposition (move minimal to 0 for each coordinate).
         role_agnostic: (Optional) whether in role-agnostic mode: uniformize states for both host and agent and
             expand all nodes even including the opponent decision.
         gumbel_scale: (Optional) scaling the gumbel noise at root node.
@@ -67,7 +69,8 @@ def get_evaluation_loop(
         # Create preprocess functions used in the evaluation of the root state
         policy_fn_on_root = get_dynamic_policy_fn(spec, policy_fn, opponent_fn)
         recurrent_fn = get_unified_recurrent_fn(
-            policy_fn, opponent_fn, reward_fn, spec, discount=discount, rescale_points=rescale_points, dtype=dtype
+            policy_fn, opponent_fn, reward_fn, spec, discount=discount, dtype=dtype,
+            rescale_points=rescale_points, reposition=reposition
         )
     else:
         def policy_fn_on_root(state, role_and_opponent_params, *args, **kwargs):
@@ -75,7 +78,8 @@ def get_evaluation_loop(
             return policy_fn(state, *params, *args, **kwargs)
 
         recurrent_fn = get_recurrent_fn_for_role(
-            role, policy_fn, opponent_fn, reward_fn, spec, discount=discount, rescale_points=rescale_points, dtype=dtype
+            role, policy_fn, opponent_fn, reward_fn, spec, discount=discount, dtype=dtype,
+            rescale_points=rescale_points, reposition=reposition
         )
 
     muzero = partial(
