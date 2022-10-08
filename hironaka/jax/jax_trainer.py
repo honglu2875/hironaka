@@ -110,6 +110,7 @@ class JAXTrainer:
     max_value: int
     max_grad_norm: float
     scale_observation: bool
+    gumbel_scale: float
     # If use_cuda is True, we try to map to all available GPUs.
     use_cuda: bool
 
@@ -170,6 +171,7 @@ class JAXTrainer:
             "max_value",
             "max_grad_norm",
             "scale_observation",
+            "gumbel_scale",
             "use_cuda",
             "version_string",
             "net_type",
@@ -783,12 +785,13 @@ class JAXTrainer:
         policy_fn = getattr(self, f"{role}_policy_fn") if policy_fn is None else policy_fn
         opp_policy_fn = getattr(self, f"{opponent}_policy_fn") if opp_policy_fn is None else opp_policy_fn
 
-        config = {
+        eval_loop_config = {
             'spec': (self.max_num_points, self.dimension),
             'max_depth': self.max_length_game,
             'max_num_considered_actions': self.max_num_considered_actions,
             'discount': self.discount,
             'rescale_points': False,  # The burden of rescaling is put to feature functions
+            'gumbel_scale': self.gumbel_scale,
             'dtype': self.dtype
         }
         eval_loop = get_evaluation_loop(
@@ -797,7 +800,7 @@ class JAXTrainer:
             action_wrapper(opp_policy_fn, None),  # output definitive actions as one-hot array
             getattr(self, f"{role}_reward_fn"),
             num_evaluations=self.num_evaluations,
-            **config
+            **eval_loop_config
         )
         eval_loop_as_opp = get_evaluation_loop(
             role,
@@ -805,16 +808,16 @@ class JAXTrainer:
             action_wrapper(opp_policy_fn, None),  # output definitive actions as one-hot array
             getattr(self, f"{role}_reward_fn"),
             num_evaluations=self.num_evaluations_as_opponent,
-            **config
+            **eval_loop_config
         )
         unified_eval_loop = get_evaluation_loop(
             'host',
-            get_host_with_flattened_obs(config['spec'], self.host_policy_fn, truncate_input=True),
+            get_host_with_flattened_obs(eval_loop_config['spec'], self.host_policy_fn, truncate_input=True),
             self.agent_policy_fn,
             self.agent_reward_fn,  # there is an off-by-one-step problem in rewards depending on your perspectives...
             num_evaluations=self.num_evaluations,
             role_agnostic=True,  # <-- this is for the unified MC search tree.
-            **config
+            **eval_loop_config
         )
         sim_fn = maybe_jit(
             get_simulation(role, eval_loop, config=simulation_config, dtype=self.dtype),

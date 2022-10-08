@@ -25,6 +25,7 @@ def get_evaluation_loop(
     discount: float,
     rescale_points: bool,
     role_agnostic: Optional[bool] = None,
+    gumbel_scale: Optional[int] = 0.3,
     dtype=jnp.float32,
 ) -> Callable:
     """
@@ -51,6 +52,7 @@ def get_evaluation_loop(
         rescale_points: Whether to rescale the point.
         role_agnostic: (Optional) whether in role-agnostic mode: uniformize states for both host and agent and
             expand all nodes even including the opponent decision.
+        gumbel_scale: (Optional) scaling the gumbel noise at root node.
         dtype: (Optional) the data type.
     Returns:
         The `evaluation_loop` function who is in charge of evaluation loops (expanding nodes in an MCTS tree and improve
@@ -80,7 +82,7 @@ def get_evaluation_loop(
         num_simulations=num_evaluations,
         max_depth=max_depth,
         max_num_considered_actions=max_num_considered_actions,
-        gumbel_scale=0.0,
+        gumbel_scale=gumbel_scale,
         qtransform=partial(
             mctx.qtransform_completed_by_mix_value,
             use_mixed_value=True),
