@@ -11,7 +11,7 @@ max_value: 20  # Not sure if this impacts the game at all
 max_grad_norm: 10
 
 c_puct: 0.5
-lr: 0.00001
+lr: 0.0000001
 max_depth: 20
 MSE_coefficient: 1.0
 

@@ -2,10 +2,14 @@ import logging
 import random
 import sys
 from typing import List, Union, Dict, Any
+from collections import defaultdict
+import time
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+import numpy as np
 
 from hironaka.core import TensorPoints
 from hironaka.agent import RandomAgent, ChooseFirstAgent
@@ -253,16 +257,16 @@ class MCTS2:
     def get_sample(self, state: TensorPoints):
         this_key = hashify(state)
         if self.train_target == 'agent':
-            host_action = self.coder.decode(torch.argmax(self.host_net(state.points[0])).item())
+            host_action = self.coder.decode(torch.argmax(self.host_net(state.points[self.batch])).item())
             host_action_tensor = torch.zeros(self.dim)
             for coord in host_action:
                 host_action_tensor[coord] = 1
-            net_input = torch.cat((torch.flatten(state.points[0]), host_action_tensor), 0)
+            net_input = torch.cat((torch.flatten(state.points[self.batch]), host_action_tensor), 0)
 
             for coord in host_action:
                 this_key += str(coord)
         else:
-            net_input = state.points[0]
+            net_input = state.points[self.batch]
 
         prob_vector = torch.softmax(self.N[this_key], 0)
         sample = (net_input, prob_vector)
@@ -273,6 +277,7 @@ class MCTS2:
         hashed_s = hashify(s)
 
         # End the game if one point left or it goes too deep.
+        # todo: change this to fit the batch, since s.ended means ALL batches are ended.
         if s.ended:
             current_reward = 1
             self.reward[hashed_s] = current_reward
@@ -286,12 +291,12 @@ class MCTS2:
 
         # If we are training agent, we require host to make a move first, since it is a part of input for agent net.
         if self.train_target == 'agent':
-            host_action = self.coder.decode(torch.argmax(self.host_net(s.points[0])).item())
+            host_action = self.coder.decode(torch.argmax(self.host_net(s.points[self.batch])).item())
             host_action_tensor = torch.zeros(self.dim)
             for coord in host_action:
                 host_action_tensor[coord] = 1
 
-            agent_net_input = torch.cat((torch.flatten(s.points[0],0), host_action_tensor), 0)
+            agent_net_input = torch.cat((torch.flatten(s.points[self.batch],0), host_action_tensor), 0)
             result = self.agent_net(agent_net_input)
 
             for coord in host_action:
@@ -366,9 +371,12 @@ class MCTSTrainer2(Trainer.Trainer):
         return HironakaNet(dim=self.dimension)
 
     def _policy_iter(self, state: TensorPoints, c_puct=0.5, max_depth=20, train_target = 'host'):
-        # This method returns samples of a single complete game.
-        examples = ([], [])
+        # This method returns samples of the batch of complete games.
+        # It returns a list of tuples of the form ([orbs], [prob, reward]). All batches are put into this single list.
+        # todo: make everything work for batch size more than 1. We only need to take actual action the same time, but for mcts we should separate each of them.
+        # For each batch, build a mcts_instance for it, run the mcts, record the probability vector
 
+        examples = []
         mcts_instance = MCTS2(state=state, host_net=self.host_net, agent_net=self.agent_net, train_target= train_target,
                               max_depth=max_depth, c_puct=c_puct)
 
@@ -412,6 +420,7 @@ class MCTSTrainer2(Trainer.Trainer):
     def _loss_function(self, pred, y: List[torch.FloatTensor], train_target ='host'):
         # loss function is a linear combination of MSE on winning/lossing prediction and cross entropy on probability
         # vectors.
+        # todo: change the loss function to work on a single big tensor, without the for loop.
 
         choices = getattr(self, f'{train_target}_net').choices
 
@@ -425,8 +434,6 @@ class MCTSTrainer2(Trainer.Trainer):
             loss = loss + self.host_MSE_coefficient * torch.square((reward_pred - reward_y)) - torch.dot(choice_y,
                                                                                                             torch.log(
                                                                                                              choice_pred))
-
-            # If it is changed to the build-in cross entropy, remove softmax both in the network and in the MCTS.get_sample().
 
         return loss
 
@@ -450,6 +457,7 @@ class MCTSTrainer2(Trainer.Trainer):
             c_puct = self.host_c_puct
 
             examples = self._policy_iter(state=test_points, c_puct=c_puct, max_depth=self.max_depth, train_target = train_target)
+            #todo: the output should be a list of tuples of the form ([orbs], [prob, reward])
 
             data = [torch.FloatTensor(_) for _ in examples[0]]
 
@@ -491,6 +499,7 @@ class MCTSTrainer2(Trainer.Trainer):
 
             print("training ", train_target)
             print("we are in interation ",i)
+            print("The current loss is", sum(losses)/len(losses))
 
     def save(self, path='test_model.pth'):
         torch.save(self.host_net, path)
@@ -649,6 +658,7 @@ class MCTSTrainer:
             if i % 10 == 0:
                 self.log.info("The MA of last 10 iterations is: " + str(sum(losses) / len(losses)))
                 self.log.info("Current iteration: " + str(i) + '/' + str(self.ITERATIONS))
+                print('The current MA lost is', sum(losses)/len(losses))
 
     def save_model(self, path='test_model.pth'):
         torch.save(self.net, path)
@@ -656,6 +666,9 @@ class MCTSTrainer:
 
 
 if __name__ == '__main__':
+
+
+
     host_net = HironakaNet(dim=3)
 
     # agent_net = ChooseFirstAgentModule(dimension=3, max_num_points=10, device='CPU')
@@ -663,7 +676,7 @@ if __name__ == '__main__':
 
     test = MCTSTrainer2("mcts_config.yml", host_module=host_net, agent_module=agent_net)
 
-    test.train(steps=10, evaluation_interval=10,train_target = 'agent')
+    test.train(steps=1000, evaluation_interval=10,train_target = 'host')
 
     test.save("test_model.pth")
 
