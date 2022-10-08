@@ -451,7 +451,7 @@ class TestJAX(unittest.TestCase):
         root_state = jnp.concatenate([jax.pmap(flatten)(root_state), coordinate_mask], axis=-1)
 
         # jax.config.update('jax_disable_jit', True)
-        sim = get_simulation("agent", eval_loop, config=config, dtype=jnp.float32)
+        sim = get_simulation("agent", eval_loop, dtype=jnp.float32, **config)
         rollout = jax.pmap(sim)(pkey, jax.pmap(flatten)(root_state), role_fn_args=(parameters,), opponent_fn_args=())
 
         assert rollout_sanity_tests(rollout, spec)
@@ -582,7 +582,7 @@ class TestJAX(unittest.TestCase):
             "scale_observation": True,
         }
         # jax.config.update('jax_disable_jit', True)
-        sim = get_simulation("host", eval_loop, config=config, dtype=jnp.float32)
+        sim = get_simulation("host", eval_loop, dtype=jnp.float32, **config)
         rollout = sim(key, host_obs, role_fn_args=(host_parameters,), opponent_fn_args=(agent_parameters,))
         assert rollout_sanity_tests(rollout, spec)
         rollout = sim(key, rollout[0][:, 1], role_fn_args=(host_parameters,), opponent_fn_args=(agent_parameters,))

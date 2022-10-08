@@ -49,7 +49,6 @@ from jax import pmap
 
 RollOut = Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]
 
-
 # A helper function that selects the indices of the 3-item tuple
 #   (used in the selection of training data of the (observation, policy, value)-tuple)
 p_get_index = pmap(lambda x, y: (x[0][y, :], x[1][y, :], x[2][y]))
@@ -57,7 +56,7 @@ p_get_index = pmap(lambda x, y: (x[0][y, :], x[1][y, :], x[2][y]))
 
 @partial(pmap, axis_name="d", static_broadcasted_argnums=(2, 3, 4))
 def p_train_loop(
-    state: TrainState, sample: jnp.ndarray, apply_fn: Callable, loss_fn: Callable, max_grad=1.0
+        state: TrainState, sample: jnp.ndarray, apply_fn: Callable, loss_fn: Callable, max_grad=1.0
 ) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """
     A pmap compiled training loop. Note that the last 3 arguments are statically broadcast, and the first two are
@@ -145,13 +144,13 @@ class JAXTrainer:
     unified_sim_fn: Callable
 
     def __init__(
-        self,
-        key: jnp.ndarray,
-        config: Union[dict, str],
-        dtype=jnp.float32,
-        loss_fn=policy_value_loss,
-        host_feature_fn=None,
-        agent_feature_fn=None,
+            self,
+            key: jnp.ndarray,
+            config: Union[dict, str],
+            dtype=jnp.float32,
+            loss_fn=policy_value_loss,
+            host_feature_fn=None,
+            agent_feature_fn=None,
     ):
         self.logger = logging.getLogger(__class__.__name__)
 
@@ -199,7 +198,7 @@ class JAXTrainer:
 
         _, max_num_points, dimension = self.eval_batch_size, self.max_num_points, self.dimension
         self.input_dim = {"host": max_num_points * dimension, "agent": max_num_points * dimension + dimension}
-        self.output_dim = {"host": 2**dimension - dimension - 1, "agent": dimension}
+        self.output_dim = {"host": 2 ** dimension - dimension - 1, "agent": dimension}
         sim_keys = {}
         key, sim_keys["host"], sim_keys["agent"] = jax.random.split(key, num=3)
 
@@ -307,22 +306,24 @@ class JAXTrainer:
         keys = jax.random.split(keys[0], num=self.device_num + 1)
 
         role_fn_args = (role_train_state.params,)
-        opp_fn_args = (opp_train_state.params,) if use_unified_tree else (opp_train_state.params, role_train_state.params)
+        opp_fn_args = (opp_train_state.params,) if use_unified_tree else (
+        opp_train_state.params, role_train_state.params)
         simulate_output = pmap(sim_fn)(
             keys[1:], root_state, role_fn_args, opp_fn_args
         )
-        return pmap(self.rollout_postprocess, static_broadcasted_argnums=(1, 2))(simulate_output, role, use_unified_tree)
+        return pmap(self.rollout_postprocess, static_broadcasted_argnums=(1, 2))(simulate_output, role,
+                                                                                 use_unified_tree)
 
     def train(
-        self,
-        key: jnp.ndarray,
-        role: str,
-        gradient_steps: int,
-        rollouts: RollOut,
-        mask=None,
-        random_sampling=False,
-        verbose=0,
-        save_best=True,
+            self,
+            key: jnp.ndarray,
+            role: str,
+            gradient_steps: int,
+            rollouts: RollOut,
+            mask=None,
+            random_sampling=False,
+            verbose=0,
+            save_best=True,
     ):
         """
         Trains the neural network with a collection of samples ('rollouts', supposedly collected from simulation).
@@ -376,7 +377,9 @@ class JAXTrainer:
 
                     self.tensorboard_log_scalar(f"{role}/loss", loss[0], state.step[0])
                     self.summary_writer.add_histogram(
-                        f"{role}/gradient", np.array(self.layerwise_average(grad["params"], [])), state.step[0]
+                        f"{role}/gradient",
+                        np.array([jnp.mean(layer) for layer in jax.tree_util.tree_leaves(grad["params"])]),
+                        state.step[0]
                     )
 
                     if self.config["tensorboard"]["layerwise_logging"]:
@@ -398,14 +401,14 @@ class JAXTrainer:
                     self.summary_writer.flush()  # Force writing to file after each validation.
 
     def validate(
-        self,
-        metric_fn: Optional[Callable] = None,
-        verbose=1,
-        batch_size=50,
-        num_of_loops=10,
-        max_length=None,
-        write_tensorboard=False,
-        key=None,
+            self,
+            metric_fn: Optional[Callable] = None,
+            verbose=1,
+            batch_size=50,
+            num_of_loops=10,
+            max_length=None,
+            write_tensorboard=False,
+            key=None,
     ) -> Tuple[List, List]:
         """
         This method validates the current host and agent by pitting them against pre-defined strategies including:
@@ -466,14 +469,14 @@ class JAXTrainer:
         return rhos, details
 
     def compute_rho(
-        self,
-        host: Callable,
-        agent: Callable,
-        batch_size=None,
-        num_of_loops=10,
-        max_length=None,
-        write_tensorboard=False,
-        key=None,
+            self,
+            host: Callable,
+            agent: Callable,
+            batch_size=None,
+            num_of_loops=10,
+            max_length=None,
+            write_tensorboard=False,
+            key=None,
     ) -> Tuple[float, List]:
         """
         Calculate the rho number between the host and agent.
@@ -530,7 +533,8 @@ class JAXTrainer:
                 pts = take_action(pts, coords, axis)
 
                 # Have to sync by summing results across devices. prev_done and done are single scalars.
-                prev_done, done = done, jnp.sum(pmap(get_dones)(p_reshape(pts, (-1, *spec))))  # Update the finished games
+                prev_done, done = done, jnp.sum(
+                    pmap(get_dones)(p_reshape(pts, (-1, *spec))))  # Update the finished games
 
                 if write_tensorboard:
                     collect_host_actions.append(np.array(jnp.ravel(np.argmax(host_action, axis=-1))))
@@ -601,18 +605,6 @@ class JAXTrainer:
         else:
             self.summary_writer.add_histogram(name, np.array(params), step)
 
-    @staticmethod
-    def layerwise_average(grads, avg_lst: List) -> List:
-        """
-        Recursively compute the average of each layer, and put them together into a list.
-        """
-        if isinstance(grads, (flax.core.FrozenDict, dict)):
-            for item in grads.values():
-                JAXTrainer.layerwise_average(item, avg_lst)
-        else:
-            avg_lst.append(jnp.mean(grads))
-        return avg_lst
-
     def save_checkpoint(self, path: str, roles: Optional[Union[List[str], str]] = None):
         roles = ['host', 'agent'] if roles is None else roles
         if isinstance(roles, str):
@@ -620,7 +612,8 @@ class JAXTrainer:
         for role in roles:
             state = self.get_state(role)
             checkpoints.save_checkpoint(
-                ckpt_dir=path, prefix=f"{role}_", overwrite=True, target=flax.jax_utils.unreplicate(state), step=state.step[0]
+                ckpt_dir=path, prefix=f"{role}_", overwrite=True, target=flax.jax_utils.unreplicate(state),
+                step=state.step[0]
             )
 
     def load_checkpoint(self, path: str, step=None):
@@ -778,53 +771,65 @@ class JAXTrainer:
             "max_num_points": self.max_num_points,
             "dimension": self.dimension,
             "max_length_game": self.max_length_game,
-            "max_value": self.max_value,
-            "scale_observation": False,  # The burden of rescaling is put to feature functions
+            'dtype': self.dtype
         }
 
         policy_fn = getattr(self, f"{role}_policy_fn") if policy_fn is None else policy_fn
         opp_policy_fn = getattr(self, f"{opponent}_policy_fn") if opp_policy_fn is None else opp_policy_fn
 
+        # Generate functions for evaluations (input observation and output the MCTS result).
         eval_loop_config = {
+            'role': role,
+            'policy_fn': policy_fn,  # output policy logits and value estimates
+            'opponent_fn': action_wrapper(opp_policy_fn, None),  # output definitive actions as one-hot array
+            'reward_fn': getattr(self, f"{role}_reward_fn"),
+            'num_evaluations': self.num_evaluations,
             'spec': (self.max_num_points, self.dimension),
             'max_depth': self.max_length_game,
             'max_num_considered_actions': self.max_num_considered_actions,
             'discount': self.discount,
-            'rescale_points': False,  # The burden of rescaling is put to feature functions
-            'gumbel_scale': self.gumbel_scale,
+            'rescale_points': False,  # The burden of rescaling is now put to feature functions
             'dtype': self.dtype
         }
+        eval_loop_with_gumbel = get_evaluation_loop(
+            gumbel_scale=self.gumbel_scale,
+            **eval_loop_config
+        )
         eval_loop = get_evaluation_loop(
-            role,
-            policy_fn,  # output policy logits and value estimates
-            action_wrapper(opp_policy_fn, None),  # output definitive actions as one-hot array
-            getattr(self, f"{role}_reward_fn"),
-            num_evaluations=self.num_evaluations,
+            gumbel_scale=0.0,
             **eval_loop_config
         )
         eval_loop_as_opp = get_evaluation_loop(
-            role,
-            policy_fn,  # output policy logits and value estimates
-            action_wrapper(opp_policy_fn, None),  # output definitive actions as one-hot array
-            getattr(self, f"{role}_reward_fn"),
-            num_evaluations=self.num_evaluations_as_opponent,
-            **eval_loop_config
+            gumbel_scale=0.0,
+            **{**eval_loop_config, 'num_evaluations': self.num_evaluations_as_opponent}
+        )
+
+        # Generate evaluation functions for unified MCTS (expand both host and agent nodes with unified format.
+        unified_eval_loop_config = {**eval_loop_config,
+                                    'role': 'host',
+                                    'policy_fn': get_host_with_flattened_obs(eval_loop_config['spec'],
+                                                                             self.host_policy_fn,
+                                                                             truncate_input=True),
+                                    'opponent_fn': self.agent_policy_fn,
+                                    'reward_fn': self.agent_reward_fn,  # agent because of off-by-one-step problem in rewards
+                                    'role_agnostic': True  # <-- this is for the unified MC search tree.
+                                    }
+        unified_eval_loop_with_gumbel = get_evaluation_loop(
+            gumbel_scale=self.gumbel_scale,
+            **unified_eval_loop_config
         )
         unified_eval_loop = get_evaluation_loop(
-            'host',
-            get_host_with_flattened_obs(eval_loop_config['spec'], self.host_policy_fn, truncate_input=True),
-            self.agent_policy_fn,
-            self.agent_reward_fn,  # there is an off-by-one-step problem in rewards depending on your perspectives...
-            num_evaluations=self.num_evaluations,
-            role_agnostic=True,  # <-- this is for the unified MC search tree.
-            **eval_loop_config
+            gumbel_scale=0.0,
+            **unified_eval_loop_config
         )
+
+        # Simulation functions may include gumble noise.
         sim_fn = maybe_jit(
-            get_simulation(role, eval_loop, config=simulation_config, dtype=self.dtype),
+            get_simulation(role, eval_loop_with_gumbel, **simulation_config),
             backend="cpu" if self.eval_on_cpu or not self.use_cuda else jax.default_backend(),
         )
         unified_sim_fn = maybe_jit(
-            get_simulation('host', unified_eval_loop, config=simulation_config, dtype=self.dtype),
+            get_simulation('host', unified_eval_loop_with_gumbel, **simulation_config),
             backend="cpu" if self.eval_on_cpu or not self.use_cuda else jax.default_backend(),
         )
         mcts_policy_fn = mcts_wrapper(eval_loop_as_opp)
@@ -832,15 +837,14 @@ class JAXTrainer:
             mcts_policy_fn = apply_agent_action_mask(mcts_policy_fn, self.dimension)
 
         if return_function:
-            return eval_loop, sim_fn, mcts_policy_fn
+            return eval_loop, eval_loop_as_opp, sim_fn, mcts_policy_fn, unified_eval_loop, unified_sim_fn
         else:
             setattr(self, f"{role}_eval_loop", eval_loop)
             setattr(self, f"{role}_eval_loop_as_opp", eval_loop_as_opp)
             setattr(self, f"{role}_sim_fn", sim_fn)
             setattr(self, f"{role}_mcts_policy_fn", mcts_policy_fn)
-            if not hasattr(self, "unified_eval_loop") or not hasattr(self, "unified_sim_fn"):
-                setattr(self, "unified_eval_loop", unified_eval_loop)
-                setattr(self, "unified_sim_fn", unified_sim_fn)
+            setattr(self, "unified_eval_loop", unified_eval_loop)
+            setattr(self, "unified_sim_fn", unified_sim_fn)
 
     def update_policy_fn(self, role: str, return_function=False) -> Any:
         """
