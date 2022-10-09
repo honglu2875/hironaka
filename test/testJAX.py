@@ -441,10 +441,12 @@ class TestJAX(unittest.TestCase):
             max_num_considered_actions=10,
             discount=0.99,
             rescale_points=True,
+            reposition=False
         )
         pkey = jax.random.split(key, num=len(jax.devices()))
 
-        root_state = generate_pts(pkey, (batch_size, max_num_points, dimension), config["max_value"], jnp.float32, True)
+        root_state = generate_pts(pkey, (batch_size, max_num_points, dimension), config["max_value"], jnp.float32,
+                                  True, False)
         coords, _ = jax.pmap(host_policy)(replicate(root_state), host_params)
         batch_decode_from_one_hot = get_batch_decode_from_one_hot(dimension)
         coordinate_mask = jax.pmap(batch_decode_from_one_hot)(coords)
@@ -467,7 +469,7 @@ class TestJAX(unittest.TestCase):
         ).astype(jnp.float32)
         agent_obs = {"points": jnp.copy(host_obs), "coords": jnp.array([[0, 1, 1], [1, 1, 1]])}
         combined = jnp.concatenate([agent_obs["points"].reshape(2, -1), agent_obs["coords"]], axis=1)
-        take_actions = get_take_actions("host", (4, 3), rescale_points=True)
+        take_actions = get_take_actions("host", (4, 3), rescale_points=True, reposition=False)
         # For host, `take_actions` directly receives *(obs, coords, axis)
         out = take_actions(host_obs.reshape(2, -1), agent_obs["coords"], jnp.ones(2, dtype=jnp.float32))
         assert jnp.all(
@@ -478,7 +480,7 @@ class TestJAX(unittest.TestCase):
             == out
         )
         # For agent, `take_actions` receives *(combined, axis, axis)
-        take_actions = get_take_actions("agent", (4, 3), rescale_points=False)
+        take_actions = get_take_actions("agent", (4, 3), rescale_points=False, reposition=False)
         out = take_actions(combined, jnp.ones(2, dtype=jnp.float32), jnp.ones(2, dtype=jnp.float32))
         assert jnp.all(
             flatten(get_newton_polytope_jax(
@@ -571,6 +573,7 @@ class TestJAX(unittest.TestCase):
             discount=0.99,
             role_agnostic=True,  # <-- this is for the unified MC search tree.
             rescale_points=True,
+            reposition=False
         )
 
         config = {
