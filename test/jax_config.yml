@@ -7,6 +7,8 @@ tensorboard:
 
 use_cuda: true
 scale_observation: true
+reposition: true
+gumbel_scale: 0.3
 version_string: 'mcts'
 net_type: dense
 

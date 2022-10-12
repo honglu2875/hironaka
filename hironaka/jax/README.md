@@ -12,6 +12,10 @@ We break down components into (factory) functions included in:
 - [.loss](loss.py)
 - [.host_action_preprocess](host_action_preprocess.py)
 
+Some helper functions or executable scripts to help visualize the full host tree and MCTS tree.
+- [.search](search.py)
+- [.analysis](analysis.py)
+
 and package the whole process in the class [`JAXTrainer`](jax_trainer.py). But feel free to use the functions for more
 fine-grained modifications.
 JAX is ultimately built under functional programming concepts. It is easier to maintain key parts as individual
@@ -94,3 +98,11 @@ But regarding all the choices as discrete actions, one may also try to label the
 - E.g., we can say (1., 1., 0.) is the action 0, (1., 0., 1.) is the action 1, (0., 1., 1.) is the action 2 and (1., 1., 1.) is the action 3. In this convention, (1., 1., 0.) corresponds to the one-hot encoding (1., 0., 0., 0.).
 
 Some simple encode-decode helper functions are necessary for this purpose. We use a look-up table to make the query constant time (for a fixed dimension).
+
+## .search
+Contains a `TreeNode` class and `search_tree_fix_host` to help investigate the full tree fixing a host.
+An executable script is also included, which was used to print out the resolutions for A, D, E singularities.
+
+## .analysis
+Contains helper functions to print out the MCTS search tree.
+

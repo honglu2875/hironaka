@@ -21,7 +21,7 @@ jobs:
           python -m pip install --upgrade pip
           sudo apt-get install graphviz graphviz-dev
           pip install torch==1.11+cpu -f https://download.pytorch.org/whl/torch_stable.html
-          pip install .[tests]
+          pip install .[tests,tools]
       - name: Lint with flake8
         run: |
           make lint
