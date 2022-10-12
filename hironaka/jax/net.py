@@ -74,7 +74,7 @@ class CustomNet(nn.Module):
     net_arch: List[int]
     spec: Tuple[int]
     norm: ModuleDef = partial(nn.GroupNorm, num_groups=32)
-    block_cls: ModuleDef = DenseResNet
+    block_cls: ModuleDef = DenseResidueBlock
     dtype: jnp.dtype = jnp.float32
     activation: Callable = nn.relu
 
@@ -85,13 +85,13 @@ class CustomNet(nn.Module):
 
         outs = []
         for i in range(self.spec[0]):
-            out = x[..., :i, :].reshape((*x.shape[:-2], -1))
+            out = x[..., :i+1, :].reshape((*x.shape[:-2], -1))
             for size in self.net_arch:
                 out = self.block_cls(features=size, dtype=self.dtype, norm=self.norm, activation=self.activation)(out)
             outs.append(out)
 
-        out = jnp.sum(jnp.stack(outs, axis=-1) * available[..., None, self.spec[0]], axis=-1)  # (b, size)
-        extra = x[..., self.spec[0]:, :].reshape((*x.shape[:-2], -1))
+        out = jnp.sum(jnp.stack(outs, axis=-1) * available[..., None, :], axis=-1)  # (b, size)
+        extra = x[..., self.spec[0]+1:, :].reshape((*x.shape[:-2], -1))
 
         features = jnp.concatenate([out, extra], axis=-1)
         # Policy head and value head
