@@ -80,8 +80,7 @@ There are 3 ways to start training:
   Of course, for this to work you need to
     - set up the system path so that Python can import those stuff;
     - copy the config file `dqn_config_test.yml` from `.test/` to your running folder.
-- **DQN, PPO, A3C, or anything with stable-baselines3**: When you are here in the project folder and `requirements.txt` are met (or create a venv and
-  run `pip install -r requirements.txt`), try the following:
+- **DQN, PPO, A3C, or anything with stable-baselines3**: When you are here in the project folder, try the following:
   ```bash
   python train/train_sb3.py
   ```
