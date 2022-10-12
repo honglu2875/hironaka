@@ -64,7 +64,7 @@ class TreeNode:
             graph.add_edge(parent_id, id, label=edge_label)
 
 
-def default_label_fn(node):
+def default_label_fn(node, spec):
     points = node.data[:, :-spec[1]].reshape(spec)
     points = points[points[:, 0] >= 0]
     return str(points)
@@ -142,6 +142,6 @@ if __name__ == '__main__':
 
     search_tree_fix_host(root, spec, host, 0, jax.random.PRNGKey(422), scale_observation=True, max_depth=4)
 
-    graph = root.to_graphviz(10, label_fn=default_label_fn)
+    graph = root.to_graphviz(10, label_fn=partial(default_label_fn, spec=spec))
     graph.layout('dot')
     graph.draw('runs/tree.png')

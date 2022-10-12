@@ -4,6 +4,9 @@ First of all, this is **NOT** a submodule. This is a separate area for python sc
 keep a record of some important training scripts but they are not decent enough to be merged into the mainn library.
 This folder exists only for documenting purposes. Please proceed with caution.
 
+## .jax_mcts.py
+The best method so far is to use JAX to implement MCTS+neural network like AlphaZero for our game, because we have the luxury of encoding the game into our policy. The general training script is this one (in practice, one can tweak it all you like).
+
 ## .train_sb3.py
 
 The most straightforward and perhaps lazy way to solve an RL problem is to plug into a general-purpose RL trainer and
