@@ -33,7 +33,7 @@ looks like the following:
 ![architect](img/MCTS.png)
 
 The library [mctx](https://github.com/deepmind/mctx) already provided components that can be built to handle the first
-block. Here, we build the rest.
+block. Here we try to put things together. Note that we only take advantage of the batch operations but have not implemented multi-thread MCTS.
 
 ## .JAXTrainer
 
@@ -105,3 +105,4 @@ An executable script is also included, which was used to print out the resolutio
 
 ## .analysis
 Contains helper functions to print out the MCTS search tree.
+
