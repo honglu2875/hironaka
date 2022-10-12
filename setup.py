@@ -73,7 +73,6 @@ setup(
         "optax>=0.1.3",
         "tensorboard",
         "tensorflow-cpu",
-        "pygraphviz"
     ],
     extras_require={
         "tests": [
@@ -87,6 +86,10 @@ setup(
             "isort>=5.0",
             # Reformat
             "black",
+        ],
+        "tools": [
+            # Visualization
+            "pygraphviz",
         ],
         "docs": [
             "sphinx",

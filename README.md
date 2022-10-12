@@ -11,6 +11,7 @@ happen.
 - A winning strategy of a Hironaka game is [a resolution of certain singular point](what-is-a-resolution-of-singularity)
   in a high dimensional space. Use reinforcement learning to win the game => resolving singularities and solving a range
   of algebraic geometry problems.
+- Check out some [resolution trees for ADE singularities](https://github.com/honglu2875/hironaka-experiments/blob/main/5x3-surface-singularities/README.md#model-with-014-score-against-choose-firstchoose-last) by **our neural networks** (*prototypes without fine-tuning!*). Note that there is redundancy on the trees as the game did not terminate on equations like $x + y^2 + z^2 = 0$ where the origin is already smooth.
 
 ***Brief Background***:
 
@@ -44,47 +45,45 @@ demonstration of some key classes in this repo.
 ## Reinforcement Learning
 
 There are 3 ways to start training:
-
-- (TL;DR, clone
-  this [Google Colab file](https://colab.research.google.com/drive/1nVnVA6cyg0GT5qTadJTJH7aU6smgopLm?usp=sharing),
-  forget what I say below and start your adventure)
+- **Best method so far**: Use the JAX implementation of AlphaZero-style MCTS + neural net approach. It runs with more lines but with fine-grained controls(the sample code trains hosts, but can be modified to agent without extra changes):
+  ```python
+  import jax
+  from hironaka.jax import JAXTrainer
+  from hironaka.jax.util import select_sample_after_sim
+  key = jax.random.PRNGKey(42)
+  trainer = JAXTrainer(key, 'jax_config.yml')
+  
+  role = 'host'
+  keys = jax.random.split(key, num=len(jax.devices()) + 2)
+  key, subkey = keys[0], keys[1]
+  device_keys = keys[2:]
+  
+  rollout = trainer.simulate(subkey, role, use_mcts_policy=True)
+  # Filter out a certain amount of finished games(terminal state), in order to prevent samples from being concentrated with terminal states. But this is merely a sampling trick and can be ignored if you wish.
+  mask = jax.pmap(select_sample_after_sim, static_broadcasted_argnums=(0, 2, 3))(role, rollout, 3, True, device_keys)
+  
+  key, subkey = jax.random.split(key)
+  # Train the host for 50 gradient steps.
+  trainer.train(subkey, role, 50, rollout, random_sampling=True, mask=mask)
+  ```
+  It runs on Google cloud TPUs and is already training *thanks to GCP TRC program and Research Credits*!
+- **DQN with games/replay buffer and everything on multiple GPUs**: (TL;DR, clone
+  this [Google Colab file](https://colab.research.google.com/drive/1nVnVA6cyg0GT5qTadJTJH7aU6smgopLm?usp=sharing) and start your adventure)
 
   `DQNTrainer` is a quick implementation combining my interface `Trainer` with `stable-baseline3`'s DQN codes. It runs
   in 3 lines:
-    ```python
-    from hironaka.trainer.dqn_trainer import DQNTrainer
-    trainer = DQNTrainer('dqn_config_test.yml')
-    trainer.train(100)
-    ```
+  ```python
+  from hironaka.trainer.dqn_trainer import DQNTrainer
+  trainer = DQNTrainer('dqn_config_test.yml')
+  trainer.train(100)
+  ```
   Of course, for this to work you need to
     - set up the system path so that Python can import those stuff;
     - copy the config file `dqn_config_test.yml` from `.test/` to your running folder.
-- Use the JAX implementation of AlphaZero-style MCTS + neural net approach. It runs with more lines but with fine-grained controls (the sample code trains hosts, but can be modified to agent without extra changes):
-    ```python
-    import jax
-    from hironaka.jax import JAXTrainer
-    from hironaka.jax.util import select_sample_after_sim
-    key = jax.random.PRNGKey(42)
-    trainer = JAXTrainer(key, 'jax_config.yml')
-  
-    role = 'host'
-    keys = jax.random.split(key, num=len(jax.devices()) + 2)
-    key, subkey = keys[0], keys[1]
-    device_keys = keys[2:]
-  
-    rollout = trainer.simulate(subkey, role, use_mcts_policy=True)
-    # Filter out a certain amount of finished games(terminal state), in order to prevent samples from being concentrated with terminal states. But this step can be ignored if you wish.
-    mask = jax.pmap(select_sample_after_sim, static_broadcasted_argnums=(0, 2, 3))(
-        role, rollout, 3, True, device_keys)
-  
-    key, subkey = jax.random.split(key)
-    trainer.train(subkey, role, 50, rollout, random_sampling=True, mask=mask)
-    ```
-- When you are here in the project folder and `requirements.txt` are met (or create a venv and
-  run `pip install -r requirements.txt`), try the following:
-    ```bash
-    python train/train_sb3.py
-    ```
+- **DQN, PPO, A3C, or anything with stable-baselines3**: When you are here in the project folder, try the following:
+  ```bash
+  python train/train_sb3.py
+  ```
   It starts from our base classes `Host, Agent`, goes through the gym
   wrappers `.gym_env.HironakaHostEnv, .gym_env.HironakaAgentEnv`, and ends up using `stable_baseline3`'s
   implementations. In this particular script, it uses their `DQN` class. But you can totally try other stuff like `PPO`
@@ -184,13 +183,13 @@ larger.
 
 # The structure of the repo
 
-For the detailed structure of the repo, please check out the README starting from the [hironaka](hironaka) package. But
-we would like to draw ML and RL researcher's attention to this submodule first:
+Here are a few important places to go:
 
-- [hironaka.trainer](hironaka/trainer)
-
-This is directly related to the current progress of the model training. I hope the codes and comments are
-self-explanatory.
+- [hironaka.jax](hironaka/jax) A standalone module fully devoted to JAX implementations. The structure is quite different and the implementation is heavily relying on functions, so I separate `JAXTrainer` out of `hironaka.trainer`. Despite being critical about JAX semantic designs in the very beginning, I have been converted into a big fan of JAX, as it is incredibly fast and functional programming really makes sense here!
+- [hironaka.trainer](hironaka/trainer) is my implementation of DQN where I put games/replay buffers all on GPU, and can be wrapped up by DP/DDP.
+- [hironaka.train](train) Some training scripts. `train_sb3.py`, `jax_mcts.py` are battle-tested and already produced models for us.
+- [hironaka.core](hironaka.core) Abstractions of game states and transformations. `JAXPoints`, `ListPoints`, `TensorPoints` correspond to different implementations using JAX, native List, and PyTorch, respectively.
+- [.host](host.py), [.agent](agent.py), [.game](game.py), are simple abstractions of host, agent and the game. Good for simple manipulations of gameplay but most trainings are not based on them.
 
 ---
 Now the big question is, how this game is related to some fundamental questions in pure math, or specifically, algebraic

@@ -1,3 +1,4 @@
+import functools
 from functools import partial
 from typing import Callable, Tuple, Optional
 
@@ -13,19 +14,22 @@ from .recurrent_fn import get_recurrent_fn_for_role, get_unified_recurrent_fn
 from .util import get_preprocess_fns, get_dynamic_policy_fn
 
 
+@functools.lru_cache()
 def get_evaluation_loop(
-    role: str,
-    policy_fn: Callable,
-    opponent_fn: Callable,
-    reward_fn: Callable,
-    spec: Tuple,
-    num_evaluations: int,
-    max_depth: int,
-    max_num_considered_actions: int,
-    discount: float,
-    rescale_points: bool,
-    role_agnostic: Optional[bool] = None,
-    dtype=jnp.float32,
+        role: str,
+        policy_fn: Callable,
+        opponent_fn: Callable,
+        reward_fn: Callable,
+        spec: Tuple,
+        num_evaluations: int,
+        max_depth: int,
+        max_num_considered_actions: int,
+        discount: float,
+        rescale_points: bool,
+        reposition: bool,
+        role_agnostic: Optional[bool] = None,
+        gumbel_scale: Optional[float] = 0.3,
+        dtype=jnp.float32,
 ) -> Callable:
     """
     The factory function of `evaluation_loop` which creates a new node and do one single (batched) MCTS search using
@@ -49,8 +53,10 @@ def get_evaluation_loop(
         max_depth: maximal depth of the MCTS tree.
         max_num_considered_actions: The maximum number of actions expanded at the root.
         rescale_points: Whether to rescale the point.
+        reposition: Whether to reposition (move minimal to 0 for each coordinate).
         role_agnostic: (Optional) whether in role-agnostic mode: uniformize states for both host and agent and
             expand all nodes even including the opponent decision.
+        gumbel_scale: (Optional) scaling the gumbel noise at root node.
         dtype: (Optional) the data type.
     Returns:
         The `evaluation_loop` function who is in charge of evaluation loops (expanding nodes in an MCTS tree and improve
@@ -63,7 +69,8 @@ def get_evaluation_loop(
         # Create preprocess functions used in the evaluation of the root state
         policy_fn_on_root = get_dynamic_policy_fn(spec, policy_fn, opponent_fn)
         recurrent_fn = get_unified_recurrent_fn(
-            policy_fn, opponent_fn, reward_fn, spec, discount=discount, rescale_points=rescale_points, dtype=dtype
+            policy_fn, opponent_fn, reward_fn, spec, discount=discount, dtype=dtype,
+            rescale_points=rescale_points, reposition=reposition
         )
     else:
         def policy_fn_on_root(state, role_and_opponent_params, *args, **kwargs):
@@ -71,7 +78,8 @@ def get_evaluation_loop(
             return policy_fn(state, *params, *args, **kwargs)
 
         recurrent_fn = get_recurrent_fn_for_role(
-            role, policy_fn, opponent_fn, reward_fn, spec, discount=discount, rescale_points=rescale_points, dtype=dtype
+            role, policy_fn, opponent_fn, reward_fn, spec, discount=discount, dtype=dtype,
+            rescale_points=rescale_points, reposition=reposition
         )
 
     muzero = partial(
@@ -80,11 +88,14 @@ def get_evaluation_loop(
         num_simulations=num_evaluations,
         max_depth=max_depth,
         max_num_considered_actions=max_num_considered_actions,
-        gumbel_scale=0.0
+        gumbel_scale=gumbel_scale,
+        qtransform=partial(
+            mctx.qtransform_completed_by_mix_value,
+            use_mixed_value=True),
     )
 
     def evaluation_loop(
-        key: jnp.ndarray, root_states: jnp.ndarray, role_fn_args=(), opponent_fn_args=(), invalid_actions=None
+            key: jnp.ndarray, root_states: jnp.ndarray, role_fn_args=(), opponent_fn_args=(), invalid_actions=None
     ) -> PolicyOutput:
         """
         Parameters:
@@ -111,28 +122,40 @@ def get_evaluation_loop(
     return evaluation_loop
 
 
-def get_simulation(role: str, evaluation_loop: Callable, config: dict, dtype=jnp.float32):
+def get_simulation(role: str,
+                   evaluation_loop: Callable,
+                   eval_batch_size: int,
+                   max_num_points: int,
+                   dimension: int,
+                   max_length_game: int,
+                   dtype=jnp.float32,
+                   **kwargs):
     """
-    A simulation process goes roughly as follows:
+    A simulation process (self-play under some context) goes roughly as follows:
         0. Set up initial specs, generate a batch of random points.
         1. Run `evaluation_loop` (get policy priors -> MCTS -> improve policy)
         2. Make one step according to the improved policy and add the p(obs, policy_prior, value_prior) into the
             collection of roll-outs.
-        3. Repeat 0 until enough roll-outs are collected.
+        3. Repeat 0 until enough roll-outs are collected (in this case, maximal game-length reached for every game).
+    Parameters:
+        role: host or agent. (if unified tree is used, this is ignored).
+        evaluation_loop: the evaluation function.
+        eval_batch_size: the evaluation batch size.
+        max_num_points: the maximal number of points in each state.
+        dimension: the dimension of the space.
+        max_length_game: maximal length of the game.
+        dtype: the data type.
+    Returns:
+        The corresponding simulation function (taking in initial states and carry out the 'simulation process', or
+            in other words, 'self-play'.
     """
-    eval_batch_size, max_num_points, dimension, max_length_game = (
-        config["eval_batch_size"],
-        config["max_num_points"],
-        config["dimension"],
-        config["max_length_game"],
-    )
     # If we unify roles and expand all actions: agent input dim and host action num.
     if hasattr(evaluation_loop, 'role_agnostic') and evaluation_loop.role_agnostic:
         input_dim = (max_num_points + 1) * dimension
-        action_num = 2**dimension - dimension - 1
+        action_num = 2 ** dimension - dimension - 1
     else:
         input_dim = max_num_points * dimension if role == "host" else (max_num_points + 1) * dimension
-        action_num = 2**dimension - dimension - 1 if role == "host" else dimension
+        action_num = 2 ** dimension - dimension - 1 if role == "host" else dimension
 
     def simulation(key: jnp.ndarray, root_state, role_fn_args=(), opponent_fn_args=()) -> Tuple:
         """
@@ -162,7 +185,8 @@ def get_simulation(role: str, evaluation_loop: Callable, config: dict, dtype=jnp
             action_idx = jnp.take_along_axis(
                 policy_output.search_tree.children_index[:, 0, :], policy_output.action[:, None], axis=1
             )
-            state = jnp.take_along_axis(policy_output.search_tree.embeddings[:, :, :], action_idx[:, None], axis=1).squeeze(1)
+            state = jnp.take_along_axis(policy_output.search_tree.embeddings[:, :, :], action_idx[:, None],
+                                        axis=1).squeeze(1)
 
             return jax.random.split(key, num=3), (obs, policy, value), state
 
@@ -180,7 +204,8 @@ def get_simulation(role: str, evaluation_loop: Callable, config: dict, dtype=jnp
         )
 
         _, rollouts, _ = lax.fori_loop(
-            0, num_loops, body_fn, (starting_keys, (rollout_obs_init, rollout_policy_init, rollout_value_init), root_state)
+            0, num_loops, body_fn,
+            (starting_keys, (rollout_obs_init, rollout_policy_init, rollout_value_init), root_state)
         )
 
         return rollouts[0], jnp.log(rollouts[1]), rollouts[2]

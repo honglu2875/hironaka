@@ -9,7 +9,7 @@ from jax.example_libraries.optimizers import l2_norm
 
 from hironaka.jax.host_action_preprocess import decode_table, _MAX_DIM, dec_table
 from hironaka.jax.loss import clip_log
-from hironaka.src import get_newton_polytope_jax, rescale_jax, shift_jax
+from hironaka.src import get_newton_polytope_jax, rescale_jax, shift_jax, reposition_jax
 from jax import jit, lax
 from jax import numpy as jnp
 from jax import vmap
@@ -80,13 +80,15 @@ def get_preprocess_fns(role: str, spec: Tuple[int, int]) -> Tuple[Callable, Call
 
 
 @functools.lru_cache()
-def get_take_actions(role: str, spec: Tuple[int, int], rescale_points: bool = True) -> Callable:
+def get_take_actions(role: str, spec: Tuple[int, int],
+                     rescale_points: bool = False, reposition: bool = True) -> Callable:
     """
     Factory function that returns a `take_actions` function to perform observation update depending on the current role.
     Parameters:
         role: 'host' or 'agent'
         spec: (max_num_points, dimension)
         rescale_points: whether to do an L0-rescale at the end.
+        reposition: whether to shift the minimal coordinate of each coordinate to 0 (-> ignoring exceptional divisor).
     Returns:
         the `take_actions` function.
     """
@@ -114,7 +116,9 @@ def get_take_actions(role: str, spec: Tuple[int, int], rescale_points: bool = Tr
         """
         points = obs_preprocess(observations)
         coords = coords_preprocess(observations, actions)
-        shifted_pts = get_newton_polytope_jax(shift_jax(points, coords, axis))
+        shifted_pts = shift_jax(points, coords, axis)
+        shifted_pts = jnp.where(reposition, reposition_jax(shifted_pts), shifted_pts)
+        shifted_pts = get_newton_polytope_jax(shifted_pts)
         maybe_rescaled = jnp.where(rescale_points, rescale_jax(shifted_pts), shifted_pts).reshape((-1, spec[0] * spec[1]))
         return maybe_rescaled
 
@@ -328,7 +332,7 @@ def select_sample_after_sim(role: str, rollout: Rollout, dimension: int, mix_ran
     """
     key = jnp.where(key is None, jax.random.PRNGKey(time.time_ns()), key)
     size = rollout[0].shape[0]
-    offset = jnp.where(role == "agent", 2**dimension - dimension - 1, 0)
+    offset = jnp.where(role == "agent", dimension, 0)
 
     undone_idx = jnp.sum(rollout[0] >= 0, axis=-1) > (dimension + offset)
     # jit does not allow variable array size (like this `undone_sum`). So this is a work-around to sample exactly
@@ -342,10 +346,13 @@ def select_sample_after_sim(role: str, rollout: Rollout, dimension: int, mix_ran
     return selected_idx
 
 
-@partial(jax.pmap, static_broadcasted_argnums=(1, 2, 3, 4))
-def generate_pts(key: jnp.ndarray, shape: Tuple, max_value: int, dtype=jnp.float32, rescale=True) -> jnp.ndarray:
+@partial(jax.pmap, static_broadcasted_argnums=(1, 2, 3, 4, 5))
+def generate_pts(key: jnp.ndarray, shape: Tuple, max_value: int, dtype=jnp.float32,
+                 rescale=True, reposition=True) -> jnp.ndarray:
     pts = jax.random.randint(key, shape, 0, max_value).astype(dtype)
-    pts = jnp.where(rescale, rescale_jax(get_newton_polytope_jax(pts)), get_newton_polytope_jax(pts))
+    pts = get_newton_polytope_jax(pts)
+    pts = jnp.where(reposition, reposition_jax(pts), pts)
+    pts = jnp.where(rescale, rescale_jax(pts), pts)
     return pts
 
 

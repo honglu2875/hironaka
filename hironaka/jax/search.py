@@ -1,6 +1,8 @@
 """
 Utility functions for the actual game playing or tree searching.
 """
+import logging
+import sys
 from collections import deque, namedtuple
 from functools import partial
 from typing import Optional, Any, Callable, List, Tuple
@@ -62,6 +64,12 @@ class TreeNode:
             graph.add_edge(parent_id, id, label=edge_label)
 
 
+def default_label_fn(node, spec):
+    points = node.data[:, :-spec[1]].reshape(spec)
+    points = points[points[:, 0] >= 0]
+    return str(points)
+
+
 def search_tree_fix_host(node: TreeNode, spec: Tuple, host: Callable,
                          depth: int, key: jnp.ndarray, scale_observation=True, max_depth=1000) -> TreeNode:
     """
@@ -106,15 +114,24 @@ def search_tree_fix_host(node: TreeNode, spec: Tuple, host: Callable,
 
 
 if __name__ == '__main__':
-    #pt = jnp.array([[3, 0, 0, 0, 5, 0, 0, 0, 2, 0, 0, 0]])  # E8-singularity
-    #pt = jnp.array([[2, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0]])  # D4-singularity
-    pt = jnp.array([[2, 0, 0, 0, 3, 0, 0, 0, 3] + [-1] * 51 + [0, 0, 0]], dtype=jnp.float32)
-    root = TreeNode(parent=None, action_from_parent=None, data=pt)
-    spec = (20, 3)
-    #zeillinger_flattened = get_host_with_flattened_obs(spec, zeillinger_fn, truncate_input=True)
+    # zeillinger_flattened = get_host_with_flattened_obs(spec, zeillinger_fn, truncate_input=True)
 
     # ------------ Get the MCTS policy functions ------------ #
     trainer = JAXTrainer(jax.random.PRNGKey(42), 'train/jax_mcts.yml')
+    spec = (trainer.max_num_points, trainer.dimension)
+    assert spec[1] == 3  # Below we run search for a few A,D,E singularities.
+    # pt = jnp.array([[3, 0, 0, 0, 5, 0, 0, 0, 2] + [-1] * (spec[0]-3) * spec[1] + [0, 0, 0]], dtype=jnp.float32)
+    # pt = jnp.array([[2, 0, 0, 0, 3, 0, 0, 0, 3] + [-1] * (spec[0]-3) * spec[1] + [0, 0, 0]], dtype=jnp.float32)
+    # pt = jnp.array([[2, 0, 0, 0, 3, 0, 0, 0, 4] + [-1] * (spec[0]-3) * spec[1] + [0, 0, 0]], dtype=jnp.float32)
+    # pt = jnp.array([[2, 0, 0, 0, 2, 1, 0, 0, 5] + [-1] * (spec[0]-3) * spec[1] + [0, 0, 0]], dtype=jnp.float32)
+    # pt = jnp.array([[2, 0, 0, 0, 2, 0, 0, 0, 4] + [-1] * (spec[0]-3) * spec[1] + [0, 0, 0]], dtype=jnp.float32)
+    pt = jnp.array([[3, 0, 0, 0, 5, 0, 0, 2, 2] + [-1] * (spec[0] - 3) * spec[1] + [0, 0, 0]], dtype=jnp.float32)
+    root = TreeNode(parent=None, action_from_parent=None, data=pt)
+
+    logger = trainer.logger
+    logger.setLevel(logging.INFO)
+    if not logger.hasHandlers():
+        logger.addHandler(logging.StreamHandler(sys.stdout))
     trainer.load_checkpoint('train/models')
     host_fn = mcts_wrapper(trainer.unified_eval_loop)
 
@@ -125,11 +142,6 @@ if __name__ == '__main__':
 
     search_tree_fix_host(root, spec, host, 0, jax.random.PRNGKey(422), scale_observation=True, max_depth=4)
 
-    def label_fn(node):
-        points = node.data[:, :-spec[1]].reshape(spec)
-        points = points[points[:, 0] >= 0]
-        return str(points)
-
-    graph = root.to_graphviz(10, label_fn=label_fn)
+    graph = root.to_graphviz(10, label_fn=partial(default_label_fn, spec=spec))
     graph.layout('dot')
     graph.draw('runs/tree.png')
