@@ -206,7 +206,9 @@ class JAXTrainer:
                 continue
 
             # Note: self.output_dim means the dimension of policy vectors only.
-            net = self.net_dict[self.net_type](self.output_dim[role], net_arch=self.config[role]["net_arch"])
+            net = self.net_dict[self.net_type](self.output_dim[role],
+                                               net_arch=self.config[role]["net_arch"],
+                                               spec=(self.max_num_points, self.dimension))
             setattr(self, f"{role}_model", net)
             self.set_optim(role, self.config[role]["optim"])
 

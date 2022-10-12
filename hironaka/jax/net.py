@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Any, Callable, List, Tuple
+from typing import Any, Callable, List, Tuple, Optional
 
 from flax import linen as nn
 
@@ -47,6 +47,7 @@ class DenseBlock(nn.Module):
 class DenseResNet(nn.Module):
     output_size: int
     net_arch: List[int]
+    spec: Optional[Tuple[int]] = None
     norm: ModuleDef = partial(nn.GroupNorm, num_groups=32)
     block_cls: ModuleDef = DenseResidueBlock
     dtype: jnp.dtype = jnp.float32
@@ -66,7 +67,40 @@ class DenseResNet(nn.Module):
 
 
 DenseNet = partial(DenseResNet, block_cls=DenseBlock)
-CustomNet = DenseResNet  # Placeholder for a future network design
+
+
+class CustomNet(nn.Module):
+    output_size: int
+    net_arch: List[int]
+    spec: Tuple[int]
+    norm: ModuleDef = partial(nn.GroupNorm, num_groups=32)
+    block_cls: ModuleDef = DenseResNet
+    dtype: jnp.dtype = jnp.float32
+    activation: Callable = nn.relu
+
+    @nn.compact
+    def __call__(self, x, train: bool = True):
+        x = x.reshape((*x.shape[:-1], -1, self.spec[1]))
+        available = x[..., :self.spec[0], 0] >= 0
+
+        outs = []
+        for i in range(self.spec[0]):
+            out = x[..., :i, :].reshape((*x.shape[:-2], -1))
+            for size in self.net_arch:
+                out = self.block_cls(features=size, dtype=self.dtype, norm=self.norm, activation=self.activation)(out)
+            outs.append(out)
+
+        out = jnp.sum(jnp.stack(outs, axis=-1) * available[..., None, self.spec[0]], axis=-1)  # (b, size)
+        extra = x[..., self.spec[0]:, :].reshape((*x.shape[:-2], -1))
+
+        features = jnp.concatenate([out, extra], axis=-1)
+        # Policy head and value head
+        p = nn.Dense(self.output_size, dtype=self.dtype)(features)
+        v = nn.Dense(1, dtype=self.dtype)(features)
+        # Regulate the value output between -1 and 1
+        v = nn.tanh(v)
+        return p, v
+
 
 DResNetMini = partial(DenseResNet, net_arch=[32] * 2)
 DResNet18 = partial(DenseResNet, net_arch=[256] * 18)
