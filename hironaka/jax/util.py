@@ -136,12 +136,12 @@ def get_reward_fn(role: str) -> Callable:
     if role == "host":
 
         def reward_fn(dones: jnp.ndarray, prev_dones: jnp.ndarray) -> jnp.ndarray:
-            return (dones & (~prev_dones)).astype(jnp.float32)
+            return dones.astype(jnp.float32)
 
     elif role == "agent":
 
         def reward_fn(dones: jnp.ndarray, prev_dones: jnp.ndarray) -> jnp.ndarray:
-            return -(dones & (~prev_dones)).astype(jnp.float32)
+            return -dones.astype(jnp.float32)
 
     else:
         raise ValueError(f"role must be either host or agent. Got {role}.")
@@ -243,7 +243,7 @@ def calculate_value_using_reward_fn(
 ) -> jnp.ndarray:
     reward = vmap(reward_fn, (0, 0), 0)(done, prev_done)
     diff = jnp.arange(max_length_game).reshape((1, -1)) - jnp.arange(max_length_game).reshape((-1, 1))
-    discount_table = (discount**diff) * (diff >= 0)
+    discount_table = (discount**diff) * (diff >= 0) + (diff < 0)
     discounted_value = vmap(jnp.matmul, (None, 0), 0)(discount_table, reward)
     return discounted_value
 
