@@ -1,6 +1,7 @@
 from functools import partial
 from typing import Any, Callable, List, Tuple, Optional
 
+import jax
 from flax import linen as nn
 
 from hironaka.jax.util import get_feature_fn
@@ -81,17 +82,17 @@ class CustomNet(nn.Module):
     @nn.compact
     def __call__(self, x, train: bool = True):
         x = x.reshape((*x.shape[:-1], -1, self.spec[1]))
-        available = x[..., :self.spec[0], 0] >= 0
+        available = jax.nn.one_hot(jnp.sum(x[..., :self.spec[0], 0] >= 0, axis=-1), self.spec[0])
+        extra = x[..., self.spec[0]+1:, :].reshape((*x.shape[:-2], -1))  # (b, ?)
 
         outs = []
         for i in range(self.spec[0]):
-            out = x[..., :i+1, :].reshape((*x.shape[:-2], -1))
+            out = jnp.concatenate([x[..., :i+1, :].reshape((*x.shape[:-2], -1)), extra], axis=-1)
             for size in self.net_arch:
                 out = self.block_cls(features=size, dtype=self.dtype, norm=self.norm, activation=self.activation)(out)
             outs.append(out)
 
         out = jnp.sum(jnp.stack(outs, axis=-1) * available[..., None, :], axis=-1)  # (b, size)
-        extra = x[..., self.spec[0]+1:, :].reshape((*x.shape[:-2], -1))
 
         features = jnp.concatenate([out, extra], axis=-1)
         # Policy head and value head
