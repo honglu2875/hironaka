@@ -83,7 +83,7 @@ class CustomNet(nn.Module):
     def __call__(self, x, train: bool = True):
         x = x.reshape((*x.shape[:-1], -1, self.spec[1]))
         available = jax.nn.one_hot(jnp.sum(x[..., :self.spec[0], 0] >= 0, axis=-1), self.spec[0])
-        extra = x[..., self.spec[0]+1:, :].reshape((*x.shape[:-2], -1))  # (b, ?)
+        extra = x[..., self.spec[0]:, :].reshape((*x.shape[:-2], -1))  # (b, ?)
 
         outs = []
         for i in range(self.spec[0]):
