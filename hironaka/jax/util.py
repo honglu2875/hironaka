@@ -239,14 +239,17 @@ def get_dynamic_policy_fn(spec: Tuple[int, int], host_fn: Callable, agent_fn: Ca
 
 
 def calculate_value_using_reward_fn(
-    done: jnp.ndarray, prev_done: jnp.ndarray, discount: float, max_length_game: int, reward_fn: Callable
+    value_prior: jnp.ndarray, done: jnp.ndarray, prev_done: jnp.ndarray, discount: float, reward_fn: Callable
 ) -> jnp.ndarray:
+    batch_size, max_length_game = value_prior.shape
+    # Calculate discounted reward for finished games (before finished: discount each step, after finished: constant)
     reward = vmap(reward_fn, (0, 0), 0)(done, prev_done)
     diff = jnp.arange(max_length_game).reshape((1, -1)) - jnp.arange(max_length_game).reshape((-1, 1))
-    # Calculate cumulative reward
     discount_table = discount**jnp.clip(diff, 0, None)
     discounted_value = vmap(jnp.matmul, (None, 0), 0)(discount_table, reward)
-    return discounted_value
+    # For unfinished games: back-propagate the final value prior and apply discounts.
+    unfinished = (~done[:, -1:] * value_prior[:, -1:]) * (discount ** jnp.arange(max_length_game)[::-1])[None, :]
+    return discounted_value + unfinished
 
 
 def apply_agent_action_mask(agent_policy: Callable, dimension: int) -> Callable:

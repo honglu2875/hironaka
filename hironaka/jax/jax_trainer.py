@@ -590,7 +590,7 @@ class JAXTrainer:
         else:
             done = get_done_from_flatten(obs, role, self.dimension)  # (b, max_length_game)
         prev_done = jnp.concatenate([jnp.zeros((batch_size, 1), dtype=bool), done[:, :-1]], axis=1)
-        value = calculate_value_using_reward_fn(done, prev_done, self.discount, max_length_game, reward_fn)
+        value = calculate_value_using_reward_fn(value, done, prev_done, self.discount, reward_fn)
         value = jnp.ravel(value).astype(value_dtype)
 
         obs = obs.reshape((-1, obs.shape[2]))

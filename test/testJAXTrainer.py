@@ -326,10 +326,13 @@ class TestJAXTrainer(unittest.TestCase):
             ),
         )
 
+        # The first game ended, resulting in discounted reward (penalty)
+        # The second game did not end, and the last value was propagated to the front via discount.
         v = jnp.array(
-            [-0.960596, -0.970299, -0.9801, -0.98999995, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0], dtype=jnp.float32
-        )  # The first game ended, resulting in discounted reward (penalty)
-        assert jnp.all(self.trainer.rollout_postprocess(rollout, "agent")[2] - v < 1e-6)
+            [-0.960596, -0.970299, -0.9801, -0.98999995, -1.0, -0.04532285,
+             -0.04578065, -0.04624309, -0.04671019, -0.04718201], dtype=jnp.float32
+        )
+        assert jnp.all(jnp.isclose(self.trainer.rollout_postprocess(rollout, "agent")[2], v))
 
     def test_mcts_policy_fns(self):
         orig_size = self.trainer.eval_batch_size
