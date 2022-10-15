@@ -16,11 +16,11 @@ def policy_value_loss(
     # policy_logit, target_policy: (B, action)
     # value_logit, target_value: (B,)
     weight = jnp.ones_like(value) if weight is None else weight
-    policy_loss = jnp.sum(
+    policy_loss = jnp.mean(
         -jax.nn.softmax(target_policy, axis=-1) * jax.nn.log_softmax(policy_logit, axis=-1),
-        axis=1
+        axis=-1
     )
-    value_loss = jnp.square(value - target_value)
+    value_loss = jnp.abs(value - target_value)
     return jnp.mean((policy_loss + value_loss) * weight)
 
 

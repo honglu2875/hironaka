@@ -249,7 +249,8 @@ def calculate_value_using_reward_fn(
     discounted_value = vmap(jnp.matmul, (None, 0), 0)(discount_table, reward)
     # For unfinished games: back-propagate the final value prior and apply discounts.
     unfinished = (~done[:, -1:] * value_prior[:, -1:]) * (discount ** jnp.arange(max_length_game)[::-1])[None, :]
-    return discounted_value + unfinished
+    # The -1 is to adjust the difference of roles between the first state and the last state
+    return discounted_value + unfinished * ((-1) ** (max_length_game + 1))
 
 
 def apply_agent_action_mask(agent_policy: Callable, dimension: int) -> Callable:

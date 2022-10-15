@@ -6,13 +6,13 @@ tensorboard:
   validation_interval: 1250
 use_cuda: true
 scale_observation: true
-reposition: true
+reposition: false
 gumbel_scale: 0.3
 version_string: 'mcts'
 net_type: custom
 
 dimension: 3
-max_num_points: 20
+max_num_points: 5
 max_length_game: 40
 max_value: 20
 max_grad_norm: 0.5
@@ -26,23 +26,23 @@ max_num_considered_actions: 10
 discount: 0.98
 
 host:
-  batch_size: 512
+  batch_size: 256
   optim:
     name: 'adam'
     args: # Pass optimizer parameters here
-      learning_rate: 0.00003  #
+      learning_rate: 0.0001  #
     # Learning rate scheduling is built-in (by schedule function and `chain`), so we do not specify them.
   #net_arch: [256, 256, 256, 256, 256, 256, 256, 256]
-  net_arch: [256, 256, 256, 256, 256, 256, 256, 256]
+  net_arch: [256, 256, 256, 256]
 
 
 agent:
-  batch_size: 512
+  batch_size: 256
   optim:
     name: 'adam'
     args: # Pass optimizer parameters here
-      learning_rate: 0.00003
+      learning_rate: 0.0001
     # Learning rate scheduling is built-in (by schedule function and `chain`), so we do not specify them.
   #net_arch: [256, 256, 256, 256, 256, 256, 256, 256]
-  net_arch: [256, 256, 256, 256, 256]
+  net_arch: [256, 256, 256, 256]
 
