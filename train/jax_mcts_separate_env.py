@@ -64,7 +64,6 @@ def main(argv):
             logger.info(f"{role} rollout finished.")
             #logger.info(f"Non-terminal states/number of all samples: {jnp.sum(mask)}/{rollout[0].shape[0] * rollout[0].shape[1]}")
             logger.info(f"Value dist: {jnp.histogram(rollout[2])}")
-            apply_fn = trainer.get_apply_fn(role)
 
             key, subkey = jax.random.split(key)
             num_steps = 2000 if role == 'host' else 500

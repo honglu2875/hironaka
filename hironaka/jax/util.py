@@ -239,7 +239,8 @@ def get_dynamic_policy_fn(spec: Tuple[int, int], host_fn: Callable, agent_fn: Ca
 
 
 def calculate_value_using_reward_fn(
-    value_prior: jnp.ndarray, done: jnp.ndarray, prev_done: jnp.ndarray, discount: float, reward_fn: Callable
+        value_prior: jnp.ndarray, done: jnp.ndarray, prev_done: jnp.ndarray, discount: float, reward_fn: Callable,
+        use_unified_tree: bool
 ) -> jnp.ndarray:
     batch_size, max_length_game = value_prior.shape
     # Calculate discounted reward for finished games (before finished: discount each step, after finished: constant)
@@ -249,8 +250,9 @@ def calculate_value_using_reward_fn(
     discounted_value = vmap(jnp.matmul, (None, 0), 0)(discount_table, reward)
     # For unfinished games: back-propagate the final value prior and apply discounts.
     unfinished = (~done[:, -1:] * value_prior[:, -1:]) * (discount ** jnp.arange(max_length_game)[::-1])[None, :]
-    # The -1 is to adjust the difference of roles between the first state and the last state
-    return discounted_value + unfinished * ((-1) ** (max_length_game + 1))
+    # The -1 is to adjust the difference of roles between the first state and the last state, if unified MCTS is used.
+    unfinished = jnp.where(use_unified_tree, unfinished * ((-1) ** (max_length_game + 1)), unfinished)
+    return discounted_value + unfinished
 
 
 def apply_agent_action_mask(agent_policy: Callable, dimension: int) -> Callable:
