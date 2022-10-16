@@ -330,7 +330,7 @@ class TestJAXTrainer(unittest.TestCase):
         # The first game ended, resulting in discounted reward (penalty)
         # The second game did not end, and the last value was propagated to the front via discount.
         v = jnp.array(
-            [-0.960596, -0.970299, -0.9801, -0.98999995, -1.0, -0.480298, -0.4851495, -0.49005002, -0.495, -0.5],
+            [-0.970299, -0.9801, -0.98999995, -1.0, -1.0, -0.480298, -0.4851495, -0.49005002, -0.495, -0.5],
             dtype=jnp.float32
         )
         # print(self.trainer.rollout_postprocess(rollout, "agent", use_unified_tree=False)[2])
@@ -360,6 +360,34 @@ class TestJAXTrainer(unittest.TestCase):
         rollout = rollout[0][:, 1:], rollout[1][:, 1:], rollout[2][:, 1:]
         v = jnp.array([[0.4851495, -0.49005002, 0.495, -0.5]])
         assert jnp.all(jnp.isclose(self.trainer.rollout_postprocess(rollout, "host", use_unified_tree=True)[2], v))
+        rollout = jnp.array([[[-1., -1., -1., -1., -1., -1., 1., 1., 14., -1.,
+                               -1., -1., 4., 1., 3., 1., 1., 0.],
+                              [-1., -1., -1., -1., -1., -1., -1., -1., -1., -1.,
+                               -1., -1., 4., 5., 3., 0., 0., 0.],
+                              [-1., -1., -1., -1., -1., -1., -1., -1., -1., -1.,
+                               -1., -1., 4., 5., 3., 1., 0., 1.],
+                              [-1., -1., -1., -1., -1., -1., -1., -1., -1., -1.,
+                               -1., -1., 4., 5., 3., 0., 0., 0.],
+                              ]]), jnp.array([[
+            [9.3919918e-02, 2.0432323e-03, 9.0403688e-01],
+            [2.7057916e-01, 1.4561049e-03, 7.2796470e-01],
+            [2.7057916e-01, 1.4561049e-03, 7.2796470e-01],
+            [2.7057916e-01, 1.4561049e-03, 7.2796470e-01],
+        ]]), jnp.array([[-0.00777596, -0.0012398, 0.00597944, -0.04718201]])
+        v = jnp.array([[-1, 1, -1, 1]])
+        assert jnp.all(jnp.isclose(self.trainer.rollout_postprocess(rollout, "agent", use_unified_tree=True)[2], v))
+        rollout = jnp.array([[[-1., -1., -1., -1., -1., -1., 1., 1., 14., -1.,
+                               -1., -1., 4., 1., 3., 0., 0., 0.],
+                              [-1., -1., -1., -1., -1., -1., 1., 1., 14., -1.,
+                               -1., -1., 4., 5., 3., 1., 1., 1.],
+                              [-1., -1., -1., -1., -1., -1., -1., -1., -1., -1.,
+                               -1., -1., 4., 5., 3., 0., 0., 0.],
+                              [-1., -1., -1., -1., -1., -1., -1., -1., -1., -1.,
+                               -1., -1., 4., 5., 3., 1., 1., 1.],
+                              ]]), rollout[1], rollout[2]
+        v = jnp.array([[0.99, -1, 1, -1]])
+        assert jnp.all(jnp.isclose(self.trainer.rollout_postprocess(rollout, "host", use_unified_tree=True)[2], v))
+
 
 
     def test_mcts_policy_fns(self):

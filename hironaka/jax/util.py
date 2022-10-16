@@ -265,15 +265,15 @@ def calculate_value_using_reward_fn(
     batch_size, max_length_game = value_prior.shape
 
     done = num_points <= 1
-    prev_done = jnp.concatenate([jnp.zeros((batch_size, 1), dtype=bool), done[:, :-1]], axis=1)
+    next_done = jnp.concatenate([done[:, 1:], jnp.zeros((batch_size, 1), dtype=bool)], axis=1)
 
     # Calculate discounted reward for finished games (before finished: discount each step, after finished: constant)
-    reward = vmap(reward_fn, (0, 0), 0)(done, prev_done)
+    reward = vmap(reward_fn, (0, 0), 0)(next_done, done)
     diff = jnp.arange(max_length_game).reshape((1, -1)) - jnp.arange(max_length_game).reshape((-1, 1))
 
     # Apply -1 on the discount if use unified tree.
     discount = jnp.where(use_unified_tree, -discount, discount)
-    discount_table = discount**jnp.clip(diff, 0, None)
+    discount_table = jnp.clip(discount**diff, -1, 1)
     discounted_value = vmap(jnp.matmul, (None, 0), 0)(discount_table, reward)
 
     # Estimate the value for unfinished games.

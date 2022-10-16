@@ -583,7 +583,7 @@ class JAXTrainer:
         batch_size, max_length_game = obs.shape[0], obs.shape[1]
         value_dtype = value.dtype
 
-        reward_fn = getattr(self, f"{role}_reward_fn")
+        reward_fn = self.agent_reward_fn if use_unified_tree else getattr(self, f"{role}_reward_fn")
         est_fn = getattr(self, f"{role}_value_est_fn")
         # the last 'dimension' entries are extra host states if `use_unified_tree` is used or the role is agent.
         offset = 1 if use_unified_tree or role == 'agent' else 0
