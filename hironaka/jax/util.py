@@ -277,7 +277,7 @@ def calculate_value_using_reward_fn(
     discounted_value = vmap(jnp.matmul, (None, 0), 0)(discount_table, reward)
 
     # Estimate the value for unfinished games.
-    sign = (-1) ** (num_points + 1) if use_unified_tree else 1
+    sign = (-1) ** (max_length_game + 1) if use_unified_tree else 1
     est_values = est_fn(value_prior[:, -1], num_points[:, -1])[:, None] * sign
     unfinished = (~done[:, -1:] * est_values) * (discount ** jnp.arange(max_length_game)[::-1])[None, :]
 
