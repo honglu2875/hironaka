@@ -357,6 +357,10 @@ class TestJAXTrainer(unittest.TestCase):
         v = jnp.array([[-0.480298, 0.4851495, -0.49005002, 0.495, -0.5]])
         # print(self.trainer.rollout_postprocess(rollout, "agent", use_unified_tree=True)[2])
         assert jnp.all(jnp.isclose(self.trainer.rollout_postprocess(rollout, "agent", use_unified_tree=True)[2], v))
+        rollout = rollout[0][:, 1:], rollout[1][:, 1:], rollout[2][:, 1:]
+        v = jnp.array([[0.4851495, -0.49005002, 0.495, -0.5]])
+        assert jnp.all(jnp.isclose(self.trainer.rollout_postprocess(rollout, "host", use_unified_tree=True)[2], v))
+
 
     def test_mcts_policy_fns(self):
         orig_size = self.trainer.eval_batch_size
