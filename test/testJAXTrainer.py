@@ -60,7 +60,8 @@ class TestJAXTrainer(unittest.TestCase):
             if role == "agent":
                 # Assert all invalid agent actions have probability 0.0
                 assert jnp.all(exp[0][0, :, -3:] - exp[1][0, :, :] >= 0)
-            mask = jax.pmap(select_sample_after_sim, static_broadcasted_argnums=(0, 2, 3))(role, exp, 3, True, device_keys)
+            mask = jax.pmap(select_sample_after_sim, static_broadcasted_argnums=(0, 2, 3))(role, exp, 3, True,
+                                                                                           device_keys)
             self.trainer.train(subkey, role, 10, exp, random_sampling=True, mask=mask)
 
         original_state = {"host": self.trainer.host_state, "agent": self.trainer.agent_state}
@@ -329,11 +330,33 @@ class TestJAXTrainer(unittest.TestCase):
         # The first game ended, resulting in discounted reward (penalty)
         # The second game did not end, and the last value was propagated to the front via discount.
         v = jnp.array(
-            [-0.960596, -0.970299, -0.9801, -0.98999995, -1.0, -0.04532285,
-             -0.04578065, -0.04624309, -0.04671019, -0.04718201], dtype=jnp.float32
+            [-0.960596, -0.970299, -0.9801, -0.98999995, -1.0, -0.480298, -0.4851495, -0.49005002, -0.495, -0.5],
+            dtype=jnp.float32
         )
-        print(self.trainer.rollout_postprocess(rollout, "agent")[2])
-        assert jnp.all(jnp.isclose(self.trainer.rollout_postprocess(rollout, "agent")[2], v))
+        # print(self.trainer.rollout_postprocess(rollout, "agent", use_unified_tree=False)[2])
+        assert jnp.all(jnp.isclose(self.trainer.rollout_postprocess(rollout, "agent", use_unified_tree=False)[2], v))
+
+        rollout = jnp.array([[[-1., -1., -1., -1., -1., -1., 1., 1., 14., -1.,
+                               -1., -1., 4., 1., 3., 1., 1., 0.],
+                              [-1., -1., -1., -1., -1., -1., 1., 2., 14., -1.,
+                               -1., -1., 4., 5., 3., 0., 0., 0.],
+                              [-1., -1., -1., -1., -1., -1., 1., 2., 14., -1.,
+                               -1., -1., 4., 5., 3., 1., 1., 0.],
+                              [-1., -1., -1., -1., -1., -1., 1., 3., 14., -1.,
+                               -1., -1., 4., 9., 3., 0., 0., 0.],
+                              [-1., -1., -1., -1., -1., -1., 1., 3., 14., -1.,
+                               -1., -1., 4., 9., 3., 1., 1., 1.],
+                              ]]), jnp.array([[
+            [9.3919918e-02, 2.0432323e-03, 9.0403688e-01],
+            [2.7057916e-01, 1.4561049e-03, 7.2796470e-01],
+            [2.7057916e-01, 1.4561049e-03, 7.2796470e-01],
+            [2.7057916e-01, 1.4561049e-03, 7.2796470e-01],
+            [2.7057916e-01, 1.4561049e-03, 7.2796470e-01],
+            [2.7057916e-01, 1.4561049e-03, 7.2796470e-01],
+        ]]), jnp.array([[0.14874144, -0.00777596, -0.0012398, 0.00597944, -0.04718201]])
+        v = jnp.array([[-0.480298, 0.4851495, -0.49005002, 0.495, -0.5]])
+        # print(self.trainer.rollout_postprocess(rollout, "agent", use_unified_tree=True)[2])
+        assert jnp.all(jnp.isclose(self.trainer.rollout_postprocess(rollout, "agent", use_unified_tree=True)[2], v))
 
     def test_mcts_policy_fns(self):
         orig_size = self.trainer.eval_batch_size
@@ -343,9 +366,11 @@ class TestJAXTrainer(unittest.TestCase):
         self.trainer.update_fns('agent')
 
         host = action_wrapper(partial(jax.pmap(self.trainer.host_mcts_policy_fn),
-                                      params=self.trainer.host_state.params, opp_params=self.trainer.agent_state.params))
+                                      params=self.trainer.host_state.params,
+                                      opp_params=self.trainer.agent_state.params))
         agent = action_wrapper(partial(jax.pmap(self.trainer.agent_mcts_policy_fn),
-                                       params=self.trainer.agent_state.params, opp_params=self.trainer.host_state.params))
+                                       params=self.trainer.agent_state.params,
+                                       opp_params=self.trainer.host_state.params))
 
         rho, details = self.trainer.compute_rho(host, agent)
         print(rho, details)

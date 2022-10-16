@@ -150,6 +150,26 @@ def get_reward_fn(role: str) -> Callable:
 
 
 @functools.lru_cache()
+def get_value_est_fn(role: str) -> Callable:
+    """
+    Parameters:
+        role: host or agent.
+    Returns:
+        the corresponding value estimate function (given some rollout information, return value estimates)
+    """
+    sign = 1 if role == 'host' else -1
+
+    def est_fn(last_values: jnp.array, num_points: jnp.array):
+        """
+        Parameters:
+            last_values: the last value of a rollout. (b,)
+            num_points: the number of remaining points. (b,)
+        """
+        return 1 / jnp.clip(num_points, 1, None) * sign
+    return est_fn
+
+
+@functools.lru_cache()
 def get_feature_fn(role: str, spec: Tuple, scale_observation=True) -> Callable:
     """
     Get the feature function on (possibly flattened) observations.
@@ -239,19 +259,27 @@ def get_dynamic_policy_fn(spec: Tuple[int, int], host_fn: Callable, agent_fn: Ca
 
 
 def calculate_value_using_reward_fn(
-        value_prior: jnp.ndarray, done: jnp.ndarray, prev_done: jnp.ndarray, discount: float, reward_fn: Callable,
+        value_prior: jnp.ndarray, num_points: jnp.ndarray, discount: float, reward_fn: Callable, est_fn: Callable,
         use_unified_tree: bool
 ) -> jnp.ndarray:
     batch_size, max_length_game = value_prior.shape
+
+    done = num_points <= 1
+    prev_done = jnp.concatenate([jnp.zeros((batch_size, 1), dtype=bool), done[:, :-1]], axis=1)
+
     # Calculate discounted reward for finished games (before finished: discount each step, after finished: constant)
     reward = vmap(reward_fn, (0, 0), 0)(done, prev_done)
     diff = jnp.arange(max_length_game).reshape((1, -1)) - jnp.arange(max_length_game).reshape((-1, 1))
+
+    # Apply -1 on the discount if use unified tree.
+    discount = jnp.where(use_unified_tree, -discount, discount)
     discount_table = discount**jnp.clip(diff, 0, None)
     discounted_value = vmap(jnp.matmul, (None, 0), 0)(discount_table, reward)
-    # For unfinished games: back-propagate the final value prior and apply discounts.
-    unfinished = (~done[:, -1:] * value_prior[:, -1:]) * (discount ** jnp.arange(max_length_game)[::-1])[None, :]
-    # The -1 is to adjust the difference of roles between the first state and the last state, if unified MCTS is used.
-    unfinished = jnp.where(use_unified_tree, unfinished * ((-1) ** (max_length_game + 1)), unfinished)
+
+    # Estimate the value for unfinished games.
+    est_values = est_fn(value_prior[:, -1], num_points[:, -1])[:, None]
+    unfinished = (~done[:, -1:] * est_values) * (discount ** jnp.arange(max_length_game)[::-1])[None, :]
+
     return discounted_value + unfinished
 
 
