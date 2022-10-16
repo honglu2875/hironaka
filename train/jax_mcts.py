@@ -88,7 +88,7 @@ def main(argv):
 
             logger.info(f"{role} rollout finished.")
             #logger.info(f"Non-terminal states/number of all samples: {jnp.sum(mask)}/{rollout[0].shape[0] * rollout[0].shape[1]}")
-            logger.info("Value dist:", jnp.unique(rollout[2], return_counts=True))
+            logger.info(f"Value dist: {jnp.histogram(rollout[2], return_counts=True)}")
             apply_fn = trainer.get_apply_fn(role)
 
             if FLAGS.early_stop:
