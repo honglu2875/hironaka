@@ -313,7 +313,7 @@ class JAXTrainer:
 
         role_fn_args = (role_train_state.params,)
         opp_fn_args = (opp_train_state.params,) if use_unified_tree else (
-        opp_train_state.params, role_train_state.params)
+            opp_train_state.params, role_train_state.params)
         simulate_output = pmap(sim_fn)(
             keys[1:], root_state, role_fn_args, opp_fn_args
         )

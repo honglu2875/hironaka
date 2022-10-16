@@ -9,7 +9,7 @@ scale_observation: true
 reposition: false
 gumbel_scale: 0.3
 version_string: 'mcts'
-net_type: custom
+net_type: dense
 
 dimension: 3
 max_num_points: 5
