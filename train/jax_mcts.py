@@ -119,7 +119,7 @@ def main(argv):
                     prev_test_loss = test_loss
             else:
                 key, subkey = jax.random.split(key)
-                num_steps = 200 if role == 'host' else 100
+                num_steps = 2000 if role == 'host' else 500
                 trainer.train(subkey, role, num_steps, rollout, random_sampling=True, mask=mask, save_best=True)
 
         if i % 10 == 0:
