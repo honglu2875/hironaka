@@ -53,23 +53,28 @@ def main(argv):
     dim_difference = 2 ** dimension - 2 * dimension - 1
 
     for i in range(10000):
+        keys = jax.random.split(key, num=len(jax.devices()) + 3)
+        key, subkey, test_key = keys[0], keys[1], keys[2]
+        device_keys = keys[3:]
+
+        samples = trainer.simulate(subkey, 'host', use_unified_tree=True)
+        if FLAGS.early_stop:
+            tests = trainer.simulate(test_key, 'host', use_unified_tree=True)
+
+        # Size offsets of input shapes for host and agent, respectively.
+        offset = {'host': -dimension, 'agent': None}
+        p_offset = {'host': None, 'agent': -dim_difference}
+
+        logger.info(f"Rollout finished.")
+        # logger.info(f"Non-terminal states/number of all samples: {jnp.sum(mask)}/{rollout[0].shape[0] * rollout[0].shape[1]}")
+        logger.info(f"Value dist: {jnp.histogram(samples[2])}")
 
         for role in ['host', 'agent']:
-            keys = jax.random.split(key, num=len(jax.devices()) + 3)
-            key, subkey, test_key = keys[0], keys[1], keys[2]
-            device_keys = keys[3:]
-
-            rollout = trainer.simulate(subkey, role, use_unified_tree=True)
+            start = 0 if role == 'host' else 1
+            sign = (-1) ** start
+            rollout = samples[0][:, start::2, :], samples[1][:, start::2], sign * samples[2][:, start::2]
             if FLAGS.early_stop:
-                test_set = trainer.simulate(test_key, role, use_unified_tree=True)
-
-            # Size offsets of input shapes for host and agent, respectively.
-            offset = -dimension if role == 'host' else None
-            p_offset = None if role == 'host' else -dim_difference
-
-            rollout = rollout[0][:, ::2, :], rollout[1][:, ::2], rollout[2][:, ::2]
-            if FLAGS.early_stop:
-                test_set = test_set[0][:, ::2, :], test_set[1][:, ::2], test_set[2][:, ::2]
+                test_set = tests[0][:, start::2, :], tests[1][:, start::2], sign * tests[2][:, start::2]
 
             if FLAGS.use_mask:
                 # Put mask on non-terminal states. `device_keys` are not used since we turn random selection off.
@@ -82,13 +87,10 @@ def main(argv):
                 mask, mask_for_test = None, None
 
             # Cutting the observation sizes. (Note: doing it earlier will affect the correctness of masks)
-            rollout = rollout[0][..., :offset], rollout[1][..., :p_offset], rollout[2]
+            rollout = rollout[0][..., :offset[role]], rollout[1][..., :p_offset[role]], rollout[2]
             if FLAGS.early_stop:
-                test_set = test_set[0][..., :offset], test_set[1][..., :p_offset], test_set[2]
+                test_set = test_set[0][..., :offset[role]], test_set[1][..., :p_offset[role]], test_set[2]
 
-            logger.info(f"{role} rollout finished.")
-            #logger.info(f"Non-terminal states/number of all samples: {jnp.sum(mask)}/{rollout[0].shape[0] * rollout[0].shape[1]}")
-            logger.info(f"Value dist: {jnp.histogram(rollout[2])}")
             apply_fn = trainer.get_apply_fn(role)
 
             if FLAGS.early_stop:
