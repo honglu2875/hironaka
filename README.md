@@ -13,6 +13,14 @@ happen.
   of algebraic geometry problems.
 - Check out some [resolution trees for ADE singularities](https://github.com/honglu2875/hironaka-experiments/blob/main/5x3-surface-singularities/README.md#model-with-014-score-against-choose-firstchoose-last) by **our neural networks** (*prototypes without fine-tuning!*). Note that there is redundancy on the trees as the game did not terminate on equations like $x + y^2 + z^2 = 0$ where the origin is already smooth.
 
+***Acknowledgement:***
+
+Currently at the infant stage of this project, the following has been kindly offering us support of computing powers. We are deeply grateful to them.
+- [High Flyer AI](https://www.high-flyer.cn/en/)
+- [Google TRC program](https://sites.research.google/trc/about/)
+
+We also greatly appreciate the Google Cloud Research Credits we received for using GCP.
+
 ***Brief Background***:
 
 In 1964 Hironaka proved that it was possible to resolve singularities of varieties over fields of characteristic 0 by
