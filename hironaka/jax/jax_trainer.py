@@ -17,7 +17,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 import jax
 import jax.numpy as jnp
-from hironaka.jax.net import CustomNet, DenseNet, DenseResNet, get_apply_fn
+from hironaka.jax.net import CustomNet, DenseNet, DenseResNet, DenseBlock, get_apply_fn
 from hironaka.jax.players import (
     all_coord_host_fn,
     choose_first_agent_fn,
