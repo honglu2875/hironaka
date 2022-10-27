@@ -124,7 +124,10 @@ class JAXTrainer:
     discount: float
 
     optim_dict = {"adam": optax.adam, "adamw": optax.adamw, "sgd": optax.sgd}
-    net_dict = {"dense_resnet": DenseResNet, "dense": DenseNet, "custom": CustomNet}
+    net_dict = {"dense_resnet": DenseResNet,
+                "dense": DenseNet,
+                "custom": CustomNet,
+                "custom_dense": partial(CustomNet, block_cls=DenseBlock)}
 
     host_model: nn.Module
     agent_model: nn.Module
