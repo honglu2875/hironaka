@@ -1,4 +1,4 @@
-tensorboard:
+wandb:
   use: true
   work_dir: runs
   layerwise_logging: true
