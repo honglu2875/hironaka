@@ -223,10 +223,10 @@ class TestJAX(unittest.TestCase):
         v = jnp.array([5.0, 6.0])
         t_pi = jnp.array([[1.0, 0.0], [0.0, 1.0]])
         t_v = jnp.array([1.0, -1.0])
-        assert jnp.isclose(policy_value_loss(pi, v, t_pi, t_v), 38.8529)
+        assert jnp.isclose(policy_value_loss(pi, v, t_pi, t_v), 8.676451)
         # Masked. They add up the the sum above.
-        assert jnp.isclose(policy_value_loss(pi, v, t_pi, t_v, jnp.array([1.0, 0.0])), 9.711966)
-        assert jnp.isclose(policy_value_loss(pi, v, t_pi, t_v, jnp.array([0.0, 1.0])), 29.140936)
+        assert jnp.isclose(policy_value_loss(pi, v, t_pi, t_v, jnp.array([1.0, 0.0])), 2.8559828)
+        assert jnp.isclose(policy_value_loss(pi, v, t_pi, t_v, jnp.array([0.0, 1.0])), 5.820468)
 
 
     def test_hosts(self):

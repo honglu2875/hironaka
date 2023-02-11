@@ -17,7 +17,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 import jax
 import jax.numpy as jnp
-from hironaka.jax.net import CustomNet, DenseNet, DenseResNet, get_apply_fn
+from hironaka.jax.net import CustomNet, DenseNet, DenseResNet, DenseBlock, get_apply_fn
 from hironaka.jax.players import (
     all_coord_host_fn,
     choose_first_agent_fn,
@@ -34,10 +34,10 @@ from hironaka.jax.util import (
     calculate_value_using_reward_fn,
     flatten,
     generate_pts,
-    get_done_from_flatten,
     get_dones,
     get_name,
     get_reward_fn,
+    get_value_est_fn,
     get_take_actions,
     make_agent_obs,
     mcts_wrapper, get_feature_fn,
@@ -124,7 +124,10 @@ class JAXTrainer:
     discount: float
 
     optim_dict = {"adam": optax.adam, "adamw": optax.adamw, "sgd": optax.sgd}
-    net_dict = {"dense_resnet": DenseResNet, "dense": DenseNet, "custom": CustomNet}
+    net_dict = {"dense_resnet": DenseResNet,
+                "dense": DenseNet,
+                "custom": CustomNet,
+                "custom_dense": partial(CustomNet, block_cls=DenseBlock)}
 
     host_model: nn.Module
     agent_model: nn.Module
@@ -210,12 +213,15 @@ class JAXTrainer:
                 continue
 
             # Note: self.output_dim means the dimension of policy vectors only.
-            net = self.net_dict[self.net_type](self.output_dim[role], net_arch=self.config[role]["net_arch"])
+            net = self.net_dict[self.net_type](self.output_dim[role],
+                                               net_arch=self.config[role]["net_arch"],
+                                               spec=(self.max_num_points, self.dimension))
             setattr(self, f"{role}_model", net)
             self.set_optim(role, self.config[role]["optim"])
 
             # Use a fixed reward function for now.
             setattr(self, f"{role}_reward_fn", get_reward_fn(role))
+            setattr(self, f"{role}_value_est_fn", get_value_est_fn(role))
             setattr(self, f"{role}_state", None)
 
             self.update_policy_fn(role)
@@ -311,7 +317,7 @@ class JAXTrainer:
 
         role_fn_args = (role_train_state.params,)
         opp_fn_args = (opp_train_state.params,) if use_unified_tree else (
-        opp_train_state.params, role_train_state.params)
+            opp_train_state.params, role_train_state.params)
         simulate_output = pmap(sim_fn)(
             keys[1:], root_state, role_fn_args, opp_fn_args
         )
@@ -580,15 +586,13 @@ class JAXTrainer:
         batch_size, max_length_game = obs.shape[0], obs.shape[1]
         value_dtype = value.dtype
 
-        reward_fn = getattr(self, f"{role}_reward_fn")
-        if use_unified_tree:
-            # if the unified tree is used, host observations are zero-padded and should use the same agent-criteria
-            #   to identify states that are terminal.
-            done = get_done_from_flatten(obs, 'agent', self.dimension)  # (b, max_length_game)
-        else:
-            done = get_done_from_flatten(obs, role, self.dimension)  # (b, max_length_game)
-        prev_done = jnp.concatenate([jnp.zeros((batch_size, 1), dtype=bool), done[:, :-1]], axis=1)
-        value = calculate_value_using_reward_fn(done, prev_done, self.discount, max_length_game, reward_fn)
+        reward_fn = self.agent_reward_fn if use_unified_tree else getattr(self, f"{role}_reward_fn")
+        est_fn = getattr(self, f"{role}_value_est_fn")
+        # the last 'dimension' entries are extra host states if `use_unified_tree` is used or the role is agent.
+        offset = 1 if use_unified_tree or role == 'agent' else 0
+        num_points = jnp.sum(obs >= 0, axis=-1) // self.dimension - offset  # (b, max_length_game)
+
+        value = calculate_value_using_reward_fn(value, num_points, self.discount, reward_fn, est_fn, use_unified_tree)
         value = jnp.ravel(value).astype(value_dtype)
 
         obs = obs.reshape((-1, obs.shape[2]))

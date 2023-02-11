@@ -22,6 +22,7 @@ flags.DEFINE_string('config', 'jax_mcts.yml', 'The config file.')
 flags.DEFINE_string('model_path', 'models', 'The model path.')
 flags.DEFINE_integer('key', 42, 'The random seed.')
 flags.DEFINE_bool('early_stop', False, 'Whether to stop training early when signs of overfitting are observed.')
+flags.DEFINE_bool('use_mask', False, 'Whether to mask the rollout and only look at non-terminal states.')
 
 
 @partial(jax.pmap, static_broadcasted_argnums=(1, 3), axis_name='d')
@@ -52,35 +53,44 @@ def main(argv):
     dim_difference = 2 ** dimension - 2 * dimension - 1
 
     for i in range(10000):
+        keys = jax.random.split(key, num=len(jax.devices()) + 3)
+        key, subkey, test_key = keys[0], keys[1], keys[2]
+        device_keys = keys[3:]
+
+        samples = trainer.simulate(subkey, 'host', use_unified_tree=True)
+        if FLAGS.early_stop:
+            tests = trainer.simulate(test_key, 'host', use_unified_tree=True)
+
+        # Size offsets of input shapes for host and agent, respectively.
+        offset = {'host': -dimension, 'agent': None}
+        p_offset = {'host': None, 'agent': -dim_difference}
+
+        logger.info(f"Rollout finished.")
+        # logger.info(f"Non-terminal states/number of all samples: {jnp.sum(mask)}/{rollout[0].shape[0] * rollout[0].shape[1]}")
+        logger.info(f"Value dist: {jnp.histogram(samples[2])}")
 
         for role in ['host', 'agent']:
-            keys = jax.random.split(key, num=len(jax.devices()) + 3)
-            key, subkey, test_key = keys[0], keys[1], keys[2]
-            device_keys = keys[3:]
+            start = 0 if role == 'host' else 1
+            sign = (-1) ** start
+            rollout = samples[0][:, start::2, :], samples[1][:, start::2], sign * samples[2][:, start::2]
+            if FLAGS.early_stop:
+                test_set = tests[0][:, start::2, :], tests[1][:, start::2], sign * tests[2][:, start::2]
 
-            rollout = trainer.simulate(subkey, role, use_unified_tree=True)
-            test_set = trainer.simulate(test_key, role, use_unified_tree=True)
-
-            # Size offsets of input shapes for host and agent, respectively.
-            offset = -dimension if role == 'host' else None
-            p_offset = None if role == 'host' else -dim_difference
-
-            rollout = rollout[0][:, ::2, :], rollout[1][:, ::2], rollout[2][:, ::2]
-            test_set = test_set[0][:, ::2, :], test_set[1][:, ::2], test_set[2][:, ::2]
-
-            # Put mask on non-terminal states. `device_keys` are not used since we turn random selection off.
-            # Since we use unified MC search tree, observations are padded. The game ending criteria is like 'agent'.
-            mask = jax.pmap(select_sample_after_sim, static_broadcasted_argnums=(0, 2, 3))(
-                'agent', rollout, dimension, False, device_keys)
-            mask_for_test = jax.pmap(select_sample_after_sim, static_broadcasted_argnums=(0, 2, 3))(
-                'agent', test_set, dimension, False, device_keys)
+            if FLAGS.use_mask:
+                # Put mask on non-terminal states. `device_keys` are not used since we turn random selection off.
+                # Since we use unified MC search tree, observations are padded. The game ending criteria is like 'agent'.
+                mask = jax.pmap(select_sample_after_sim, static_broadcasted_argnums=(0, 2, 3))(
+                    'agent', rollout, dimension, False, device_keys)
+                mask_for_test = jax.pmap(select_sample_after_sim, static_broadcasted_argnums=(0, 2, 3))(
+                    'agent', test_set, dimension, False, device_keys)
+            else:
+                mask, mask_for_test = None, None
 
             # Cutting the observation sizes. (Note: doing it earlier will affect the correctness of masks)
-            rollout = rollout[0][..., :offset], rollout[1][..., :p_offset], rollout[2]
-            test_set = test_set[0][..., :offset], test_set[1][..., :p_offset], test_set[2]
+            rollout = rollout[0][..., :offset[role]], rollout[1][..., :p_offset[role]], rollout[2]
+            if FLAGS.early_stop:
+                test_set = test_set[0][..., :offset[role]], test_set[1][..., :p_offset[role]], test_set[2]
 
-            logger.info(f"{role} rollout finished.")
-            logger.info(f"Non-terminal states/number of all samples: {jnp.sum(mask)}/{rollout[0].shape[0] * rollout[0].shape[1]}")
             apply_fn = trainer.get_apply_fn(role)
 
             if FLAGS.early_stop:
@@ -111,10 +121,10 @@ def main(argv):
                     prev_test_loss = test_loss
             else:
                 key, subkey = jax.random.split(key)
-                num_steps = 2000 if role == 'host' else 500
+                num_steps = 2000 if role == 'host' else 1000
                 trainer.train(subkey, role, num_steps, rollout, random_sampling=True, mask=mask, save_best=True)
 
-        if i % 40 == 0:
+        if i % 10 == 0:
             trainer.save_checkpoint(FLAGS.model_path)
             logger.info('--------------------')
             logger.info(f'Checkpoint saved at loop {i}.')

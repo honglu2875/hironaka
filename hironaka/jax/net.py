@@ -1,6 +1,7 @@
 from functools import partial
-from typing import Any, Callable, List, Tuple
+from typing import Any, Callable, List, Tuple, Optional
 
+import jax
 from flax import linen as nn
 
 from hironaka.jax.util import get_feature_fn
@@ -47,6 +48,7 @@ class DenseBlock(nn.Module):
 class DenseResNet(nn.Module):
     output_size: int
     net_arch: List[int]
+    spec: Optional[Tuple[int]] = None
     norm: ModuleDef = partial(nn.GroupNorm, num_groups=32)
     block_cls: ModuleDef = DenseResidueBlock
     dtype: jnp.dtype = jnp.float32
@@ -66,7 +68,40 @@ class DenseResNet(nn.Module):
 
 
 DenseNet = partial(DenseResNet, block_cls=DenseBlock)
-CustomNet = DenseResNet  # Placeholder for a future network design
+
+
+class CustomNet(nn.Module):
+    output_size: int
+    net_arch: List[int]
+    spec: Tuple[int]
+    norm: ModuleDef = partial(nn.GroupNorm, num_groups=32)
+    block_cls: ModuleDef = DenseResidueBlock
+    dtype: jnp.dtype = jnp.float32
+    activation: Callable = nn.relu
+
+    @nn.compact
+    def __call__(self, x, train: bool = True):
+        x = x.reshape((*x.shape[:-1], -1, self.spec[1]))
+        available = jax.nn.one_hot(jnp.sum(x[..., :self.spec[0], 0] >= 0, axis=-1), self.spec[0])
+        extra = x[..., self.spec[0]:, :].reshape((*x.shape[:-2], -1))  # (b, ?)
+
+        outs = []
+        for i in range(self.spec[0]):
+            out = jnp.concatenate([x[..., :i+1, :].reshape((*x.shape[:-2], -1)), extra], axis=-1)
+            for size in self.net_arch:
+                out = self.block_cls(features=size, dtype=self.dtype, norm=self.norm, activation=self.activation)(out)
+            outs.append(out)
+
+        out = jnp.sum(jnp.stack(outs, axis=-1) * available[..., None, :], axis=-1)  # (b, size)
+
+        features = jnp.concatenate([out, extra], axis=-1)
+        # Policy head and value head
+        p = nn.Dense(self.output_size, dtype=self.dtype)(features)
+        v = nn.Dense(1, dtype=self.dtype)(features)
+        # Regulate the value output between -1 and 1
+        v = nn.tanh(v)
+        return p, v
+
 
 DResNetMini = partial(DenseResNet, net_arch=[32] * 2)
 DResNet18 = partial(DenseResNet, net_arch=[256] * 18)
