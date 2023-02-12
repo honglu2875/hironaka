@@ -12,8 +12,7 @@ import yaml
 from flax.training import checkpoints
 from flax.training.train_state import TrainState
 
-# Funny that jax doesn't work with tensorflow well, and using PyTorch's tensorboard is the most convenient...
-from torch.utils.tensorboard import SummaryWriter
+import wandb
 
 import jax
 import jax.numpy as jnp
@@ -158,6 +157,7 @@ class JAXTrainer:
             agent_feature_fn=None,
     ):
         self.logger = logging.getLogger(__class__.__name__)
+        wandb.init(project="hironaka")
 
         if isinstance(config, str):
             with open(config, "r") as stream:
@@ -226,13 +226,6 @@ class JAXTrainer:
 
             self.update_policy_fn(role)
 
-        if self.config["tensorboard"]["use"]:
-            self.log_string = (
-                f"{self.config['version_string']}_{datetime.now().year}_{datetime.now().month}"
-                f"_{datetime.now().day}_{time.time_ns()}"
-            )
-            self.summary_writer = SummaryWriter(log_dir=f"{self.config['tensorboard']['work_dir']}/{self.log_string}")
-
         for role in ["host", "agent"]:
             self.update_eval_sim_and_mcts_policy(role)
 
@@ -248,6 +241,8 @@ class JAXTrainer:
         self._cached_sim_fn = {}
         # Used when the training needs to save the best performing player
         self.best_against_choose_first, self.best_against_choose_last, self.best_against_zeillinger = 0, 0, jnp.inf
+
+        self.log = {}
 
     def simulate(self, key: jnp.ndarray, role: str, use_mcts_policy=False, use_unified_tree=False) -> RollOut:
         """
@@ -379,24 +374,16 @@ class JAXTrainer:
             # Save the state
             setattr(self, f"{role}_state", state)
 
-            # Tensorboard logging
-            if self.config["tensorboard"]["use"]:
-                if state.step[0] % self.config["tensorboard"]["log_interval"] == 0:
+            # wandb logging
+            if self.config["wandb"]["use"]:
+                if state.step[0] % self.config["wandb"]["log_interval"] == 0:
                     if verbose:
                         self.logger.info(f"Loss: {loss[0]}")
 
-                    self.tensorboard_log_scalar(f"{role}/loss", loss[0], state.step[0])
-                    self.summary_writer.add_histogram(
-                        f"{role}/gradient",
-                        np.array([jnp.mean(layer) for layer in jax.tree_util.tree_leaves(grad["params"])]),
-                        state.step[0]
-                    )
+                    self.update_log(f"{role}/loss", loss[0], step=state.step[0], commit=True)
 
-                    if self.config["tensorboard"]["layerwise_logging"]:
-                        self.tensorboard_log_layers(role, state.params["params"], state.step[0])
-
-                if state.step[0] % self.config["tensorboard"]["validation_interval"] == 0:
-                    rhos, details = self.validate(write_tensorboard=True)
+                if state.step[0] % self.config["wandb"]["validation_interval"] == 0:
+                    rhos, details = self.validate(write_wandb=True)
                     if verbose:
                         self.logger.info(f"Rhos:\n{rhos}\nGame length histogram:\n{details}")
                     if save_best:
@@ -408,8 +395,6 @@ class JAXTrainer:
                             self.save_checkpoint(f'{self.version_string}/best_agent', roles='agent')
                             self.best_against_zeillinger = rhos[5]
 
-                    self.summary_writer.flush()  # Force writing to file after each validation.
-
     def validate(
             self,
             metric_fn: Optional[Callable] = None,
@@ -417,7 +402,7 @@ class JAXTrainer:
             batch_size=50,
             num_of_loops=10,
             max_length=None,
-            write_tensorboard=False,
+            write_wandb=False,
             key=None,
     ) -> Tuple[List, List]:
         """
@@ -431,7 +416,7 @@ class JAXTrainer:
             batch_size: (Optional) the batch size of samples to feed into players.
             num_of_loops: (Optional) number of loops in computing the metric. To be fed into the metric_fn.
             max_length: (Optional) max length of games. Default to self.max_length_game.
-            write_tensorboard: (Optional) write the results to tensorboard.
+            write_wandb: (Optional) write the results to wandb.
             key: (Optional) the PRNG random key. Default to the key from the seed `time.time_ns()`.
         Returns:
             a tuple of a list of computed metric(rho) and a list of details (histogram of game lengths)
@@ -458,7 +443,7 @@ class JAXTrainer:
                 batch_size=batch_size,
                 num_of_loops=num_of_loops,
                 max_length=max_length,
-                write_tensorboard=pair_idx == (0, 0) and write_tensorboard,
+                write_wandb=pair_idx == (0, 0) and write_wandb,
                 key=key,
             )
             rhos.append(rho)
@@ -466,15 +451,16 @@ class JAXTrainer:
             if verbose:
                 self.logger.info(f"{get_name(host)} vs {get_name(agent)}:")
                 self.logger.info(f"  {get_name(metric_fn)}: {rho}")
-            if write_tensorboard:
-                self.summary_writer.add_scalar(
-                    f"{get_name(host)}_v_{get_name(agent)}", float(rho), self.get_state("host").step[0]
-                )
+            if write_wandb:
+                self.update_log(f"{get_name(host)}_v_{get_name(agent)}",
+                                float(rho),
+                                step=self.get_state("host").step[0])
                 if sum(detail) > 0:
                     hist = np.concatenate([np.full((detail[i],), i) for i in range(len(detail) - 1)], axis=0)
-                    self.summary_writer.add_histogram(
-                        f"{get_name(host)}_v_{get_name(agent)}/length_histogram", hist, self.get_state("host").step[0]
-                    )
+                    self.update_log(f"{get_name(host)}_v_{get_name(agent)}/game_length_hist",
+                                    hist,
+                                    step=self.get_state("host").step[0])
+        self.commit_log()
 
         return rhos, details
 
@@ -485,7 +471,7 @@ class JAXTrainer:
             batch_size=None,
             num_of_loops=10,
             max_length=None,
-            write_tensorboard=False,
+            write_wandb=False,
             key=None,
     ) -> Tuple[float, List]:
         """
@@ -496,7 +482,7 @@ class JAXTrainer:
             batch_size: (Optional) the batch size. Default to self.eval_batch_size.
             num_of_loops: (Optional) the number of times to run a batch of points. Default to 10.
             max_length: (Optional) the maximal length of game. Default is self.max_length_game
-            write_tensorboard: (Optional) write the histogram of host/agent policy argmax
+            write_wandb: (Optional) write the histogram of host/agent policy argmax
             key: (Optional) the PRNG random key (if None, will use time.time_ns() to seed a key)
         Returns:
             a tuple of the rho number and a list of game details (histogram of game lengths).
@@ -527,7 +513,7 @@ class JAXTrainer:
             prev_done, done = 0, jnp.sum(pmap(get_dones)(pts))  # Calculate the finished games
             pts = pmap(flatten)(pts)
 
-            # For tensorboard logging
+            # For wandb logging
             collect_host_actions, collect_agent_actions = [], []
 
             for step in range(max_length - 1):
@@ -547,18 +533,23 @@ class JAXTrainer:
                 prev_done, done = done, jnp.sum(
                     pmap(get_dones)(p_reshape(pts, (-1, *spec))))  # Update the finished games
 
-                if write_tensorboard:
+                if write_wandb:
                     collect_host_actions.append(np.array(jnp.ravel(np.argmax(host_action, axis=-1))))
                     collect_agent_actions.append(np.array(jnp.ravel(axis)))
 
             details[max_length - 1] += batch_size * self.device_num - done
 
-            if write_tensorboard:
-                self.summary_writer.add_histogram(
-                    "host_action_distributions", np.concatenate(collect_host_actions), self.get_state("host").step[0]
+            if write_wandb:
+                self.update_log(
+                    "host_action_distributions",
+                    np.concatenate(collect_host_actions),
+                    step=self.get_state("host").step[0]
                 )
-                self.summary_writer.add_histogram(
-                    "agent_action_distributions", np.concatenate(collect_agent_actions), self.get_state("agent").step[0]
+                self.update_log(
+                    "agent_action_distributions",
+                    np.concatenate(collect_agent_actions),
+                    self.get_state("agent").step[0],
+                    commit=True
                 )
 
         rho = sum(details[1:]) / sum([i * num for i, num in enumerate(details)])
@@ -599,20 +590,6 @@ class JAXTrainer:
         policy = policy.reshape((-1, policy.shape[2]))
 
         return obs, policy, value
-
-    def tensorboard_log_scalar(self, name: str, number: float, step: int):
-        if hasattr(self, "summary_writer") and self.summary_writer is not None:
-            self.summary_writer.add_scalar(name, float(number), int(step))
-
-    def tensorboard_log_layers(self, name: str, params, step: int):
-        """
-        Recursively log each layer.
-        """
-        if isinstance(params, (flax.core.FrozenDict, dict)):
-            for key, item in params.items():
-                self.tensorboard_log_layers(f"{name}/{key}", item, step)
-        else:
-            self.summary_writer.add_histogram(name, np.array(params), step)
 
     def save_checkpoint(self, path: str, roles: Optional[Union[List[str], str]] = None):
         roles = ['host', 'agent'] if roles is None else roles
@@ -897,3 +874,35 @@ class JAXTrainer:
             return "host"
         else:
             raise ValueError(f"role must be either host or agent. Got {role}.")
+
+    def update_log(self, name: str, content, step: int, commit=False):
+        """
+        Update the log.
+        Parameters:
+            name: name of the log.
+            content: content to be added.
+            step: step number.
+            commit: (Optional) if true, commit the log.
+        """
+        step = int(step)
+        if step not in self.log:
+            self.log[step] = {}
+
+        self.log[step][name] = content
+
+        if commit:
+            self.commit_log(step=step)
+
+    def commit_log(self, step=None):
+        """
+        Commit the log.
+        Parameters:
+            step: (Optional) step number. If None, commit all logs.
+        """
+        if step is None:
+            for step in self.log:
+                wandb.log(self.log[step], step=step)
+            self.log = {}
+        else:
+            wandb.log(self.log[step], step=step)
+            self.log[step] = {}
