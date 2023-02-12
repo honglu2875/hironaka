@@ -7,6 +7,7 @@ from absl import app
 import logging
 import sys
 import time
+import wandb
 from functools import partial
 
 import jax
@@ -36,8 +37,8 @@ def main(argv):
 
     trainer = JAXTrainer(subkey, FLAGS.config)
 
-    trainer.summary_writer.add_scalar('learning_rate', trainer.config['host']['optim']['args']['learning_rate'], 0)
-    trainer.summary_writer.add_scalar('batch_size', trainer.config['host']['batch_size'], 0)
+    wandb.log({'learning_rate': trainer.config['host']['optim']['args']['learning_rate'],
+               'batch_size': trainer.config['host']['batch_size']})
     trainer.load_checkpoint(FLAGS.model_path)
 
     logger = trainer.logger
