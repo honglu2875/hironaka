@@ -225,7 +225,7 @@ class Spivakovsky(Host):
         result = []
         for b in range(points.batch_size):
             result_this_batch = set()
-            pts = points.get_batch(b)
+            pts = points[b]
             dim = len(pts[0])
             coord_dict = list(range(dim))
 
