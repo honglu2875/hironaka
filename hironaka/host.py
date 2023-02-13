@@ -308,7 +308,7 @@ class RandomSpivakovsky(Host):
         assert not points.ended
         result = []
         for b in range(points.batch_size):
-            pts = points.get_batch(b)
+            pts = points[b]
             if len(pts) <= 1:
                 result.append([])
                 continue
@@ -397,7 +397,7 @@ class WeakSpivakovskyRandom(Host):
         assert not points.ended
         result = []
         for b in range(points.batch_size):
-            pts = points.get_batch(b)
+            pts = points[b]
             if len(pts) <= 1:
                 result.append([])
                 continue
