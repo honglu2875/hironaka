@@ -195,7 +195,7 @@ Here are a few important places to go:
 
 - [hironaka.jax](hironaka/jax) A standalone module fully devoted to JAX implementations. The structure is quite different and the implementation is heavily relying on functions, so I separate `JAXTrainer` out of `hironaka.trainer`. Despite being critical about JAX semantic designs in the very beginning, I have been converted into a big fan of JAX, as it is incredibly fast and functional programming really makes sense here!
 - [hironaka.trainer](hironaka/trainer) is my implementation of DQN where I put games/replay buffers all on GPU, and can be wrapped up by DP/DDP.
-- [hironaka.train](train) Some training scripts. `train_sb3.py`, `jax_mcts.py` are battle-tested and already produced models for us.
+- [hironaka.train](train) Some training scripts. `train_sb3.py`, `jax_mcts.py` are applied to produce models for us.
 - [hironaka.core](hironaka.core) Abstractions of game states and transformations. `JAXPoints`, `ListPoints`, `TensorPoints` correspond to different implementations using JAX, native List, and PyTorch, respectively.
 - [.host](host.py), [.agent](agent.py), [.game](game.py), are simple abstractions of host, agent and the game. Good for simple manipulations of gameplay but most trainings are not based on them.
 
