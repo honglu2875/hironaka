@@ -378,7 +378,7 @@ class WeakSpivakovsky(Host):
         return result
 
 
-class WeakSpivakovskyRandom(Host):
+class WeakSpivakovskyMinHitting(Host):
     def __init__(self, dim=16):
         super().__init__()
         subset_route = []
