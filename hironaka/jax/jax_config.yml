@@ -1,0 +1,47 @@
+tensorboard:
+  use: true
+  work_dir: runs
+  layerwise_logging: true
+  log_interval: 20
+  # Validation: test host and agent against pre-determined benchmarks including random/fixed action/zeillinger
+  validation_interval: 1000
+
+use_all_gpu: true
+scale_observation: true
+reposition: true
+gumbel_scale: 0.3
+version_string: 'mcts'
+net_type: dense
+
+dimension: 3
+max_num_points: 20
+max_length_game: 20
+max_value: 20
+max_grad_norm: 1.0
+
+eval_batch_size: 10
+num_evaluations: 100
+eval_on_cpu: false
+max_num_considered_actions: 10
+discount: 0.99
+
+host:
+  batch_size: 256
+  optim:
+    name: 'adamw'
+    args: # Pass optimizer parameters here
+      learning_rate: 0.00000001
+    # Learning rate scheduling is built-in (by schedule function and `chain`), so we do not specify them.
+  #net_arch: [256, 256, 256, 256, 256, 256, 256, 256]
+  net_arch: [ 32, 32 ]
+
+
+agent:
+  batch_size: 256
+  optim:
+    name: 'adamw'
+    args: # Pass optimizer parameters here
+      learning_rate: 0.00000001
+    # Learning rate scheduling is built-in (by schedule function and `chain`), so we do not specify them.
+  #net_arch: [256, 256, 256, 256, 256, 256, 256, 256]
+  net_arch: [ 32, 32 ]

@@ -1,6 +1,6 @@
-use_tensorboard: false
-log_time: false
-layerwise_logging: false
+use_tensorboard: true
+log_time: true
+layerwise_logging: true
 use_cuda: false
 scale_observation: true
 version_string: 'mcts_v0'
@@ -15,7 +15,15 @@ lr: 0.0000001
 max_depth: 20
 MSE_coefficient: 1.0
 
+# MCTS only trains one player at a time
+# If host is specified, agent will need to be passed during initialization, and vice-versa.
 host:
+  # Note: Simulation is always run step-by-step, but the number of batches is used when training the policy net.
+  batch_size: 10
+  iterations: 200,
+  c_puct: 0.5,
+  max_depth: 20,
+  MSE_coefficient: 1.0,
   c_puct: 0.5
   lr: 0.00001
   max_depth: 20

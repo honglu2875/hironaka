@@ -1,0 +1,48 @@
+tensorboard:
+  use: true
+  work_dir: runs
+  layerwise_logging: true
+  log_interval: 200
+  validation_interval: 1250
+use_cuda: true
+scale_observation: false
+reposition: false
+gumbel_scale: 0.3
+version_string: 'mcts'
+net_type: custom_dense
+
+dimension: 3
+max_num_points: 5
+max_length_game: 40
+max_value: 20
+max_grad_norm: 0.5
+
+eval_batch_size: 512
+num_evaluations: 100
+num_evaluations_as_opponent: 100
+eval_on_cpu: false
+max_num_considered_actions: 10
+#rollout process repeats `rollout_size//eval_batch_size` amount of times
+discount: 0.98
+
+host:
+  batch_size: 128
+  optim:
+    name: 'adam'
+    args: # Pass optimizer parameters here
+      learning_rate: 0.001  #
+    # Learning rate scheduling is built-in (by schedule function and `chain`), so we do not specify them.
+  #net_arch: [256, 256, 256, 256, 256, 256, 256, 256]
+  net_arch: [128, 128, 128, 128, 128, 128, 128, 128]
+
+
+agent:
+  batch_size: 128
+  optim:
+    name: 'adam'
+    args: # Pass optimizer parameters here
+      learning_rate: 0.001
+    # Learning rate scheduling is built-in (by schedule function and `chain`), so we do not specify them.
+  #net_arch: [256, 256, 256, 256, 256, 256, 256, 256]
+  net_arch: [128, 128, 128, 128, 128, 128, 128, 128]
+

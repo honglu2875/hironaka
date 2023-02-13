@@ -1,2 +1,4 @@
-from .NNPolicy import NNPolicy
-from .Policy import Policy
+from .nn_policy import NNPolicy
+from .policy import Policy
+
+__all__ = ["NNPolicy", "Policy"]

@@ -1,38 +1,29 @@
 import abc
 import logging
-from typing import Union
-
-# Sorry about this block of codes. Blame google colab for not updating their python version...
-from hironaka.src import get_python_version_in_float
-
-if get_python_version_in_float() <= 3.7:
-    Final = Union  # Basically we ignore Final in versions <= 3.7
-else:
-    from typing import Final
+import random
+from typing import List, Optional, Union
 
 import numpy as np
 
-from hironaka.Points import Points
 from hironaka.core import ListPoints
-from hironaka.policy.Policy import Policy
+from hironaka.points import Points
+from hironaka.policy.policy import Policy
 
 
 class Agent(abc.ABC):
     """
-        An agent can either modify the points in-place, or just return the action (the chosen coordinate)
-        Must implement:
-            _get_actions
+    An agent can either modify the points in-place, or just return the action (the chosen coordinate)
+    Must implement:
+        _get_actions
     """
-    logger = None
 
-    # Please implement the following. They are *constants*!
+    # Please set the following. They are *class constants*!
     USE_WEIGHTS: bool
     USE_REPOSITION: bool  # apply a self.points.reposition() between shift() and get_newton_polytope()
     must_implement = ["USE_WEIGHTS", "USE_REPOSITION"]
 
-    def __init__(self, ignore_batch_dimension=False, **kwargs):
-        if self.logger is None:
-            self.logger = logging.getLogger(__class__.__name__)
+    def __init__(self, ignore_batch_dimension: bool = False, **kwargs):
+        self.logger = logging.getLogger(__class__.__name__)
 
         # If the agent only has one batch and wants to ignore batch dimension in the parameters, set it to True.
         self.ignore_batch_dimension = ignore_batch_dimension
@@ -41,12 +32,23 @@ class Agent(abc.ABC):
             if not hasattr(self, s) or getattr(self, s) is None:
                 raise NotImplementedError(f"Please specify {s} for the subclass.")
 
-    def move(self, points: Union[ListPoints, Points], coords, weights=None, inplace=True):
+    def move(self, points: Union[ListPoints, Points], coords: List, weights: Optional[List] = None, inplace: bool = True):
+        """
+        Make moves on (the set of) points.
+        Parameters:
+            points: either `ListPoints` (a batch of different collection of points) or `Points` (a simple wrapper with
+                one single collection of points).
+            coords: host's choice(-s) of coordinates. Not including the batch axis if points is a `Points` object.
+            weights: a list of weights (only for those weight-related games).
+            inplace: whether the modification happens directly on mutable objects `points`, `coords` and `weights`.
+        """
         if self.USE_WEIGHTS and weights is None:
             raise Exception("Please specify weights in the parameters.")
         if not self.USE_WEIGHTS and weights is not None:
             self.logger.warning("The weights parameter will be ignored.")
         if isinstance(points, Points):
+            # `Points` is a wrapper of one single collection of points (i.e., one single game).
+            # Here we turn it into a batch with batch size 1.
             points = points.points
 
         if not self.ignore_batch_dimension:
@@ -69,7 +71,7 @@ class Agent(abc.ABC):
             points.reposition()
         points.get_newton_polytope()
         if self.USE_WEIGHTS:
-            weights[:] = new_weights
+            weights[:] = new_weights  # pytype: disable=unsupported-operands
         return actions
 
     @abc.abstractmethod
@@ -81,24 +83,24 @@ class Agent(abc.ABC):
 
 
 class RandomAgent(Agent):
-    USE_WEIGHTS: Final[bool] = False
-    USE_REPOSITION: Final[bool] = False
+    USE_WEIGHTS = False
+    USE_REPOSITION = False
 
     def _get_actions(self, points, batch_coords, batch_weights):
-        return [np.random.choice(coord, size=1)[0].tolist() if len(coord) > 1 else None for coord in batch_coords]
+        return [random.choice(coord) if len(coord) > 1 else None for coord in batch_coords]
 
 
 class ChooseFirstAgent(Agent):
-    USE_WEIGHTS: Final[bool] = False
-    USE_REPOSITION: Final[bool] = False
+    USE_WEIGHTS = False
+    USE_REPOSITION = False
 
     def _get_actions(self, points, batch_coords, batch_weights):
         return [min(coord) if len(coord) > 1 else None for coord in batch_coords]
 
 
 class PolicyAgent(Agent):
-    USE_WEIGHTS: Final[bool] = False
-    USE_REPOSITION: Final[bool] = False
+    USE_WEIGHTS = False
+    USE_REPOSITION = False
 
     def __init__(self, policy: Policy, **kwargs):
         self._policy = policy
@@ -106,12 +108,12 @@ class PolicyAgent(Agent):
 
     def _get_actions(self, points, batch_coords, batch_weights):
         features = points.get_features()
-        return self._policy.predict((features, batch_coords))
+        return self._policy.predict((features, batch_coords)).tolist()
 
 
 class AgentMorin(Agent):
-    USE_WEIGHTS: Final[bool] = True
-    USE_REPOSITION: Final[bool] = True
+    USE_WEIGHTS = True
+    USE_REPOSITION = True
 
     def _get_actions(self, points, batch_coords, batch_weights):
         assert points.batch_size == 1, "Currently only support batch size 1."  # TODO: generalize!
@@ -121,9 +123,7 @@ class AgentMorin(Agent):
         if weights[coords[0]] == weights[coords[1]]:
             action = np.random.choice(coords, size=1)[0]
         else:
-            action = coords[np.argmin(
-                [weights[coords[0]], weights[coords[1]]]
-            )]
+            action = coords[np.argmin([weights[coords[0]], weights[coords[1]]])]
         return [action]
 
     def _get_weights(self, points, batch_coords, batch_weights, batch_actions):
@@ -132,6 +132,5 @@ class AgentMorin(Agent):
         action = batch_actions[0]
 
         changing_coordinate = [coord for coord in coords if coord != action]
-        next_weights = [weights[i] if i not in changing_coordinate else 0
-                        for i in range(len(weights))]
+        next_weights = [weights[i] if i not in changing_coordinate else 0 for i in range(len(weights))]
         return [next_weights]
