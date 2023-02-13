@@ -296,7 +296,7 @@ class RandomSpivakovsky(Host):
         subset_route = []
         for i in range(1, pow(2, dim)):
             if (i & (i - 1)):
-                subset_route.append((bin(i).count(), i))
+                subset_route.append((bin(i).count("1"), i))
 
         subset_route.sort()
 
