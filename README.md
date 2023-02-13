@@ -11,7 +11,7 @@ happen.
 - A winning strategy of a Hironaka game is [a resolution of certain singular point](what-is-a-resolution-of-singularity)
   in a high dimensional space. Use reinforcement learning to win the game => resolving singularities and solving a range
   of algebraic geometry problems.
-- Check out some [resolution trees for ADE singularities](https://github.com/honglu2875/hironaka-experiments/blob/main/5x3-surface-singularities/README.md#model-with-014-score-against-choose-firstchoose-last) by **our neural networks** (*prototypes without fine-tuning!*). Note that there is redundancy on the trees as the game did not terminate on equations like $x + y^2 + z^2 = 0$ where the origin is already smooth.
+- Check out some [resolution trees for ADE singularities](https://github.com/honglu2875/hironaka-experiments/blob/main/5x3-surface-singularities/README.md#model-with-014-score-against-choose-firstchoose-last) by **our neural networks** (*just prototypes*). Note that there is redundancy on the trees as the game did not terminate on equations like $x + y^2 + z^2 = 0$ where the origin is already smooth.
 
 ***Acknowledgement:***
 
