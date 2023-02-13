@@ -31,7 +31,7 @@ register(
 )
 
 sb3_policy_config = {
-    "net_arch": [32] * 4,
+    "net_arch": [256] * 4,
     "normalize_images": False}
 
 
@@ -91,14 +91,14 @@ def main(config_file: str):
             agent_names = ["neural_net", "random_agent", "choose_first"]
             perf_log = {}
             for agent, name in zip(agents, agent_names):
-                validator = HironakaValidator(Zeillinger(), agent, config_kwargs=config)
+                validator = HironakaValidator(nnhost, agent, config_kwargs=config)
                 result = validator.playoff(_num_games)
                 print(str(type(agent)).split("'")[-2].split(".")[-1])
                 print(f" - number of games:{len(result)}")
-                perf_log[f"zeillinger-{name}"] = len(result) / _num_games
+                perf_log[f"neural_net-{name}"] = len(result) / _num_games
             print(f"host validation:")
             hosts = [nnhost, RandomHost(), Zeillinger()]
-            host_names = ["neural_net", "random_host", "zeillinger"]
+            host_names = ["random_host", "zeillinger"]
             for host, name in zip(hosts, host_names):
                 validator = HironakaValidator(host, nnagent, config_kwargs=config)
                 result = validator.playoff(_num_games)
