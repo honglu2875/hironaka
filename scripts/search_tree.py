@@ -7,7 +7,7 @@ import numpy as np
 from treelib import Tree
 
 from hironaka.util import search_tree_morin
-from hironaka.host import WeakSpivakovsky, WeakSpivakovskyRandom
+from hironaka.host import WeakSpivakovsky, WeakSpivakovskyRandom, RandomSpivakovsky
 
 
 def main():
@@ -24,7 +24,7 @@ def main():
     tree = Tree()
     tree.create_node(0, 0, data=initial_points)
 
-    host = WeakSpivakovskyRandom()
+    host = RandomSpivakovsky()
     weights = [1] * dimension
     search_tree_morin(initial_points, tree, 0, weights, host, max_size=MAX_SIZE)
     tree.show(data_property="points", idhidden=False)
