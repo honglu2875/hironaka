@@ -61,17 +61,24 @@ def main(config_file: str):
     batch_size = config['training']['batch_size']
     save_frequency = config['training']['save_frequency']
     total_timestep = config['training']['total_timestep']
-
+    learning_starts = config['training']['learning_starts']
+    lr = config['training']['lr'] if 'lr' in config['training'] else 1e-3
     version_string = config['models']['version_string']
 
     env_h = gym.make("hironaka/HironakaHost-v0", host=Zeillinger(), config_kwargs=training_config)
-    model_a = DQN("MultiInputPolicy", env_h, verbose=0, policy_kwargs=sb3_policy_config, batch_size=batch_size)
+    model_a = DQN("MultiInputPolicy", env_h,
+                  verbose=0, policy_kwargs=sb3_policy_config,
+                  batch_size=batch_size, learning_starts=learning_starts,
+                  learning_rate=lr)
 
     p_a = NNPolicy(model_a.q_net.q_net, mode='agent', eval_mode=True, **training_config)
     nnagent = PolicyAgent(p_a)
     env_a = gym.make("hironaka/HironakaAgent-v0", agent=nnagent, config_kwargs=training_config)
 
-    model_h = DQN("MlpPolicy", env_a, verbose=0, policy_kwargs=sb3_policy_config, batch_size=batch_size, gamma=1)
+    model_h = DQN("MlpPolicy", env_a,
+                  verbose=0, policy_kwargs=sb3_policy_config,
+                  batch_size=batch_size, gamma=1, learning_starts=learning_starts,
+                  learning_rate=lr)
 
     p_h = NNPolicy(model_h.q_net.q_net, mode='host', eval_mode=True, **training_config)
     nnhost = PolicyHost(p_h, **training_config)
@@ -91,7 +98,7 @@ def main(config_file: str):
             agent_names = ["neural_net", "random_agent", "choose_first"]
             perf_log = {}
             for agent, name in zip(agents, agent_names):
-                validator = HironakaValidator(nnhost, agent, config_kwargs=config)
+                validator = HironakaValidator(nnhost, agent, config_kwargs=training_config)
                 result = validator.playoff(_num_games)
                 print(str(type(agent)).split("'")[-2].split(".")[-1])
                 print(f" - number of games:{len(result)}")

@@ -71,6 +71,7 @@ def get_padded_array(f: Union[List[List[int]], np.ndarray], new_length, constant
     This augments a 2d nested list (axis 1 having uniform length) on axis 0 into given length.
     """
     f_np = np.array(f).astype(float)
+    assert f_np.shape[0] <= new_length, f"Got {f_np.shape[0]}."
     f_np = np.pad(f_np, ((0, new_length - f_np.shape[0]), (0, 0)), mode="constant", constant_values=constant_value)
     return f_np
 

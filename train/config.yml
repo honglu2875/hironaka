@@ -18,5 +18,7 @@ training:
   batch_size: 32
   save_frequency: 1 # save model every {save_frequency} epochs.
   total_timestep: 10000
+  learning_starts: 1000
+  #lr: 1e-5
 models:
   version_string: 'vanilla_v0'
