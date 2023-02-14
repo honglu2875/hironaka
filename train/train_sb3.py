@@ -65,21 +65,21 @@ def main(config_file: str):
     version_string = config['models']['version_string']
 
     env_h = gym.make("hironaka/HironakaHost-v0", host=Zeillinger(), config_kwargs=training_config)
+    model_a = DQN("MultiInputPolicy", env_h, verbose=0, policy_kwargs=sb3_policy_config, batch_size=batch_size)
+
+    p_a = NNPolicy(model_a.q_net.q_net, mode='agent', eval_mode=True, **training_config)
+    nnagent = PolicyAgent(p_a)
+    env_a = gym.make("hironaka/HironakaAgent-v0", agent=nnagent, config_kwargs=training_config)
+
+    model_h = DQN("MlpPolicy", env_a, verbose=0, policy_kwargs=sb3_policy_config, batch_size=batch_size, gamma=1)
+
+    p_h = NNPolicy(model_h.q_net.q_net, mode='host', eval_mode=True, **training_config)
+    nnhost = PolicyHost(p_h, **training_config)
+    env_h = gym.make("hironaka/HironakaHost-v0", host=nnhost, config_kwargs=training_config)
 
     for i in range(epoch):
-        model_a = DQN("MultiInputPolicy", env_h, verbose=0, policy_kwargs=sb3_policy_config, batch_size=batch_size)
         model_a.learn(total_timesteps=total_timestep)
-
-        p_a = NNPolicy(model_a.q_net.q_net, mode='agent', eval_mode=True, **training_config)
-        nnagent = PolicyAgent(p_a)
-        env_a = gym.make("hironaka/HironakaAgent-v0", agent=nnagent, config_kwargs=training_config)
-
-        model_h = DQN("MlpPolicy", env_a, verbose=0, policy_kwargs=sb3_policy_config, batch_size=batch_size, gamma=1)
         model_h.learn(total_timesteps=total_timestep)
-
-        p_h = NNPolicy(model_h.q_net.q_net, mode='host', eval_mode=True, **training_config)
-        nnhost = PolicyHost(p_h, **training_config)
-        env_h = gym.make("hironaka/HironakaHost-v0", host=nnhost, config_kwargs=training_config)
 
         # Validation
 

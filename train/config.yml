@@ -12,6 +12,7 @@ global:
   scale_observation: true
   reward_based_on_point_reduction: false
   use_discrete_actions_for_host: true
+  #device: 'cuda'
 training:
   epoch: 100
   batch_size: 32

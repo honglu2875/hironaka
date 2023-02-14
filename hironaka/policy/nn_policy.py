@@ -60,12 +60,12 @@ class NNPolicy(Policy):
             if self.masked:
                 mask = torch.tensor(batched_coord_list_to_binary(features[1], self.dimension), device=self.device)
                 output_tensor = output_tensor * mask
-            return torch.argmax(output_tensor, dim=1).detach().numpy()
+            return torch.argmax(output_tensor, dim=1).detach().cpu().numpy()
         elif self.mode == "host":
             # action probabilities -> decode into multi-binary.
             # E.g., output [[0.5, 0.7, 0.5, 0.3]] --argmax--> [[1]] --decode_tensor--> [[1, 0, 1]]
             output_tensor = torch.softmax(output_tensor, dim=1)
-            return self.host_encoder.decode_tensor(torch.argmax(output_tensor, dim=1)).detach().numpy()
+            return self.host_encoder.decode_tensor(torch.argmax(output_tensor, dim=1)).detach().cpu().numpy()
         else:
             raise AssertionError()
 
