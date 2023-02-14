@@ -10,10 +10,10 @@ global:
   stop_at_threshold: true # HironakaAgentEnv, Validator only
   improve_efficiency: true
   scale_observation: true
-  reward_based_on_point_reduction: true
+  reward_based_on_point_reduction: false
   use_discrete_actions_for_host: true
 training:
-  epoch: 1
+  epoch: 100
   batch_size: 32
   save_frequency: 1 # save model every {save_frequency} epochs.
   total_timestep: 10000
