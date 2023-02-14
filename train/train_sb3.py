@@ -3,6 +3,7 @@ import logging
 import os
 import pathlib
 import sys
+from typing import Any, Optional, Union, Tuple
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.resolve()))
 
@@ -17,6 +18,7 @@ from stable_baselines3 import DQN
 
 from hironaka.agent import RandomAgent, ChooseFirstAgent, PolicyAgent
 from hironaka.host import Zeillinger, RandomHost, PolicyHost
+from hironaka.util.sb3_util import CustomLogger, configure
 
 register(
     id='hironaka/HironakaHost-v0',
@@ -35,11 +37,39 @@ sb3_policy_config = {
     "normalize_images": False}
 
 
+class SB3Logger(CustomLogger):
+    prefix = ""
+
+    def record(
+        self,
+        key: str,
+        value: Any,
+        exclude: Optional[Union[str, Tuple[str, ...]]] = None,
+    ) -> None:
+        super().record(key, value, exclude)
+        wandb.log({f"{self.prefix}/{key}": value}, step=len(self.history_value[key]))
+
+    def record_mean(
+        self,
+        key: str,
+        value: Any,
+        exclude: Optional[Union[str, Tuple[str, ...]]] = None,
+    ) -> None:
+        super().record_mean(key, value, exclude)
+        wandb.log({f"{self.prefix}/{key}_mean": value}, step=len(self.history_mean_value[key]))
+
+
+HostLogger = SB3Logger(prefix="host")
+AgentLogger = SB3Logger(prefix="agent")
+
+
 def main(config_file: str):
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
     if not logger.hasHandlers():
         logger.addHandler(logging.StreamHandler(sys.stdout))
+    sb3_logger_host = configure(None, None, HostLogger)
+    sb3_logger_agent = configure(None, None, AgentLogger)
 
     wandb.init(project="hironaka_sb3", config=config_file)
 
@@ -70,6 +100,7 @@ def main(config_file: str):
                   verbose=0, policy_kwargs=sb3_policy_config,
                   batch_size=batch_size, learning_starts=learning_starts,
                   learning_rate=lr)
+    model_a.set_logger(sb3_logger_agent)
 
     p_a = NNPolicy(model_a.q_net.q_net, mode='agent', eval_mode=True, **training_config)
     nnagent = PolicyAgent(p_a)
@@ -79,6 +110,7 @@ def main(config_file: str):
                   verbose=0, policy_kwargs=sb3_policy_config,
                   batch_size=batch_size, gamma=1, learning_starts=learning_starts,
                   learning_rate=lr)
+    model_h.set_logger(sb3_logger_host)
 
     p_h = NNPolicy(model_h.q_net.q_net, mode='host', eval_mode=True, **training_config)
     nnhost = PolicyHost(p_h, **training_config)
