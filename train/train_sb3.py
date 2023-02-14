@@ -107,7 +107,7 @@ def main(config_file: str):
             hosts = [nnhost, RandomHost(), Zeillinger()]
             host_names = ["random_host", "zeillinger"]
             for host, name in zip(hosts, host_names):
-                validator = HironakaValidator(host, nnagent, config_kwargs=config)
+                validator = HironakaValidator(host, nnagent, config_kwargs=training_config)
                 result = validator.playoff(_num_games)
                 print(str(type(host)).split("'")[-2].split(".")[-1])
                 print(f" - number of games:{len(result)}")
