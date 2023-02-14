@@ -1,8 +1,8 @@
 global:
   dimension: 3
-  max_value: 20
+  max_value: 5
   masked: true
-  max_num_points: 20
+  max_num_points: 5
   normalized: false
   value_threshold: 100000000
   step_threshold: 200 # HironakaAgentEnv, Validator only
@@ -12,13 +12,14 @@ global:
   scale_observation: true
   reward_based_on_point_reduction: false
   use_discrete_actions_for_host: true
-  #device: 'cuda'
+  device: 'cuda'
 training:
   epoch: 100
-  batch_size: 32
+  batch_size: 256
   save_frequency: 1 # save model every {save_frequency} epochs.
   total_timestep: 10000
-  learning_starts: 1000
-  #lr: 0.00003
+  learning_starts: 10000
+  log_interval: 1000
+  lr: 0.003
 models:
   version_string: 'vanilla_v0'

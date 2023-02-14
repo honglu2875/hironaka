@@ -33,7 +33,7 @@ register(
 )
 
 sb3_policy_config = {
-    "net_arch": [256] * 4,
+    "net_arch": [256] * 10,
     "normalize_images": False}
 
 
