@@ -112,7 +112,7 @@ def main(config_file: str):
     model_a = DQN("MultiInputPolicy", env_h,
                   verbose=0, policy_kwargs=sb3_policy_config,
                   batch_size=batch_size, learning_starts=learning_starts,
-                  learning_rate=lr)
+                  learning_rate=lr, target_update_interval=total_timestep*5)
     model_a.set_logger(sb3_logger_agent)
 
     p_a = NNPolicy(model_a.q_net.q_net, mode='agent', eval_mode=True, **training_config)
@@ -122,7 +122,7 @@ def main(config_file: str):
     model_h = DQN("MlpPolicy", env_a,
                   verbose=0, policy_kwargs=sb3_policy_config,
                   batch_size=batch_size, gamma=1, learning_starts=learning_starts,
-                  learning_rate=lr)
+                  learning_rate=lr, target_update_interval=total_timestep*5)
     model_h.set_logger(sb3_logger_host)
 
     p_h = NNPolicy(model_h.q_net.q_net, mode='host', eval_mode=True, **training_config)
