@@ -47,7 +47,6 @@ class SB3Logger(CustomLogger):
         exclude: Optional[Union[str, Tuple[str, ...]]] = None,
     ) -> None:
         super().record(key, value, exclude)
-        wandb.log({f"{self.prefix}/{key}": value}, step=len(self.history_value[key]))
 
     def record_mean(
         self,
@@ -56,7 +55,16 @@ class SB3Logger(CustomLogger):
         exclude: Optional[Union[str, Tuple[str, ...]]] = None,
     ) -> None:
         super().record_mean(key, value, exclude)
-        wandb.log({f"{self.prefix}/{key}_mean": value}, step=len(self.history_mean_value[key]))
+
+    def commit(self):
+        for key in self.history_value:
+            for i in range(len(self.history_value[key])):
+                wandb.log({f"{self.prefix}/{key}": self.history_value[key][i]})
+            self.history_value[key] = []
+        for key in self.history_mean_value:
+            for i in range(len(self.history_mean_value[key])):
+                wandb.log({f"{self.prefix}/{key}_mean": self.history_mean_value[key][i]})
+            self.history_mean_value[key] = []
 
 
 class HostLogger(SB3Logger):
@@ -64,7 +72,7 @@ class HostLogger(SB3Logger):
 
 
 class AgentLogger(SB3Logger):
-    prefix = "host"
+    prefix = "agent"
 
 
 def main(config_file: str):
@@ -98,6 +106,7 @@ def main(config_file: str):
     learning_starts = config['training']['learning_starts']
     lr = config['training']['lr'] if 'lr' in config['training'] else 1e-3
     version_string = config['models']['version_string']
+    log_interval = config['training']['log_interval']
 
     env_h = gym.make("hironaka/HironakaHost-v0", host=Zeillinger(), config_kwargs=training_config)
     model_a = DQN("MultiInputPolicy", env_h,
@@ -121,8 +130,12 @@ def main(config_file: str):
     env_h = gym.make("hironaka/HironakaHost-v0", host=nnhost, config_kwargs=training_config)
 
     for i in range(epoch):
-        model_a.learn(total_timesteps=total_timestep)
-        model_h.learn(total_timesteps=total_timestep)
+        model_a.learn(total_timesteps=total_timestep,
+                      log_interval=log_interval,
+                      reset_num_timesteps=False)
+        model_h.learn(total_timesteps=total_timestep,
+                      log_interval=log_interval,
+                      reset_num_timesteps=False)
 
         # Validation
 
@@ -149,6 +162,8 @@ def main(config_file: str):
                 print(f" - number of games:{len(result)}")
                 perf_log[f"{name}-neural_net"] = len(result) / _num_games
             wandb.log(perf_log, step=i)
+            sb3_logger_agent.commit()
+            sb3_logger_host.commit()
 
         # Save model
         if i % save_frequency == 0:
