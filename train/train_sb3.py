@@ -59,8 +59,12 @@ class SB3Logger(CustomLogger):
         wandb.log({f"{self.prefix}/{key}_mean": value}, step=len(self.history_mean_value[key]))
 
 
-HostLogger = SB3Logger(prefix="host")
-AgentLogger = SB3Logger(prefix="agent")
+class HostLogger(SB3Logger):
+    prefix = "host"
+
+
+class AgentLogger(SB3Logger):
+    prefix = "host"
 
 
 def main(config_file: str):
