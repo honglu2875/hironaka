@@ -33,7 +33,7 @@ register(
 )
 
 sb3_policy_config = {
-    "net_arch": [256] * 10,
+    "net_arch": [256] * 4,
     "normalize_images": False}
 
 
@@ -59,11 +59,11 @@ class SB3Logger(CustomLogger):
     def commit(self):
         for key in self.history_value:
             for i in range(len(self.history_value[key])):
-                wandb.log({f"{self.prefix}/{key}": self.history_value[key][i]})
+                wandb.log({f"{self.prefix}/{key}": self.history_value[key][i]}, commit=False)
             self.history_value[key] = []
         for key in self.history_mean_value:
             for i in range(len(self.history_mean_value[key])):
-                wandb.log({f"{self.prefix}/{key}_mean": self.history_mean_value[key][i]})
+                wandb.log({f"{self.prefix}/{key}_mean": self.history_mean_value[key][i]}, commit=False)
             self.history_mean_value[key] = []
 
 
@@ -140,7 +140,7 @@ def main(config_file: str):
         # Validation
 
         if i % save_frequency == 0:
-            print(f"Epoch {i * 5}")
+            print(f"Epoch {i}")
             print("agent validation:")
             _num_games = 1000
             agents = [nnagent, RandomAgent(), ChooseFirstAgent()]
@@ -161,9 +161,9 @@ def main(config_file: str):
                 print(str(type(host)).split("'")[-2].split(".")[-1])
                 print(f" - number of games:{len(result)}")
                 perf_log[f"{name}-neural_net"] = len(result) / _num_games
-            wandb.log(perf_log, step=i)
             sb3_logger_agent.commit()
             sb3_logger_host.commit()
+            wandb.log(perf_log, commit=True)
 
         # Save model
         if i % save_frequency == 0:
