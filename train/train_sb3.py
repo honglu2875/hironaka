@@ -131,14 +131,17 @@ def main(config_file: str):
     nnhost = PolicyHost(p_h, **training_config)
     env_h = gym.make("hironaka/HironakaHost-v0", host=nnhost, config_kwargs=training_config)
 
+    running_lr = lr
     for i in range(epoch):
+        model_a.lr_schedule = lambda _: running_lr
+        model_h.lr_schedule = lambda _: running_lr
         model_a.learn(total_timesteps=total_timestep,
                       log_interval=log_interval,
                       reset_num_timesteps=False)
         model_h.learn(total_timesteps=total_timestep,
                       log_interval=log_interval,
                       reset_num_timesteps=False)
-
+        running_lr *= 0.95
         # Validation
 
         if i % save_frequency == 0:
