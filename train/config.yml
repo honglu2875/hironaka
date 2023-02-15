@@ -5,7 +5,7 @@ global:
   max_num_points: 5
   normalized: false
   value_threshold: 100000000
-  step_threshold: 200 # HironakaAgentEnv, Validator only
+  step_threshold: 20 # HironakaAgentEnv, Validator only
   fixed_penalty_crossing_threshold: 0
   stop_at_threshold: true # HironakaAgentEnv, Validator only
   improve_efficiency: true

@@ -108,7 +108,9 @@ def main(config_file: str):
     version_string = config['models']['version_string']
     log_interval = config['training']['log_interval']
 
-    env_h = gym.make("hironaka/HironakaHost-v0", host=Zeillinger(), config_kwargs=training_config)
+    env_h = gym.make("hironaka/HironakaHost-v0",
+                     host=Zeillinger(),
+                     config_kwargs=training_config)
     model_a = DQN("MultiInputPolicy", env_h,
                   verbose=0, policy_kwargs=sb3_policy_config,
                   batch_size=batch_size, learning_starts=learning_starts,
