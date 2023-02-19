@@ -99,10 +99,9 @@ class AgentLogger(SB3Logger):
 
 class ValidateCallback(BaseCallback):
     def __init__(
-        self, agent: OnPolicyAlgorithm, nnagent, nnhost, cfg, agent_logger, host_logger, verbose: int = 0
+        self, nnagent, nnhost, cfg, agent_logger, host_logger, verbose: int = 0
     ):
         super().__init__(verbose)
-        self.agent = agent
         self.nnagent = nnagent
         self.nnhost = nnhost
         self.cfg = cfg
