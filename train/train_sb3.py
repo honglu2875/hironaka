@@ -99,7 +99,8 @@ class AgentLogger(SB3Logger):
 
 class ValidateCallback(BaseCallback):
     def __init__(
-        self, nnagent, nnhost, cfg, agent_logger, host_logger, verbose: int = 0
+        self, nnagent, nnhost, cfg, agent_logger, host_logger, save_frequency,
+        model_a, model_h, model_path, role, verbose: int = 0
     ):
         super().__init__(verbose)
         self.nnagent = nnagent
@@ -107,20 +108,27 @@ class ValidateCallback(BaseCallback):
         self.cfg = cfg
         self.agent_logger = agent_logger
         self.host_logger = host_logger
-        self.counter = 0
+        self.save_frequency = save_frequency
+        self.model_a = model_a
+        self.model_h = model_h
+        self.model_path = model_path
+        self.last_n_updates = 0
+        self.role = role
 
     def _on_step(self) -> bool:
         return True
 
-    def on_training_end(self):
-        self.counter += 1
-        if self.counter % self.cfg["save_frequency"] != 0:
+    def on_rollout_start(self):
+        n_update = self.model_a._n_updates if self.role == "agent" else self.model_h._n_updates
+
+        if n_update // self.save_frequency <= self.last_n_updates // self.save_frequency:
             return
+
         print("agent validation:")
         _num_games = 1000
         agents = [self.nnagent, RandomAgent(), ChooseFirstAgent()]
         agent_names = ["neural_net", "random_agent", "choose_first"]
-        perf_log = {"validation_step": self.counter // self.cfg["save_frequency"]}
+        perf_log = {"validation_step": self.counter // self.save_frequency}
         for agent, name in zip(agents, agent_names):
             validator = HironakaValidator(self.nnhost, agent, config_kwargs=self.cfg)
             result = validator.playoff(_num_games)
@@ -140,6 +148,9 @@ class ValidateCallback(BaseCallback):
         logs[0].update(perf_log)
         for i in logs:
             wandb.log(logs[i], commit=True)
+
+        self.model_a.save(f"{self.model_path}/{self.cfg.version_string}_epoch_{n_update // self.save_frequency}_agent")
+        self.model_h.save(f"{self.model_path}/{self.cfg.version_string}_epoch_{n_update // self.save_frequency}_host")
 
 
 def main(config_file: str):
@@ -199,24 +210,22 @@ def main(config_file: str):
 
     running_lr = lr
 
-    callback = ValidateCallback(nnagent, nnhost, training_config, sb3_logger_agent, sb3_logger_host)
+    callback_a = ValidateCallback(nnagent, nnhost, training_config, sb3_logger_agent, sb3_logger_host, save_frequency,
+                                  model_a, model_h, model_path, "agent")
+    callback_h = ValidateCallback(nnagent, nnhost, training_config, sb3_logger_agent, sb3_logger_host, save_frequency,
+                                  model_a, model_h, model_path, "host")
     for i in range(epoch):
         model_a.lr_schedule = lambda _: running_lr
         model_h.lr_schedule = lambda _: running_lr
         model_a.learn(total_timesteps=total_timestep,
                       log_interval=log_interval,
                       reset_num_timesteps=False,
-                      callback=callback)
+                      callback=callback_a)
         model_h.learn(total_timesteps=total_timestep,
                       log_interval=log_interval,
                       reset_num_timesteps=False,
-                      callback=callback)
+                      callback=callback_h)
         running_lr *= 0.95
-
-        # Save model
-        if i % save_frequency == 0:
-            model_a.save(f"{model_path}/{version_string}_epoch_{i}_agent")
-            model_h.save(f"{model_path}/{version_string}_epoch_{i}_host")
 
 
 if __name__ == "__main__":
