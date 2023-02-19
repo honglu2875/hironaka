@@ -3,6 +3,7 @@ import logging
 import os
 import pathlib
 import sys
+from collections import defaultdict
 from typing import Any, Optional, Union, Tuple
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.resolve()))
@@ -19,6 +20,11 @@ from stable_baselines3 import DQN
 from hironaka.agent import RandomAgent, ChooseFirstAgent, PolicyAgent
 from hironaka.host import Zeillinger, RandomHost, PolicyHost
 from hironaka.util.sb3_util import CustomLogger, configure
+
+from stable_baselines3.common.buffers import ReplayBuffer
+from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.on_policy_algorithm import OnPolicyAlgorithm
+
 
 register(
     id='hironaka/HironakaHost-v0',
@@ -39,6 +45,7 @@ sb3_policy_config = {
 
 class SB3Logger(CustomLogger):
     prefix = ""
+    steps = defaultdict(int)
 
     def record(
         self,
@@ -56,23 +63,84 @@ class SB3Logger(CustomLogger):
     ) -> None:
         super().record_mean(key, value, exclude)
 
-    def commit(self):
+    def export(self):
+        logs = defaultdict(dict)
         for key in self.history_value:
             for i in range(len(self.history_value[key])):
-                wandb.log({f"{self.prefix}/{key}": self.history_value[key][i]}, commit=False)
+                logs[i].update({f"{self.prefix}/{key}": self.history_value[key][i],
+                                f"{self.prefix}/{key}_step": self.steps[key] + i})
             self.history_value[key] = []
+            self.steps[key] += len(self.history_value[key])
         for key in self.history_mean_value:
             for i in range(len(self.history_mean_value[key])):
-                wandb.log({f"{self.prefix}/{key}_mean": self.history_mean_value[key][i]}, commit=False)
+                logs[i].update({f"{self.prefix}/{key}_mean": self.history_mean_value[key][i],
+                                f"{self.prefix}/{key}_mean_step": self.steps[key] + i})
             self.history_mean_value[key] = []
+            self.steps[key] += len(self.history_mean_value[key])
+        return logs
 
 
 class HostLogger(SB3Logger):
     prefix = "host"
 
 
+def combine(log1, log2) -> dict:
+    logs = defaultdict(dict)
+    for i in log1:
+        logs[i].update(log1[i])
+    for i in log2:
+        logs[i].update(log2[i])
+    return logs
+
+
 class AgentLogger(SB3Logger):
     prefix = "agent"
+
+
+class ValidateCallback(BaseCallback):
+    def __init__(
+        self, agent: OnPolicyAlgorithm, nnagent, nnhost, cfg, agent_logger, host_logger, verbose: int = 0
+    ):
+        super().__init__(verbose)
+        self.agent = agent
+        self.nnagent = nnagent
+        self.nnhost = nnhost
+        self.cfg = cfg
+        self.agent_logger = agent_logger
+        self.host_logger = host_logger
+        self.counter = 0
+
+    def _on_step(self) -> bool:
+        return True
+
+    def on_training_end(self):
+        self.counter += 1
+        if self.counter % self.cfg["save_frequency"] != 0:
+            return
+        print("agent validation:")
+        _num_games = 1000
+        agents = [self.nnagent, RandomAgent(), ChooseFirstAgent()]
+        agent_names = ["neural_net", "random_agent", "choose_first"]
+        perf_log = {"validation_step": self.counter // self.cfg["save_frequency"]}
+        for agent, name in zip(agents, agent_names):
+            validator = HironakaValidator(self.nnhost, agent, config_kwargs=self.cfg)
+            result = validator.playoff(_num_games)
+            print(str(type(agent)).split("'")[-2].split(".")[-1])
+            print(f" - number of games:{len(result)}")
+            perf_log[f"neural_net-{name}"] = len(result) / _num_games
+        print(f"host validation:")
+        hosts = [self.nnhost, RandomHost(), Zeillinger()]
+        host_names = ["random_host", "zeillinger"]
+        for host, name in zip(hosts, host_names):
+            validator = HironakaValidator(host, self.nnagent, config_kwargs=self.cfg)
+            result = validator.playoff(_num_games)
+            print(str(type(host)).split("'")[-2].split(".")[-1])
+            print(f" - number of games:{len(result)}")
+            perf_log[f"{name}-neural_net"] = len(result) / _num_games
+        logs = combine(self.agent_logger.export(), self.host_logger.export())
+        logs[0].update(perf_log)
+        for i in logs:
+            wandb.log(logs[i], commit=True)
 
 
 def main(config_file: str):
@@ -142,33 +210,6 @@ def main(config_file: str):
                       log_interval=log_interval,
                       reset_num_timesteps=False)
         running_lr *= 0.95
-        # Validation
-
-        if i % save_frequency == 0:
-            print(f"Epoch {i}")
-            print("agent validation:")
-            _num_games = 1000
-            agents = [nnagent, RandomAgent(), ChooseFirstAgent()]
-            agent_names = ["neural_net", "random_agent", "choose_first"]
-            perf_log = {}
-            for agent, name in zip(agents, agent_names):
-                validator = HironakaValidator(nnhost, agent, config_kwargs=training_config)
-                result = validator.playoff(_num_games)
-                print(str(type(agent)).split("'")[-2].split(".")[-1])
-                print(f" - number of games:{len(result)}")
-                perf_log[f"neural_net-{name}"] = len(result) / _num_games
-            print(f"host validation:")
-            hosts = [nnhost, RandomHost(), Zeillinger()]
-            host_names = ["random_host", "zeillinger"]
-            for host, name in zip(hosts, host_names):
-                validator = HironakaValidator(host, nnagent, config_kwargs=training_config)
-                result = validator.playoff(_num_games)
-                print(str(type(host)).split("'")[-2].split(".")[-1])
-                print(f" - number of games:{len(result)}")
-                perf_log[f"{name}-neural_net"] = len(result) / _num_games
-            sb3_logger_agent.commit()
-            sb3_logger_host.commit()
-            wandb.log(perf_log, commit=True)
 
         # Save model
         if i % save_frequency == 0:

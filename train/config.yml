@@ -14,11 +14,11 @@ global:
   use_discrete_actions_for_host: true
   device: 'cuda'
 training:
-  epoch: 100
+  epoch: 1
   batch_size: 256
-  save_frequency: 1 # save model every {save_frequency} epochs.
-  total_timestep: 10000
-  learning_starts: 10000
+  save_frequency: 100 # save model every {save_frequency} epochs.
+  total_timestep: 50000
+  learning_starts: 5000
   log_interval: 1000
   lr: 0.001
 models:
