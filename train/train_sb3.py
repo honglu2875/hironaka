@@ -137,7 +137,7 @@ class ValidateCallback(BaseCallback):
             print(f" - number of games:{len(result)}")
             perf_log[f"neural_net-{name}"] = len(result) / _num_games
         print(f"host validation:")
-        hosts = [self.nnhost, RandomHost(), Zeillinger()]
+        hosts = [RandomHost(), Zeillinger()]
         host_names = ["random_host", "zeillinger"]
         for host, name in zip(hosts, host_names):
             validator = HironakaValidator(host, self.nnagent, config_kwargs=self.cfg)
