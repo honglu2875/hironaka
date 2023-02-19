@@ -100,7 +100,7 @@ class AgentLogger(SB3Logger):
 class ValidateCallback(BaseCallback):
     def __init__(
         self, nnagent, nnhost, cfg, agent_logger, host_logger, save_frequency,
-        model_a, model_h, model_path, role, verbose: int = 0
+        model_a, model_h, model_path, role, version_string, verbose: int = 0
     ):
         super().__init__(verbose)
         self.nnagent = nnagent
@@ -114,6 +114,7 @@ class ValidateCallback(BaseCallback):
         self.model_path = model_path
         self.last_n_updates = 0
         self.role = role
+        self.version_string = version_string
 
     def _on_step(self) -> bool:
         return True
@@ -149,8 +150,8 @@ class ValidateCallback(BaseCallback):
         for i in logs:
             wandb.log(logs[i], commit=True)
 
-        self.model_a.save(f"{self.model_path}/{self.cfg['version_string']}_epoch_{n_update // self.save_frequency}_agent")
-        self.model_h.save(f"{self.model_path}/{self.cfg['version_string']}_epoch_{n_update // self.save_frequency}_host")
+        self.model_a.save(f"{self.model_path}/{self.version_string}_epoch_{n_update // self.save_frequency}_agent")
+        self.model_h.save(f"{self.model_path}/{self.version_string}_epoch_{n_update // self.save_frequency}_host")
 
 
 def main(config_file: str):
@@ -211,9 +212,9 @@ def main(config_file: str):
     running_lr = lr
 
     callback_a = ValidateCallback(nnagent, nnhost, training_config, sb3_logger_agent, sb3_logger_host, save_frequency,
-                                  model_a, model_h, model_path, "agent")
+                                  model_a, model_h, model_path, "agent", version_string)
     callback_h = ValidateCallback(nnagent, nnhost, training_config, sb3_logger_agent, sb3_logger_host, save_frequency,
-                                  model_a, model_h, model_path, "host")
+                                  model_a, model_h, model_path, "host", version_string)
     for i in range(epoch):
         model_a.lr_schedule = lambda _: running_lr
         model_h.lr_schedule = lambda _: running_lr
