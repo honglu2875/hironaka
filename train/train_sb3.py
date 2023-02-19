@@ -128,7 +128,7 @@ class ValidateCallback(BaseCallback):
         _num_games = 1000
         agents = [self.nnagent, RandomAgent(), ChooseFirstAgent()]
         agent_names = ["neural_net", "random_agent", "choose_first"]
-        perf_log = {"validation_step": self.counter // self.save_frequency}
+        perf_log = {"validation_step": n_update // self.save_frequency}
         for agent, name in zip(agents, agent_names):
             validator = HironakaValidator(self.nnhost, agent, config_kwargs=self.cfg)
             result = validator.playoff(_num_games)
