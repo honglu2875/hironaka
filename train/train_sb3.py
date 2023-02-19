@@ -150,7 +150,6 @@ def main(config_file: str):
         logger.addHandler(logging.StreamHandler(sys.stdout))
     sb3_logger_host = configure(None, None, HostLogger)
     sb3_logger_agent = configure(None, None, AgentLogger)
-
     wandb.init(project="hironaka_sb3", config=config_file)
 
     model_path = 'models'
@@ -200,15 +199,19 @@ def main(config_file: str):
     env_h = gym.make("hironaka/HironakaHost-v0", host=nnhost, config_kwargs=training_config)
 
     running_lr = lr
+
+    callback = ValidateCallback(nnagent, nnhost, training_config, sb3_logger_agent, sb3_logger_host)
     for i in range(epoch):
         model_a.lr_schedule = lambda _: running_lr
         model_h.lr_schedule = lambda _: running_lr
         model_a.learn(total_timesteps=total_timestep,
                       log_interval=log_interval,
-                      reset_num_timesteps=False)
+                      reset_num_timesteps=False,
+                      callback=callback)
         model_h.learn(total_timesteps=total_timestep,
                       log_interval=log_interval,
-                      reset_num_timesteps=False)
+                      reset_num_timesteps=False,
+                      callback=callback)
         running_lr *= 0.95
 
         # Save model
