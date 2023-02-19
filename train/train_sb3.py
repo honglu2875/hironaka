@@ -149,8 +149,8 @@ class ValidateCallback(BaseCallback):
         for i in logs:
             wandb.log(logs[i], commit=True)
 
-        self.model_a.save(f"{self.model_path}/{self.cfg.version_string}_epoch_{n_update // self.save_frequency}_agent")
-        self.model_h.save(f"{self.model_path}/{self.cfg.version_string}_epoch_{n_update // self.save_frequency}_host")
+        self.model_a.save(f"{self.model_path}/{self.cfg['version_string']}_epoch_{n_update // self.save_frequency}_agent")
+        self.model_h.save(f"{self.model_path}/{self.cfg['version_string']}_epoch_{n_update // self.save_frequency}_host")
 
 
 def main(config_file: str):
