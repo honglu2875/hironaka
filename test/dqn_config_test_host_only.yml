@@ -1,4 +1,4 @@
-use_tensorboard: true
+use_wandb: true
 layerwise_logging: true
 log_time: true
 use_cuda: false
