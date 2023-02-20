@@ -8,7 +8,6 @@ import torch
 import yaml
 from torch import nn
 from torch.nn import DataParallel
-from torch.utils.tensorboard import SummaryWriter
 
 from hironaka.core import TensorPoints
 
@@ -19,6 +18,7 @@ from .player_modules import AllCoordHostModule, ChooseFirstAgentModule, DummyMod
 from .replay_buffer import ReplayBuffer
 from .scheduler import ConstantScheduler, ExponentialERScheduler, ExponentialLRScheduler, InverseLRScheduler, Scheduler
 from .timer import Timer
+from .log_writer import LogWriter
 
 
 class Trainer(abc.ABC):
@@ -98,7 +98,7 @@ class Trainer(abc.ABC):
         # -------- Handle Configurations -------- #
 
         # Highest-level mandatory configs:
-        self.use_tensorboard = self.config["use_tensorboard"]
+        self.use_wandb = self.config["use_wandb"]
         self.layerwise_logging = self.config["layerwise_logging"]
         self.log_time = self.config["log_time"]
         self.use_cuda = self.config["use_cuda"]
@@ -148,8 +148,8 @@ class Trainer(abc.ABC):
         self.string_suffix = f"-{self.version_string}-cuda_{device_num}"
 
         # Initialize TensorBoard settings
-        if self.use_tensorboard:
-            self.tb_writer = SummaryWriter(comment=self.string_suffix)
+        if self.use_wandb:
+            self.log_writer = LogWriter(suffix=self.string_suffix)
 
         # Set torch device
         self.device = torch.device(f"cuda:{device_num}") if self.use_cuda else torch.device("cpu")

@@ -1,6 +1,6 @@
 # Caution: these parameters are big. Will burn your cpu without modifications...
 
-use_tensorboard: true
+use_wandb: true
 log_time: true
 layerwise_logging: true
 use_cuda: false

@@ -101,26 +101,26 @@ class DQNTrainer(Trainer):
             # Logging
             # We hard-coded the 20-step interval for now. Profiling analysis shows it is about 1/10 on time cost
             #   comparing to autograd happening above.
-            if self.use_tensorboard and (self.total_num_steps + current_step) % 100 == 0:
+            if self.use_wandb and (self.total_num_steps + current_step) % 100 == 0:
                 if self.layerwise_logging:
                     for j, layer in enumerate(q_net.parameters()):
-                        self.tb_writer.add_scalar(
+                        self.log_writer.add_scalar(
                             f"{log_prefix}/model/layer-{j}/avg_wt", layer.mean().item(), self.total_num_steps + current_step
                         )
-                        self.tb_writer.add_scalar(
+                        self.log_writer.add_scalar(
                             f"{log_prefix}/model/layer-{j}/std", layer.std().item(), self.total_num_steps + current_step
                         )
-                        self.tb_writer.add_scalar(
+                        self.log_writer.add_scalar(
                             f"{log_prefix}/gradient/layer-{j}/grad_avg",
                             layer.grad.mean().item(),
                             self.total_num_steps + current_step,
                         )
-                        self.tb_writer.add_scalar(
+                        self.log_writer.add_scalar(
                             f"{log_prefix}/gradient/layer-{j}/grad_std",
                             layer.grad.std().item(),
                             self.total_num_steps + current_step,
                         )
-                self.tb_writer.add_scalar(f"{log_prefix}/loss", loss.item(), self.total_num_steps + current_step)
+                self.log_writer.add_scalar(f"{log_prefix}/loss", loss.item(), self.total_num_steps + current_step)
 
         return loss
 
@@ -170,20 +170,20 @@ class DQNTrainer(Trainer):
                             self.logger.info(actions)
                         self.logger.info(rhos)
 
-                        if self.use_tensorboard:
-                            self.tb_writer.add_scalar(
+                        if self.use_wandb:
+                            self.log_writer.add_scalar(
                                 f"{model_prefix}/rhos/host-agent", rhos[0].item(), self.total_num_steps + i
                             )
-                            self.tb_writer.add_scalar(
+                            self.log_writer.add_scalar(
                                 f"{model_prefix}/rhos/host-random", rhos[1].item(), self.total_num_steps + i
                             )
-                            self.tb_writer.add_scalar(
+                            self.log_writer.add_scalar(
                                 f"{model_prefix}/rhos/host-choosefirst", rhos[2].item(), self.total_num_steps + i
                             )
-                            self.tb_writer.add_scalar(
+                            self.log_writer.add_scalar(
                                 f"{model_prefix}/rhos/random-agent", rhos[3].item(), self.total_num_steps + i
                             )
-                            self.tb_writer.add_scalar(
+                            self.log_writer.add_scalar(
                                 f"{model_prefix}/rhos/allcoord-agent", rhos[4].item(), self.total_num_steps + i
                             )
 
